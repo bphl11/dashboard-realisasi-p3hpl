@@ -104,6 +104,11 @@ document.addEventListener(
                 dashboardRawData
             );
 
+            tampilkanDashboardKomponen(
+                dashboardRawData
+            );
+
+
 
             // =================================================
             // TAMPILKAN MONITORING RINGKAS
@@ -1821,5 +1826,11 @@ ${formatPersenDashboard(
     });
 
     container.innerHTML = html;
+
+}
+function tampilkanDashboardKomponen(rawData){
+
+    console.log("Dashboard Komponen aktif");
+    console.log(rawData);
 
 }
