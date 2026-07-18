@@ -86,32 +86,24 @@ document.addEventListener(
                 totalTanpaBlokir
             );
 
+tampilkanCardDashboard(
+    totalTanpaBlokir
+);
 
-            // =================================================
-            // TAMPILKAN CARD
-            // =================================================
+tampilkanGrafikBulanan(
+    dashboardRawData
+);
 
-            tampilkanCardDashboard(
-                totalTanpaBlokir
-            );
+// ==========================
+// Dashboard per Komponen
+// ==========================
+tampilkanDashboardKomponen(
+    dashboardRawData
+);
 
-
-            // =================================================
-            // TAMPILKAN GRAFIK BULANAN
-            // =================================================
-
-            tampilkanGrafikBulanan(
-                dashboardRawData
-            );
-
-
-            // =================================================
-            // TAMPILKAN MONITORING RINGKAS
-            // =================================================
-
-            tampilkanMonitoringDashboard(
-                dashboardRawData
-            );
+tampilkanMonitoringDashboard(
+    dashboardRawData
+);
 
 
         } catch (error) {
@@ -1693,6 +1685,10 @@ function tampilkanDashboardKomponen(rawData) {
 
     const data =
         parseDataMonitoring(rawData);
+    
+    console.log("=== DASHBOARD KOMPONEN ===");
+console.log(data);
+console.log("Jumlah data:", data.length);
 
     const komponenMap =
         new Map();
@@ -1723,6 +1719,8 @@ function tampilkanDashboardKomponen(rawData) {
             Number(item.realisasi) || 0;
 
     });
+
+    console.log("Isi komponenMap:", komponenMap);
 
     let html = "";
 
