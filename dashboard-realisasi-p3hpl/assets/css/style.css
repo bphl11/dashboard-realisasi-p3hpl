@@ -1,0 +1,161 @@
+/* ===============================
+   DASHBOARD REALISASI P3HPHL
+   BPHL XI BANJARBARU
+================================== */
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background:#f4f6f9;
+}
+
+.wrapper{
+    display:flex;
+    min-height:100vh;
+}
+
+/* ================= Sidebar ================= */
+
+.sidebar{
+    width:260px;
+    background:#1B5E20;
+    color:white;
+    padding:25px 20px;
+}
+
+.logo{
+    margin-bottom:40px;
+}
+
+.logo h4{
+    font-weight:bold;
+}
+
+.logo small{
+    color:#d7ffd9;
+}
+
+.sidebar ul{
+    list-style:none;
+    padding-left:0;
+}
+
+.sidebar li{
+    padding:14px 15px;
+    margin-bottom:10px;
+    border-radius:8px;
+    cursor:pointer;
+    transition:.3s;
+}
+
+.sidebar li:hover{
+    background:#2E7D32;
+}
+
+.sidebar li.active{
+    background:white;
+    color:#1B5E20;
+    font-weight:bold;
+}
+
+/* ================= Content ================= */
+
+.content{
+    flex:1;
+    padding:30px;
+}
+
+header{
+    margin-bottom:30px;
+}
+
+header h2{
+    font-weight:bold;
+}
+
+header p{
+    color:#777;
+}
+
+/* ================= Dashboard Card ================= */
+
+.dashboard-card{
+
+    border:none;
+
+    border-radius:15px;
+
+    padding:25px;
+
+    box-shadow:0 5px 15px rgba(0,0,0,.08);
+
+    transition:.3s;
+
+}
+
+.dashboard-card:hover{
+
+    transform:translateY(-5px);
+
+}
+
+.dashboard-card h6{
+
+    color:#777;
+
+}
+
+.dashboard-card h3{
+
+    margin-top:15px;
+
+    color:#1B5E20;
+
+    font-weight:bold;
+
+}
+
+/* ================= Placeholder ================= */
+
+.placeholder-box{
+
+    height:250px;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    background:#fafafa;
+
+    border:2px dashed #ccc;
+
+    border-radius:10px;
+
+    color:#777;
+
+}
+
+/* ================= Responsive ================= */
+
+@media(max-width:991px){
+
+.sidebar{
+
+display:none;
+
+}
+
+.content{
+
+padding:20px;
+
+}
+
+}
