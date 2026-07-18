@@ -1696,12 +1696,16 @@ function tampilkanDashboardKomponen(rawData) {
         return;
     }
 
-    const data =
-        parseDataMonitoring(rawData);
+    const data = parseDataMonitoring(rawData);
+
+console.log("HASIL PARSER");
+console.log(data);
+console.log(data[0]);
+console.log(data[1]);
 
     const komponenMap =
         new Map();
-
+    console.table(data.slice(0,10));
     data.forEach(item => {
 
         if (
