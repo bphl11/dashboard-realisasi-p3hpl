@@ -1698,41 +1698,53 @@ function tampilkanDashboardKomponen(rawData) {
 
     const data = parseDataMonitoring(rawData);
 
-console.log("HASIL PARSER");
-console.log(data);
-console.log(data[0]);
-console.log(data[1]);
+// daftar komponen unik sesuai urutan parser
+const daftarKomponen = [];
 
-    const komponenMap =
-        new Map();
-    console.table(data.slice(0,10));
-    data.forEach(item => {
+data.forEach(item => {
 
-        if (
-            item.isRincian ||
-            !item.komponen
-        ) return;
+    if (!item.komponen) return;
 
-        if (!komponenMap.has(item.komponen)) {
+    if (!daftarKomponen.includes(item.komponen)) {
+        daftarKomponen.push(item.komponen);
+    }
 
-            komponenMap.set(item.komponen, {
-                pagu: 0,
-                realisasi: 0
-            });
+});
 
+const komponenMap = new Map();
+
+daftarKomponen.forEach(namaKomponen => {
+
+    let ringkasan = null;
+
+    if (typeof cariRingkasanHierarki === "function") {
+
+        ringkasan = cariRingkasanHierarki(
+            rawData,
+            "komponen",
+            namaKomponen
+        );
+
+    }
+
+    if (!ringkasan) {
+
+        ringkasan = {
+            pagu: 0,
+            realisasi: 0
+        };
+
+    }
+
+    komponenMap.set(
+        namaKomponen,
+        {
+            pagu: Number(ringkasan.pagu) || 0,
+            realisasi: Number(ringkasan.realisasi) || 0
         }
+    );
 
-        const obj =
-            komponenMap.get(item.komponen);
-
-        obj.pagu +=
-            Number(item.pagu) || 0;
-
-        obj.realisasi +=
-            Number(item.realisasi) || 0;
-
-    });
-
+});
     let html = "";
 
     komponenMap.forEach((nilai, nama) => {
