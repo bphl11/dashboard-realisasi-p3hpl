@@ -1059,280 +1059,189 @@ function tampilkanGrafikBulanan(
 // TAMPILKAN MONITORING RINGKAS
 // ============================================================
 
-function tampilkanMonitoringDashboard(
-    data
-) {
+function tampilkanMonitoringDashboard(rawData) {
 
     const container =
-        document.getElementById(
-            "monitoringDashboard"
-        );
+        document.getElementById("monitoringDashboard");
 
+    if (!container) return;
 
-    if (!container) {
-
-        return;
-
-    }
-
-
-    const hasil = [];
-
-    let akunKode = "";
-    let akunNama = "";
-
-
-    for (
-        let i = 0;
-        i < data.length;
-        i++
-    ) {
-
-        const row =
-            data[i] || [];
-
-
-        const kode =
-            cleanDashboard(
-                row[0]
-            );
-
-
-        const nama =
-            cleanDashboard(
-                row[1]
-            );
-
-
-        // ====================================================
-        // DETEKSI AKUN
-        // ====================================================
-
-        if (
-            /^5\d{5}$/
-                .test(
-                    kode
-                ) &&
-            nama
-                .toLowerCase()
-                .startsWith(
-                    "belanja"
-                )
-        ) {
-
-            akunKode =
-                kode;
-
-            akunNama =
-                nama;
-
-            continue;
-
-        }
-
-
-        if (!akunNama) {
-
-            continue;
-
-        }
-
-
-        // ====================================================
-        // ITEM
-        // ====================================================
-
-        if (
-            !nama ||
-            /^5\d{5}$/
-                .test(
-                    kode
-                )
-        ) {
-
-            continue;
-
-        }
-
-
-        const pagu =
-            parseNumberDashboard(
-                row[5]
-            );
-
-
-        const realisasi =
-            parseNumberDashboard(
-                row[18]
-            );
-
-
-        if (
-            pagu === null
-        ) {
-
-            continue;
-
-        }
-
-
-        hasil.push({
-
-            kode:
-                akunKode,
-
-            akun:
-                akunNama,
-
-            item:
-                nama.replace(
-                    /^\s*-\s*/,
-                    ""
-                ),
-
-            pagu:
-                pagu || 0,
-
-            realisasi:
-                realisasi || 0
-
-        });
-
-
-        if (
-            hasil.length >=
-            10
-        ) {
-
-            break;
-
-        }
-
-    }
-
-
-    if (
-        hasil.length === 0
-    ) {
+    if (typeof parseDataMonitoring !== "function") {
 
         container.innerHTML =
-            "Data Monitoring belum tersedia.";
+            "Parser tidak ditemukan.";
 
         return;
 
     }
 
+    const data =
+        parseDataMonitoring(rawData);
+
+    const subMap = new Map();
+
+    data.forEach(item => {
+
+        if (!item.subKomponen) return;
+
+        const key =
+            item.komponen +
+            "||" +
+            item.subKomponen;
+
+        if (!subMap.has(key)) {
+
+            let summary = null;
+
+            if (
+                typeof cariRingkasanHierarki ===
+                "function"
+            ) {
+
+                summary =
+                    cariRingkasanHierarki(
+
+                        rawData,
+
+                        "subKomponen",
+
+                        item.subKomponen,
+
+                        item.komponen
+
+                    );
+
+            }
+
+            subMap.set(key, {
+
+                komponen:
+                    item.komponen,
+
+                subKomponen:
+                    item.subKomponen,
+
+                pagu:
+                    summary
+                        ? Number(summary.pagu) || 0
+                        : 0,
+
+                realisasi:
+                    summary
+                        ? Number(summary.realisasi) || 0
+                        : 0,
+
+                realisasiDiblokir:
+                    0
+
+            });
+
+        }
+
+        if (
+            item.statusPagu ===
+            "Diblokir"
+        ) {
+
+            subMap.get(key)
+                .realisasiDiblokir +=
+                    Number(item.realisasi) || 0;
+
+        }
+
+    });
 
     let html = `
 
-        <div class="table-responsive">
+<div class="table-responsive">
 
-            <table
-                class="table table-striped table-bordered"
-            >
+<table class="table table-striped table-bordered">
 
-                <thead>
+<thead>
 
-                    <tr>
+<tr>
 
-                        <th>
-                            Kode
-                        </th>
+<th>Komponen</th>
 
-                        <th>
-                            Akun Belanja
-                        </th>
+<th>Sub Komponen</th>
 
-                        <th>
-                            Item
-                        </th>
+<th>Pagu</th>
 
-                        <th>
-                            Pagu
-                        </th>
+<th>Realisasi</th>
 
-                        <th>
-                            Realisasi
-                        </th>
+<th>%</th>
 
-                    </tr>
+</tr>
 
-                </thead>
+</thead>
 
-                <tbody>
+<tbody>
 
-    `;
+`;
 
+    subMap.forEach(item => {
 
-    hasil.forEach(
+        const realisasiTanpaBlokir =
+            Math.max(
+                item.realisasi -
+                item.realisasiDiblokir,
+                0
+            );
 
-        item => {
+        const persen =
+            item.pagu > 0
+                ? (
+                    realisasiTanpaBlokir /
+                    item.pagu
+                  ) * 100
+                : 0;
 
-            html += `
+        html += `
 
-                <tr>
+<tr>
 
-                    <td>
-                        ${escapeHtmlDashboard(
-                            item.kode
-                        )}
-                    </td>
+<td>${escapeHtmlDashboard(item.komponen)}</td>
 
-                    <td>
-                        ${escapeHtmlDashboard(
-                            item.akun
-                        )}
-                    </td>
+<td>${escapeHtmlDashboard(item.subKomponen)}</td>
 
-                    <td>
-                        ${escapeHtmlDashboard(
-                            item.item
-                        )}
-                    </td>
+<td>${formatRupiahDashboard(item.pagu)}</td>
 
-                    <td>
-                        ${formatRupiahDashboard(
-                            item.pagu
-                        )}
-                    </td>
+<td>${formatRupiahDashboard(realisasiTanpaBlokir)}</td>
 
-                    <td>
-                        ${formatRupiahDashboard(
-                            item.realisasi
-                        )}
-                    </td>
+<td>${formatPersenDashboard(persen)}</td>
 
-                </tr>
+</tr>
 
-            `;
+`;
 
-        }
-
-    );
-
+    });
 
     html += `
 
-                </tbody>
+</tbody>
 
-            </table>
+</table>
 
-        </div>
+</div>
 
-        <div class="text-end mt-3">
+<div class="text-end mt-3">
 
-            <a
-                href="monitoring.html"
-                class="btn btn-success btn-sm"
-            >
+<a
+href="monitoring.html"
+class="btn btn-success btn-sm">
 
-                Lihat Semua Monitoring
+Lihat Semua Monitoring
 
-            </a>
+</a>
 
-        </div>
+</div>
 
-    `;
+`;
+
+    container.innerHTML =
+        html;
+
+}
 
 
     container.innerHTML =
