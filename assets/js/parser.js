@@ -1192,7 +1192,22 @@ function hitungRingkasanData(
         // ====================================================
         // AMBIL HANYA DATA DIBLOKIR
         // ====================================================
+        console.log("====================================");
+console.log("PARSER - STATUS");
 
+console.log("Filter Status :", filterStatus);
+
+console.log(
+    "Jumlah semuaDataHierarki :",
+    semuaDataHierarki.length
+);
+
+console.log(
+    "Summary Hierarki :",
+    summaryHierarki
+);
+
+console.log("====================================");
         const dataDiblokir =
 
             semuaDataHierarki.filter(
@@ -1209,7 +1224,15 @@ function hitungRingkasanData(
                 }
 
             );
+            console.log(
+    "Jumlah Data Diblokir :",
+    dataDiblokir.length
+);
 
+console.log(
+    "Ringkasan Diblokir :",
+    ringkasanDiblokir
+);
 
         // ====================================================
         // HITUNG TOTAL DIBLOKIR
