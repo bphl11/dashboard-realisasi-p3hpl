@@ -794,16 +794,24 @@ function updateRingkasanMonitoring() {
 
 
     const ringkasan =
-        hitungRingkasanData(
-            dataMonitoringFiltered,
-            rawMonitoringData,
-            {
-                komponen,
-                subKomponen,
-                akun,
-                status
-            }
-        );
+    hitungRingkasanData(
+        dataMonitoringFiltered,
+        rawMonitoringData,
+        {
+            adaFilter:
+                !!(
+                    komponen ||
+                    subKomponen ||
+                    akun ||
+                    status
+                ),
+
+            komponen,
+            subKomponen,
+            akun,
+            status
+        }
+    );
 
 
     const elPagu =
@@ -847,12 +855,12 @@ function updateRingkasanMonitoring() {
 
     if (elSisa) {
 
-        elSisa.textContent =
-            formatRupiah(
-                ringkasan.Sisa
-            );
+    elSisa.textContent =
+        formatRupiah(
+            ringkasan.sisa
+        );
 
-    }
+}
 
     if (elPersen) {
 
