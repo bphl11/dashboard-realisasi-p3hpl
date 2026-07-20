@@ -1195,11 +1195,11 @@ if (
 
         }
 
+// ====================================================
+// AMBIL HANYA DATA DIBLOKIR
+// ====================================================
 
-        // ====================================================
-        // AMBIL HANYA DATA DIBLOKIR
-        // ====================================================
-        console.log("====================================");
+console.log("====================================");
 console.log("PARSER - STATUS");
 
 console.log("Filter Status :", filterStatus);
@@ -1215,79 +1215,47 @@ console.log(
 );
 
 console.log("====================================");
-        const dataDiblokir =
 
-            semuaDataHierarki.filter(
+const dataDiblokir =
+    semuaDataHierarki.filter(function (item) {
 
-                function (item) {
+        return (
+            item.statusPagu === "Diblokir"
+        );
 
-                    return (
+    });
 
-                        item.statusPagu ===
-                        "Diblokir"
-
-                    );
-
-                }
-
-            );
-            console.log(
+console.log(
     "Jumlah Data Diblokir :",
     dataDiblokir.length
 );
 
+// ====================================================
+// HITUNG TOTAL DIBLOKIR
+//
+// Menggunakan mekanisme anti double-count.
+// ====================================================
+
+const ringkasanDiblokir =
+    hitungRingkasanDetail(
+        dataDiblokir
+    );
+
+console.log("====================================");
+
 console.log(
-    "Ringkasan Diblokir :",
-    ringkasanDiblokir
+    "PERHITUNGAN STATUS HIERARKI"
 );
 
-        // ====================================================
-        // HITUNG TOTAL DIBLOKIR
-        //
-        // Menggunakan mekanisme anti double-count.
-        // ====================================================
+console.log(
+    "Summary Semua:",
+    summaryHierarki
+);
 
-        const ringkasanDiblokir =
-
-            hitungRingkasanDetail(
-
-                dataDiblokir
-
-            );
-
-
-        console.log(
-
-            "===================================="
-
-        );
-
-
-        console.log(
-
-            "PERHITUNGAN STATUS HIERARKI"
-
-        );
-
-
-        console.log(
-
-            "Summary Semua:",
-
-            summaryHierarki
-
-        );
-
-
-        console.log(
-
-            "Ringkasan Diblokir:",
-
-            ringkasanDiblokir
-
-        );
-
-
+console.log(
+    "Ringkasan Diblokir:",
+    ringkasanDiblokir
+);
         // ====================================================
         // STATUS DIBLOKIR
         // ====================================================
