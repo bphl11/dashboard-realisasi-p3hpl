@@ -19,6 +19,8 @@ let dataMonitoring = [];
 
 let dataMonitoringFiltered = [];
 
+let rawMonitoringData = [];
+
 let monitoringTable = null;
 
 
@@ -186,20 +188,20 @@ async function loadMonitoring() {
 
 
         console.log(
-            "Monitoring: jumlah baris mentah:",
-            rawData.length
-        );
+    "Monitoring: jumlah baris mentah:",
+    rawData.length
+);
 
+rawMonitoringData = rawData;
 
-        // ====================================================
-        // PARSE DATA
-        // ====================================================
+// ====================================================
+// PARSE DATA
+// ====================================================
 
-        dataMonitoring =
-            parseDataMonitoring(
-                rawData
-            );
-
+dataMonitoring =
+    parseDataMonitoring(
+        rawData
+    );
 
         console.log(
             "Monitoring: jumlah data hasil parser:",
@@ -220,6 +222,12 @@ async function loadMonitoring() {
         // ====================================================
 
         isiFilterMonitoring();
+
+        // ====================================================
+// UPDATE RINGKASAN
+// ====================================================
+
+updateRingkasanMonitoring();
 
 
         // ====================================================
@@ -549,6 +557,10 @@ function pasangEventFilterMonitoring() {
         document.getElementById(
             "filterAkun"
         );
+    const filterStatus =
+    document.getElementById(
+        "filterStatus"
+    );
 
 
     // ========================================================
@@ -611,7 +623,18 @@ function pasangEventFilterMonitoring() {
     // ========================================================
     // AKUN BERUBAH
     // ========================================================
+    if (filterStatus) {
 
+    filterStatus.addEventListener(
+        "change",
+        function () {
+
+            jalankanFilterMonitoring();
+
+        }
+    );
+
+}
     if (filterAkun) {
 
         filterAkun.addEventListener(
@@ -626,7 +649,6 @@ function pasangEventFilterMonitoring() {
     }
 
 }
-
 
 // ============================================================
 // JALANKAN FILTER
@@ -652,10 +674,15 @@ function jalankanFilterMonitoring() {
         )?.value || "";
 
 
+    const status =
+        document.getElementById(
+            "filterStatus"
+        )?.value || "";
+
+
     dataMonitoringFiltered =
         dataMonitoring.filter(
             function (item) {
-
 
                 // ============================================
                 // FILTER KOMPONEN
@@ -663,8 +690,7 @@ function jalankanFilterMonitoring() {
 
                 if (
                     komponen &&
-                    item.komponen !==
-                    komponen
+                    item.komponen !== komponen
                 ) {
 
                     return false;
@@ -678,8 +704,7 @@ function jalankanFilterMonitoring() {
 
                 if (
                     subKomponen &&
-                    item.subKomponen !==
-                    subKomponen
+                    item.subKomponen !== subKomponen
                 ) {
 
                     return false;
@@ -693,8 +718,21 @@ function jalankanFilterMonitoring() {
 
                 if (
                     akun &&
-                    item.akun !==
-                    akun
+                    item.akun !== akun
+                ) {
+
+                    return false;
+
+                }
+
+
+                // ============================================
+                // FILTER STATUS
+                // ============================================
+
+                if (
+                    status &&
+                    item.statusPagu !== status
                 ) {
 
                     return false;
@@ -714,13 +752,118 @@ function jalankanFilterMonitoring() {
     );
 
 
+    // ========================================================
+    // UPDATE RINGKASAN
+    // ========================================================
+
+    updateRingkasanMonitoring();
+        // ========================================================
+    // RENDER TABEL
+    // ========================================================
+
     renderMonitoring(
         dataMonitoringFiltered
     );
 
 }
+        // ============================================================
+// UPDATE RINGKASAN MONITORING
+// ============================================================
+
+function updateRingkasanMonitoring() {
+
+    const komponen =
+        document.getElementById(
+            "filterKomponen"
+        )?.value || "";
+
+    const subKomponen =
+        document.getElementById(
+            "filterSubKomponen"
+        )?.value || "";
+
+    const akun =
+        document.getElementById(
+            "filterAkun"
+        )?.value || "";
+
+    const status =
+        document.getElementById(
+            "filterStatus"
+        )?.value || "";
 
 
+    const ringkasan =
+        hitungRingkasanData(
+            dataMonitoringFiltered,
+            rawMonitoringData,
+            {
+                komponen,
+                subKomponen,
+                akun,
+                status
+            }
+        );
+
+
+    const elPagu =
+        document.getElementById(
+            "monitorPagu"
+        );
+
+    const elRealisasi =
+        document.getElementById(
+            "monitorRealisasi"
+        );
+
+    const elSisa =
+        document.getElementById(
+            "monitorSisa"
+        );
+
+    const elPersen =
+        document.getElementById(
+            "monitorPersen"
+        );
+
+
+    if (elPagu) {
+
+        elPagu.textContent =
+            formatRupiah(
+                ringkasan.totalPagu
+            );
+
+    }
+
+    if (elRealisasi) {
+
+        elRealisasi.textContent =
+            formatRupiah(
+                ringkasan.totalRealisasi
+            );
+
+    }
+
+    if (elSisa) {
+
+        elSisa.textContent =
+            formatRupiah(
+                ringkasan.totalSisa
+            );
+
+    }
+
+    if (elPersen) {
+
+        elPersen.textContent =
+            formatPersen(
+                ringkasan.persenRealisasi
+            );
+
+    }
+
+}
 // ============================================================
 // RENDER TABEL MONITORING
 // ============================================================
