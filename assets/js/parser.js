@@ -1084,7 +1084,13 @@ function hitungRingkasanData(
     //
     // dan Normal tidak mungkin lebih besar dari Summary.
     // ========================================================
-
+    console.log("=== CEK KONDISI STATUS ===");
+console.log({
+    summaryHierarki: !!summaryHierarki,
+    filterStatus,
+    filterAkun,
+    filterCari
+});
     if (
         summaryHierarki &&
         filterStatus &&
