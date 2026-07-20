@@ -1667,6 +1667,7 @@ function cariRingkasanHierarki(
         normalisasiNamaUntukPencarian(
             parentKomponen
         );
+    console.log("TARGET =", target);
 
 
     if (!target) {
@@ -1747,6 +1748,7 @@ function cariRingkasanHierarki(
             komponenAktif =
                 namaBersih ||
                 namaAsli;
+            console.log("KOMPONEN RAW =", komponenAktif);
 
 
             subKomponenKodeAktif =
@@ -1763,6 +1765,12 @@ function cariRingkasanHierarki(
                         komponenAktif,
                         target
                     )
+                    console.log(
+    "BANDINGKAN:",
+    komponenAktif,
+    "<->",
+    target
+);
                 ) {
 
                     return buatRingkasanDariRawRow(
