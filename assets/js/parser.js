@@ -1068,28 +1068,31 @@ function hitungRingkasanData(
 
 
     // ========================================================
-    // 4. FILTER STATUS PADA KOMPONEN / SUB KOMPONEN
-    //
-    // ATURAN:
-    //
-    // Semua     = Summary Excel
-    //
-    // Diblokir  = nilai detail yang benar-benar diblokir
-    //
-    // Normal    = Summary Excel - Diblokir
-    //
-    // Dengan demikian:
-    //
-    // Normal + Diblokir = Semua
-    //
-    // dan Normal tidak mungkin lebih besar dari Summary.
-    // ========================================================
-    console.log("=== CEK KONDISI STATUS ===");
+// 4. FILTER STATUS PADA KOMPONEN / SUB KOMPONEN
+//
+// ATURAN:
+//
+// Semua     = Summary Excel
+//
+// Diblokir  = nilai detail yang benar-benar diblokir
+//
+// Normal    = Summary Excel - Diblokir
+//
+// Dengan demikian:
+//
+// Normal + Diblokir = Semua
+//
+// dan Normal tidak mungkin lebih besar dari Summary.
+// ========================================================
+
+console.log("=== CEK KONDISI STATUS ===");
 console.log({
     summaryHierarki: !!summaryHierarki,
     filterStatus,
     filterAkun,
     filterCari
+});
+
 if (
     summaryHierarki &&
     filterStatus &&
@@ -1099,22 +1102,19 @@ if (
 
     console.log(">>> MASUK BLOK STATUS <<<");
 
-        // ====================================================
-        // AMBIL SEMUA DATA DALAM HIERARKI
-        //
-        // Jangan gunakan dataDetail karena dataDetail sudah
-        // terkena filter Status.
-        // ====================================================
+    // ====================================================
+    // AMBIL SEMUA DATA DALAM HIERARKI
+    // ====================================================
 
-        let semuaDataHierarki =
+    let semuaDataHierarki =
 
-            Array.isArray(
-                window.dataLaporan
-            )
+        Array.isArray(
+            window.dataLaporan
+        )
 
-                ? window.dataLaporan
+            ? window.dataLaporan
 
-                : [];
+            : [];
 
 
         // ====================================================
