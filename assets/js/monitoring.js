@@ -791,7 +791,20 @@ function updateRingkasanMonitoring() {
         document.getElementById(
             "filterStatus"
         )?.value || "";
+    console.log("====================================");
+console.log("MONITORING - PARAMETER");
 
+console.log("Komponen :", komponen);
+console.log("Sub Komponen :", subKomponen);
+console.log("Akun :", akun);
+console.log("Status :", status);
+
+console.log(
+    "Jumlah dataMonitoringFiltered :",
+    dataMonitoringFiltered.length
+);
+
+console.log("====================================");
 
     const ringkasan =
     hitungRingkasanData(
