@@ -1090,13 +1090,14 @@ console.log({
     filterStatus,
     filterAkun,
     filterCari
-});
-    if (
-        summaryHierarki &&
-        filterStatus &&
-        !filterAkun &&
-        !filterCari
-    ) {
+if (
+    summaryHierarki &&
+    filterStatus &&
+    !filterAkun &&
+    !filterCari
+) {
+
+    console.log(">>> MASUK BLOK STATUS <<<");
 
         // ====================================================
         // AMBIL SEMUA DATA DALAM HIERARKI
