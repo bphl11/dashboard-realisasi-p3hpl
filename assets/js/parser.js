@@ -1759,18 +1759,18 @@ function cariRingkasanHierarki(
                 level ===
                 "komponen"
             ) {
-
-                if (
-                    namaSama(
-                        komponenAktif,
-                        target
-                    )
-                    console.log(
+                console.log(
     "BANDINGKAN:",
     komponenAktif,
     "<->",
     target
 );
+                if (
+                    namaSama(
+                        komponenAktif,
+                        target
+                    )
+                    
                 ) {
 
                     return buatRingkasanDariRawRow(
