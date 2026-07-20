@@ -831,7 +831,7 @@ function updateRingkasanMonitoring() {
 
         elPagu.textContent =
             formatRupiah(
-                ringkasan.totalPagu
+                ringkasan.pagu
             );
 
     }
@@ -840,7 +840,7 @@ function updateRingkasanMonitoring() {
 
         elRealisasi.textContent =
             formatRupiah(
-                ringkasan.totalRealisasi
+                ringkasan.realisasi
             );
 
     }
@@ -849,7 +849,7 @@ function updateRingkasanMonitoring() {
 
         elSisa.textContent =
             formatRupiah(
-                ringkasan.totalSisa
+                ringkasan.Sisa
             );
 
     }
@@ -858,7 +858,7 @@ function updateRingkasanMonitoring() {
 
         elPersen.textContent =
             formatPersen(
-                ringkasan.persenRealisasi
+                ringkasan.persen
             );
 
     }
