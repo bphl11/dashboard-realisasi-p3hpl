@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audit Parser V4</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/audit.css">
+</head>
+<body>
+
+<div class="wrapper">
+
+<aside class="sidebar">
+<div class="logo">
+<h4>🌲 BPHL XI</h4>
+<small>Dashboard Realisasi</small>
+</div>
+
+<ul>
+<li onclick="window.location.href='index.html'" style="cursor:pointer;">
+<i class="bi bi-house"></i> Dashboard
+</li>
+
+<li onclick="window.location.href='monitoring.html'" style="cursor:pointer;">
+<i class="bi bi-table"></i> Monitoring
+</li>
+
+<li onclick="window.location.href='grafik.html'" style="cursor:pointer;">
+<i class="bi bi-bar-chart"></i> Grafik
+</li>
+
+<li onclick="window.location.href='laporan.html'" style="cursor:pointer;">
+<i class="bi bi-file-earmark-text"></i> Laporan
+</li>
+
+<li class="active" onclick="window.location.href='audit.html'" style="cursor:pointer;">
+<i class="bi bi-shield-check"></i> Audit Parser
+</li>
+</ul>
+</aside>
+
+<main class="content">
+
+<header>
+<h2>Audit Parser V4</h2>
+<p>Dashboard Validasi Parser Monitoring RKAKL</p>
+</header>
+
+<section class="audit-section">
+<h3>📊 Ringkasan Audit</h3>
+<div id="summary"></div>
+</section>
+
+<section class="audit-section">
+<h3>📈 Statistik Audit</h3>
+<div id="chartArea"></div>
+</section>
+
+<section class="audit-section">
+<h3>🔍 Filter Audit</h3>
+<div id="filterArea"></div>
+</section>
+
+<section class="audit-section">
+<h3>📋 Hasil Audit</h3>
+<div id="auditTable"></div>
+</section>
+
+<div id="detailModal" class="audit-modal" style="display:none;">
+<div class="audit-modal-content">
+<div class="audit-modal-header">
+<h2>Detail Audit</h2>
+<button onclick="tutupModal()">✕</button>
+</div>
+<div id="detailContent"></div>
+</div>
+</div>
+
+<div id="loading" class="loading-overlay" style="display:none;">
+<div class="loading-box">
+<h2>Audit Parser V4</h2>
+<p>Memproses Data...</p>
+<div class="loading-spinner">⏳</div>
+</div>
+</div>
+
+<footer class="audit-footer">
+<hr>
+<p>Audit Parser V4<br>Balai Pengelolaan Hutan Lestari Wilayah XI Banjarbaru</p>
+</footer>
+
+</main>
+</div>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/audit-trace.js"></script>
+<script src="assets/js/validator.js"></script>
+<script src="assets/js/audit-parser.js"></script>
+<script src="assets/js/audit-ui.js"></script>
+<script src="assets/js/parser.js"></script>
+
+<script>
+function updateJam(){
+ const s=new Date();
+ const t=document.getElementById("auditTanggal");
+ const j=document.getElementById("auditJam");
+ if(t) t.innerHTML=s.toLocaleDateString("id-ID");
+ if(j) j.innerHTML=s.toLocaleTimeString("id-ID");
+}
+setInterval(updateJam,1000);
+
+function bukaModal(html){
+ document.getElementById("detailContent").innerHTML=html;
+ document.getElementById("detailModal").style.display="block";
+}
+function tutupModal(){
+ document.getElementById("detailModal").style.display="none";
+}
+</script>
+
+</body>
+</html>
