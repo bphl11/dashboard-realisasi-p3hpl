@@ -1,6 +1,6 @@
 // ============================================================
-// AUDIT-UI.JS
-// Dashboard Audit Parser V3
+// AUDIT UI V4
+// Dashboard Audit Monitoring
 // ============================================================
 
 "use strict";
@@ -10,441 +10,829 @@
 // ============================================================
 
 let auditData = [];
+
+let auditView = [];
+
 let auditFilter = "Semua";
+
+let auditKeyword = "";
 
 // ============================================================
 // TAMPILKAN AUDIT
 // ============================================================
 
-function tampilkanAudit(data) {
+function tampilkanAudit(data){
 
-    if (!Array.isArray(data)) {
+    if(!Array.isArray(data)){
 
-        console.error("Audit UI : data bukan array");
+        console.error("Audit UI : Data bukan array");
 
         return;
 
     }
 
-    auditData = data;
+   auditData=data;
 
-    tampilSummary();
+auditView=[...data];
 
-    tampilFilter();
+tampilSummary();
 
-    tampilTable();
+tampilFilter();
 
+tampilChart();
+
+tampilTable();
 }
-
 // ============================================================
 // SUMMARY
 // ============================================================
 
-function tampilSummary() {
+function tampilSummary(){
 
-    const totalExcel =
-        auditData.reduce(
-            (a, b) => a + (b.paguExcel || 0),
-            0
-        );
+    let totalExcel = 0;
 
-    const totalParser =
-        auditData.reduce(
-            (a, b) => a + (b.paguParser || 0),
-            0
-        );
+    let totalParser = 0;
 
-    const totalDouble =
-        auditData.filter(i => i.doubleCount).length;
+    let critical = 0;
 
-    const totalStatus =
-        auditData.filter(i => i.salahStatus).length;
+    let major = 0;
 
-    const totalTidak =
-        auditData.filter(i => !i.terbaca).length;
+    let warning = 0;
 
-    const totalPagu =
-        auditData.filter(i => i.bedaPagu).length;
+    let info = 0;
 
-    document.getElementById("summary").innerHTML = `
+    let ok = 0;
 
-<div class="audit-summary">
+    auditData.forEach(function(item){
 
-<div class="card">
+        totalExcel += Number(item.paguExcel) || 0;
 
-<h4>Total Excel</h4>
+        totalParser += Number(item.paguParser) || 0;
 
-<h2>${formatRupiah(totalExcel)}</h2>
+        switch(item.severity){
 
-</div>
+            case "CRITICAL":
+                critical++;
+                break;
 
-<div class="card">
+            case "MAJOR":
+                major++;
+                break;
 
-<h4>Total Parser</h4>
+            case "WARNING":
+                warning++;
+                break;
 
-<h2>${formatRupiah(totalParser)}</h2>
+            case "INFO":
+                info++;
+                break;
 
-</div>
+            default:
+                ok++;
+                break;
 
-<div class="card">
+        }
 
-<h4>Selisih</h4>
+    });
 
-<h2>${formatRupiah(totalParser-totalExcel)}</h2>
+    const selisih = totalParser - totalExcel;
 
-</div>
+    let html = "";
 
-<div class="card merah">
+    html += "<div class='audit-summary'>";
 
-<h4>Double Count</h4>
+    html += "<table class='summary-table'>";
 
-<h2>${totalDouble}</h2>
+    html += "<tr><td>Total Excel</td><td>" + formatRupiah(totalExcel) + "</td></tr>";
 
-</div>
+    html += "<tr><td>Total Parser</td><td>" + formatRupiah(totalParser) + "</td></tr>";
 
-<div class="card kuning">
+    html += "<tr><td>Selisih</td><td>" + formatRupiah(selisih) + "</td></tr>";
 
-<h4>Status</h4>
+    html += "<tr><td>CRITICAL</td><td>" + critical + "</td></tr>";
 
-<h2>${totalStatus}</h2>
+    html += "<tr><td>MAJOR</td><td>" + major + "</td></tr>";
 
-</div>
+    html += "<tr><td>WARNING</td><td>" + warning + "</td></tr>";
 
-<div class="card merah">
+    html += "<tr><td>INFO</td><td>" + info + "</td></tr>";
 
-<h4>Tidak Terbaca</h4>
+    html += "<tr><td>OK</td><td>" + ok + "</td></tr>";
 
-<h2>${totalTidak}</h2>
+    html += "</table>";
 
-</div>
+    html += "</div>";
 
-<div class="card orange">
-
-<h4>Pagu Berbeda</h4>
-
-<h2>${totalPagu}</h2>
-
-</div>
-
-</div>
-
-`;
+    document.getElementById("summary").innerHTML = html;
 
 }
-
 // ============================================================
 // FILTER
 // ============================================================
 
-function tampilFilter() {
+function tampilFilter(){
 
-document.getElementById("filterArea").innerHTML=`
+    let html = "";
 
-<select id="auditFilter">
+    html += "<div class='audit-filter'>";
 
-<option>Semua</option>
+    // ============================================
+    // FILTER SEVERITY
+    // ============================================
 
-<option>Double Count</option>
+    html += "<label>Severity</label>";
 
-<option>Tidak Terbaca</option>
+    html += "<select id='filterSeverity'>";
 
-<option>Status Berubah</option>
+    html += "<option value='Semua'>Semua</option>";
 
-<option>Pagu Berbeda</option>
+    html += "<option value='CRITICAL'>CRITICAL</option>";
 
-</select>
+    html += "<option value='MAJOR'>MAJOR</option>";
 
-<input
+    html += "<option value='WARNING'>WARNING</option>";
 
-type="text"
+    html += "<option value='INFO'>INFO</option>";
 
-id="auditCari"
+    html += "<option value='OK'>OK</option>";
 
-placeholder="Cari Item..."
+    html += "</select>";
 
->
+    // ============================================
+    // FILTER ERROR
+    // ============================================
 
-`;
+    html += "<label>Error</label>";
 
-document
-.getElementById("auditFilter")
-.onchange=function(){
+    html += "<select id='filterError'>";
 
-auditFilter=this.value;
+    html += "<option value='Semua'>Semua</option>";
 
-tampilTable();
+    html += "<option value='Double Count'>Double Count</option>";
 
-};
+    html += "<option value='Duplicate AuditID'>Duplicate AuditID</option>";
 
-document
-.getElementById("auditCari")
-.onkeyup=function(){
+    html += "<option value='Parent + Rincian'>Parent + Rincian</option>";
 
-tampilTable();
+    html += "<option value='Status Berubah'>Status Berubah</option>";
 
-};
+    html += "<option value='Pagu Berbeda'>Pagu Berbeda</option>";
+
+    html += "<option value='Output Kosong'>Output Kosong</option>";
+
+    html += "<option value='Komponen Kosong'>Komponen Kosong</option>";
+
+    html += "<option value='Sub Komponen Kosong'>Sub Komponen Kosong</option>";
+
+    html += "<option value='Akun Kosong'>Akun Kosong</option>";
+
+    html += "</select>";
+
+    // ============================================
+    // SEARCH
+    // ============================================
+
+   html += "<label>Cari</label>";
+
+html += "<input";
+html += " type='text'";
+html += " id='filterKeyword'";
+html += " placeholder='Cari uraian...'";
+html += ">";
+
+html += "<button onclick='exportCSV()'>CSV</button>";
+html += "<button onclick='exportJSON()'>JSON</button>";
+html += "<button onclick='printAudit()'>Print</button>";
+
+html += "</div>";
+
+    document.getElementById("filterArea").innerHTML = html;
+
+    // ============================================
+    // EVENT
+    // ============================================
+
+    document.getElementById("filterSeverity").onchange = function(){
+
+        auditFilter = this.value;
+
+        dataFilter();
+
+    };
+
+    document.getElementById("filterError").onchange = function(){
+
+        dataFilter();
+
+    };
+
+    document.getElementById("filterKeyword").onkeyup = function(){
+
+        auditKeyword = this.value;
+
+        dataFilter();
+
+    };
 
 }
-
 // ============================================================
 // FILTER DATA
 // ============================================================
 
 function dataFilter(){
 
-let hasil=[...auditData];
+    const severity =
+        document.getElementById("filterSeverity").value;
 
-const cari=document
-.getElementById("auditCari")
-.value
-.toLowerCase();
+    const error =
+        document.getElementById("filterError").value;
 
-if(cari){
+    const keyword =
+        document.getElementById("filterKeyword")
+            .value
+            .trim()
+            .toLowerCase();
 
-hasil=hasil.filter(
+    auditView = auditData.filter(function(item){
 
-i=>
+        // ============================================
+        // FILTER SEVERITY
+        // ============================================
 
-(i.uraian||"")
+        if(
 
-.toLowerCase()
+            severity !== "Semua" &&
 
-.includes(cari)
+            item.severity !== severity
 
-);
+        ){
+
+            return false;
+
+        }
+
+        // ============================================
+        // FILTER ERROR
+        // ============================================
+
+        if(
+
+            error !== "Semua"
+
+        ){
+
+            if(
+
+                !item.errorList ||
+
+                !item.errorList.includes(error)
+
+            ){
+
+                return false;
+
+            }
+
+        }
+
+        // ============================================
+        // FILTER KEYWORD
+        // ============================================
+
+        if(keyword){
+
+            const text = (
+
+                item.uraian ||
+
+                ""
+
+            ).toLowerCase();
+
+            if(
+
+                !text.includes(keyword)
+
+            ){
+
+                return false;
+
+            }
+
+        }
+
+        return true;
+
+    });
+
+    tampilTable();
 
 }
-
-switch(auditFilter){
-
-case"Double Count":
-
-hasil=hasil.filter(
-
-i=>i.doubleCount
-
-);
-
-break;
-
-case"Tidak Terbaca":
-
-hasil=hasil.filter(
-
-i=>!i.terbaca
-
-);
-
-break;
-
-case"Status Berubah":
-
-hasil=hasil.filter(
-
-i=>i.salahStatus
-
-);
-
-break;
-
-case"Pagu Berbeda":
-
-hasil=hasil.filter(
-
-i=>i.bedaPagu
-
-);
-
-break;
-
-}
-
-return hasil;
-
-}
-
 // ============================================================
-// TABEL
+// TAMPILKAN TABEL AUDIT
 // ============================================================
 
 function tampilTable(){
 
-const data=dataFilter();
+    let html = "";
 
-let html="";
+    html += "<table class='audit-table'>";
 
-html+=`
+    html += "<thead>";
 
-<table class="audit-table">
+    html += "<tr>";
 
-<thead>
+    html += "<th>No</th>";
 
-<tr>
+    html += "<th>Row</th>";
 
-<th>No</th>
+    html += "<th>Severity</th>";
 
-<th>Row</th>
+    html += "<th>Uraian</th>";
 
-<th>Item</th>
+    html += "<th>Status Excel</th>";
 
-<th>Status Excel</th>
+    html += "<th>Status Parser</th>";
 
-<th>Status Parser</th>
+    html += "<th>Pagu Excel</th>";
 
-<th>Pagu Excel</th>
+    html += "<th>Pagu Parser</th>";
 
-<th>Pagu Parser</th>
+    html += "<th>Selisih</th>";
 
-<th>Count</th>
+    html += "<th>Error</th>";
 
-<th>Error</th>
+    html += "</tr>";
 
-</tr>
+    html += "</thead>";
 
-</thead>
+    html += "<tbody>";
 
-<tbody>
+    auditView.forEach(function(item,index){
 
-`;
+        let warna = "";
 
-let no=1;
+        switch(item.severity){
 
-data.forEach(item=>{
+            case "CRITICAL":
 
-let warna="";
+                warna = "table-danger";
 
-let error="🟢 OK";
+                break;
 
-if(item.doubleCount){
+            case "MAJOR":
 
-warna="table-danger";
+                warna = "table-warning";
 
-error="🔴 Double Count";
+                break;
 
-}
+            case "WARNING":
 
-else if(!item.terbaca){
+                warna = "table-info";
 
-warna="table-danger";
+                break;
 
-error="🔴 Tidak Terbaca";
+            case "INFO":
 
-}
+                warna = "table-secondary";
 
-else if(item.bedaPagu){
+                break;
 
-warna="table-warning";
+            default:
 
-error="🟠 Pagu Berbeda";
+                warna = "";
 
-}
+        }
 
-else if(item.salahStatus){
+        html += "<tr";
 
-warna="table-info";
+        html += " class='" + warna + "'";
 
-error="🟡 Status";
+        html += " onclick='detailAudit(" + item.rowIndex + ")'>";
 
-}
+        html += "<td>" + (index+1) + "</td>";
 
-html+=`
+        html += "<td>" + item.rowIndex + "</td>";
 
-<tr
+        html += "<td>" + item.severity + "</td>";
 
-class="${warna}"
+        html += "<td>" + (item.uraian || "-") + "</td>";
 
-onclick="detailAudit(${item.rowIndex})"
+        html += "<td>" + item.statusExcel + "</td>";
 
->
+        html += "<td>" + item.statusParser + "</td>";
 
-<td>${no++}</td>
+        html += "<td>" + formatRupiah(item.paguExcel) + "</td>";
 
-<td>${item.rowIndex}</td>
+        html += "<td>" + formatRupiah(item.paguParser) + "</td>";
 
-<td>${item.uraian}</td>
+        html += "<td>" + formatRupiah(item.selisihPagu || 0) + "</td>";
 
-<td>${item.statusExcel}</td>
+        html += "<td>";
 
-<td>${item.statusParser}</td>
+        if(item.errorList.length){
 
-<td>${formatRupiah(item.paguExcel)}</td>
+            html += item.errorList.join("<br>");
 
-<td>${formatRupiah(item.paguParser)}</td>
+        }else{
 
-<td>${item.count}</td>
+            html += "-";
 
-<td>${error}</td>
+        }
 
-</tr>
+        html += "</td>";
 
-`;
+        html += "</tr>";
 
-});
+    });
 
-html+=`
+    html += "</tbody>";
 
-</tbody>
+    html += "</table>";
 
-</table>
-
-`;
-
-document
-.getElementById("auditTable")
-.innerHTML=html;
+    document.getElementById("auditTable").innerHTML = html;
 
 }
-
 // ============================================================
-// DETAIL
+// DETAIL AUDIT
 // ============================================================
 
-function detailAudit(row){
+function detailAudit(rowIndex){
 
-const item=
+    const item = auditData.find(function(i){
 
-auditData.find(
+        return i.rowIndex === rowIndex;
 
-i=>i.rowIndex===row
+    });
 
-);
+    if(!item){
 
-if(!item){
+        alert("Data tidak ditemukan.");
 
-return;
+        return;
+
+    }
+
+    let pesan = "";
+
+    pesan += "========== DETAIL AUDIT ==========\n\n";
+
+    pesan += "Row Excel : " + item.rowIndex + "\n";
+
+    pesan += "Audit ID : " + item.auditId + "\n\n";
+
+    pesan += "Uraian :\n";
+
+    pesan += item.uraian + "\n\n";
+
+    pesan += "Severity : " + item.severity + "\n\n";
+
+    pesan += "Status Excel : ";
+
+    pesan += item.statusExcel + "\n";
+
+    pesan += "Status Parser : ";
+
+    pesan += item.statusParser + "\n\n";
+
+    pesan += "Pagu Excel : ";
+
+    pesan += formatRupiah(item.paguExcel) + "\n";
+
+    pesan += "Pagu Parser : ";
+
+    pesan += formatRupiah(item.paguParser) + "\n";
+
+    pesan += "Selisih : ";
+
+    pesan += formatRupiah(item.selisihPagu || 0) + "\n\n";
+
+    pesan += "Jumlah Parser Rows : ";
+
+    pesan += item.parserRows.length + "\n\n";
+
+    pesan += "ERROR :\n";
+
+    if(item.errorList.length){
+
+        item.errorList.forEach(function(err){
+
+            pesan += "• " + err + "\n";
+
+        });
+
+    }else{
+
+        pesan += "Tidak ada error.\n";
+
+    }
+
+    console.clear();
+
+    console.log("====================================");
+
+    console.log("DETAIL AUDIT");
+
+    console.log("====================================");
+
+    console.table(item);
+
+    console.log("Parser Rows");
+
+    console.table(item.parserRows);
+
+alert(pesan);
+
+tampilTraceViewer(rowIndex);
 
 }
+// ============================================================
+// TRACE VIEWER
+// ============================================================
 
-console.clear();
+function tampilTraceViewer(rowIndex){
 
-console.log("================================");
+    if(typeof getTrace !== "function"){
 
-console.log("DETAIL AUDIT");
+        console.warn("audit-trace.js belum dimuat.");
 
-console.log("================================");
+        return;
 
-console.table(item);
+    }
 
-const trace = getTrace(row);
+    const trace = getTrace(rowIndex);
 
-if(trace){
+    if(!trace){
 
-    console.log("TRACE");
+        alert("Trace tidak ditemukan.");
+
+        return;
+
+    }
+
+    console.clear();
+
+    console.log("====================================");
+
+    console.log("TRACE VIEWER");
+
+    console.log("====================================");
+
+    console.log("Row :", rowIndex);
 
     console.table(trace.langkah);
 
+    if(trace.error.length){
+
+        console.log("====================================");
+
+        console.log("ERROR");
+
+        console.table(trace.error);
+
+    }
+
+    let pesan="";
+
+    pesan+="========== TRACE ==========\n\n";
+
+    pesan+="Row : "+rowIndex+"\n\n";
+
+    trace.langkah.forEach(function(step,index){
+
+        pesan+=(index+1)+". "+step.nama+"\n";
+
+    });
+
+    if(trace.error.length){
+
+        pesan+="\nERROR\n";
+
+        trace.error.forEach(function(err){
+
+            pesan+="• "+err+"\n";
+
+        });
+
+    }
+
+alert(pesan);
+
 }
+// ============================================================
+// EXPORT CSV
+// ============================================================
 
-console.log("================================");
+function exportCSV(){
 
-alert(
+    if(!auditView.length){
 
-"Row Excel : "+row+
+        alert("Tidak ada data.");
 
-"\n\n"
+        return;
 
-+"Lihat Console (F12)"
+    }
 
-);
+    let csv="";
+
+    csv+="Row,Uraian,Severity,Status Excel,Status Parser,";
+
+    csv+="Pagu Excel,Pagu Parser,Selisih,Error\n";
+
+    auditView.forEach(function(item){
+
+        csv+=item.rowIndex+",";
+
+        csv+="\""+(item.uraian||"")+"\",";
+        csv+=item.severity+",";
+        csv+=item.statusExcel+",";
+        csv+=item.statusParser+",";
+        csv+=item.paguExcel+",";
+        csv+=item.paguParser+",";
+        csv+=item.selisihPagu+",";
+
+        csv+="\""+item.errorList.join(" | ")+"\"";
+
+        csv+="\n";
+
+    });
+
+    const blob=new Blob(
+
+        [csv],
+
+        {
+
+            type:"text/csv;charset=utf-8;"
+
+        }
+
+    );
+
+    const url=
+
+        URL.createObjectURL(blob);
+
+    const a=
+
+        document.createElement("a");
+
+    a.href=url;
+
+    a.download="AuditParser.csv";
+
+    a.click();
+
+    URL.revokeObjectURL(url);
+
+}
+// ============================================================
+// EXPORT JSON
+// ============================================================
+
+function exportJSON(){
+
+    const json=
+
+        JSON.stringify(
+
+            auditView,
+
+            null,
+
+            2
+
+        );
+
+    const blob=
+
+        new Blob(
+
+            [json],
+
+            {
+
+                type:"application/json"
+
+            }
+
+        );
+
+    const url=
+
+        URL.createObjectURL(blob);
+
+    const a=
+
+        document.createElement("a");
+
+    a.href=url;
+
+    a.download="AuditParser.json";
+
+    a.click();
+
+    URL.revokeObjectURL(url);
+
+}
+// ============================================================
+// PRINT
+// ============================================================
+
+function printAudit(){
+
+    window.print();
+
+}
+// ============================================================
+// DASHBOARD CHART
+// ============================================================
+
+function tampilChart(){
+
+    let critical=0;
+    let major=0;
+    let warning=0;
+    let info=0;
+    let ok=0;
+
+    auditData.forEach(function(item){
+
+        switch(item.severity){
+
+            case "CRITICAL":
+                critical++;
+                break;
+
+            case "MAJOR":
+                major++;
+                break;
+
+            case "WARNING":
+                warning++;
+                break;
+
+            case "INFO":
+                info++;
+                break;
+
+            default:
+                ok++;
+        }
+
+    });
+
+    let html="";
+
+    html+="<table class='chart-table'>";
+
+    html+="<tr>";
+    html+="<th>Severity</th>";
+    html+="<th>Jumlah</th>";
+    html+="<th>Grafik</th>";
+    html+="</tr>";
+
+    html+=buatBarisChart("CRITICAL",critical,"#d9534f");
+    html+=buatBarisChart("MAJOR",major,"#f0ad4e");
+    html+=buatBarisChart("WARNING",warning,"#5bc0de");
+    html+=buatBarisChart("INFO",info,"#777777");
+    html+=buatBarisChart("OK",ok,"#5cb85c");
+
+    html+="</table>";
+
+    document.getElementById("chartArea").innerHTML=html;
+
+}
+// ============================================================
+// BARIS CHART
+// ============================================================
+
+function buatBarisChart(judul,jumlah,warna){
+
+    return `
+
+<tr>
+
+<td>${judul}</td>
+
+<td>${jumlah}</td>
+
+<td>
+
+<div
+style="
+background:${warna};
+height:18px;
+width:${jumlah*8}px;
+border-radius:4px;
+">
+
+</div>
+
+</td>
+
+</tr>
+
+`;
 
 }
