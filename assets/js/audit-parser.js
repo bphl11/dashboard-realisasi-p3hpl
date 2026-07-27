@@ -150,6 +150,31 @@ const uraian = clean(row[1] || "");
 if (!uraian) {
     return;
 }
+        // ============================================
+// LEWATI BARIS PARENT
+// Parser memang tidak menyimpan:
+// - Kegiatan
+// - Output
+// - Komponen
+// - Sub Komponen
+// ============================================
+
+const kode = clean(row[0] || "");
+
+if (
+    /^\d{4}$/.test(kode) ||
+    /^\d{4}\.[A-Z0-9]+$/i.test(kode) ||
+    /^\d{4}\.[A-Z0-9]+\.\d{3}$/i.test(kode) ||
+    /^\d{4}\.[A-Z0-9]+\.\d{3}\.\d{3}$/i.test(kode)
+){
+    return;
+}
+
+const subHuruf = deteksiSubKomponenHuruf(row);
+
+if(subHuruf){
+    return;
+}
 
         const parserRows=
             parserMap.get(index)||[];
