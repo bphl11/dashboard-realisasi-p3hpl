@@ -143,15 +143,74 @@ function updateJam(){
  if(t) t.innerHTML=s.toLocaleDateString("id-ID");
  if(j) j.innerHTML=s.toLocaleTimeString("id-ID");
 }
+<script>
+
+document.addEventListener("DOMContentLoaded", async function () {
+
+    try {
+
+        if (typeof showLoading === "function") {
+            showLoading();
+        }
+
+        console.log("=== MEMULAI AUDIT PARSER ===");
+
+        const rawData = await getSheetData();
+
+        console.log("Jumlah baris:", rawData.length);
+
+        auditParser(rawData);
+
+        console.log("Audit selesai.");
+
+    } catch (err) {
+
+        console.error("ERROR AUDIT:", err);
+
+    } finally {
+
+        if (typeof hideLoading === "function") {
+            hideLoading();
+        }
+
+    }
+
+});
+
+</script>
+
+<script>
+
+function updateJam(){
+
+    const s = new Date();
+
+    const t = document.getElementById("auditTanggal");
+
+    const j = document.getElementById("auditJam");
+
+    if(t) t.innerHTML = s.toLocaleDateString("id-ID");
+
+    if(j) j.innerHTML = s.toLocaleTimeString("id-ID");
+
+}
+
 setInterval(updateJam,1000);
 
 function bukaModal(html){
- document.getElementById("detailContent").innerHTML=html;
- document.getElementById("detailModal").style.display="block";
+
+    document.getElementById("detailContent").innerHTML = html;
+
+    document.getElementById("detailModal").style.display = "block";
+
 }
+
 function tutupModal(){
- document.getElementById("detailModal").style.display="none";
+
+    document.getElementById("detailModal").style.display = "none";
+
 }
+
 </script>
 
 </body>
