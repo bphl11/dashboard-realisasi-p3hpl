@@ -425,6 +425,16 @@ console.log("================================");
 
 console.table(item);
 
+const trace = getTrace(row);
+
+if(trace){
+
+    console.log("TRACE");
+
+    console.table(trace.langkah);
+
+}
+
 console.log("================================");
 
 alert(
