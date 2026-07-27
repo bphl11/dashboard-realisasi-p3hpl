@@ -100,7 +100,41 @@
 <script src="assets/js/audit-parser.js"></script>
 <script src="assets/js/audit-ui.js"></script>
 <script src="assets/js/parser.js"></script>
+<script>
 
+document.addEventListener("DOMContentLoaded", async function () {
+
+    try {
+
+        if (typeof showLoading === "function") {
+            showLoading();
+        }
+
+        console.log("=== MEMULAI AUDIT PARSER ===");
+
+        // Ambil data Google Sheet
+        const rawData = await getSheetData();
+
+        console.log("Jumlah baris:", rawData.length);
+
+        // Jalankan Audit
+        auditParser(rawData);
+
+        console.log("Audit selesai.");
+
+    } catch (err) {
+
+        console.error("ERROR AUDIT:", err);
+
+    } finally {
+
+        if (typeof hideLoading === "function") {
+            hideLoading();
+        }
+
+    }
+
+});
 <script>
 function updateJam(){
  const s=new Date();
