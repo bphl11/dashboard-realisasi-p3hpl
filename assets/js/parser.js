@@ -91,6 +91,12 @@ function parseDataMonitoring(data) {
 
         const row =
             data[i] || [];
+        traceMulai(i);
+
+traceTambah(
+    i,
+    "Baca Row Excel"
+);
 
 
         const kode =
@@ -98,11 +104,23 @@ function parseDataMonitoring(data) {
                 row[0]
             );
 
+        traceTambah(
+    i,
+    "Kode",
+    kode
+);
+
 
         const namaAsli =
             clean(
                 row[1]
             );
+
+        traceTambah(
+    i,
+    "Nama",
+    namaAsli
+);
 
 
         const nama =
@@ -151,6 +169,11 @@ function parseDataMonitoring(data) {
             kegiatan =
                 nama ||
                 namaAsli;
+            traceTambah(
+    i,
+    "Deteksi Kegiatan",
+    kegiatan
+);
 
 
             kegiatanDiblokir =
@@ -198,6 +221,11 @@ function parseDataMonitoring(data) {
             output =
                 nama ||
                 namaAsli;
+            traceTambah(
+    i,
+    "Deteksi Output",
+    output
+);
 
 
             outputDiblokir =
@@ -246,6 +274,11 @@ function parseDataMonitoring(data) {
             komponen =
                 nama ||
                 namaAsli;
+            traceTambah(
+    i,
+    "Deteksi Komponen",
+    komponen
+);
 
 
             komponenDiblokir =
@@ -294,6 +327,11 @@ function parseDataMonitoring(data) {
             subKomponen =
                 nama ||
                 namaAsli;
+            traceTambah(
+    i,
+    "Deteksi Sub Komponen",
+    subKomponen
+);
 
 
             subKomponenDiblokir =
@@ -354,6 +392,11 @@ function parseDataMonitoring(data) {
                 cleanItemName(
                     subHuruf.nama
                 );
+            traceTambah(
+    i,
+    "Deteksi Sub Komponen Huruf",
+    subKomponen
+);
 
 
             subKomponenDiblokir =
@@ -410,6 +453,12 @@ function parseDataMonitoring(data) {
                 cleanItemName(
                     namaAsli
                 );
+
+            traceTambah(
+    i,
+    "Deteksi Akun",
+    akunKode + " - " + akunNama
+);
 
 
             akunDiblokir =
@@ -471,6 +520,11 @@ function parseDataMonitoring(data) {
             ambilAngkaKeuangan(
                 row
             );
+        traceTambah(
+    i,
+    "Keuangan",
+    angka
+);
 
 
         // ====================================================
@@ -498,6 +552,13 @@ function parseDataMonitoring(data) {
             isRincianItem(
                 namaAsli
             );
+        traceTambah(
+    i,
+    rincian
+        ? "Rincian Item"
+        : "Item Utama",
+    namaAsli
+);
 
 
         let itemFinal = "";
@@ -583,6 +644,11 @@ function parseDataMonitoring(data) {
                 ? "Diblokir"
 
                 : "Normal";
+        traceTambah(
+    i,
+    "Status Pagu",
+    statusPagu
+);
 
 
         // ====================================================
@@ -604,63 +670,44 @@ function parseDataMonitoring(data) {
         // ====================================================
         // SIMPAN
         // ====================================================
+     traceTambah(i,"Simpan ke Hasil Parser");
 
-        hasil.push({
+hasil.push({
 
-            rowIndex:
-                i,
+    rowIndex:i,
 
-            kode:
-                akunKode ||
-                "-",
+    kode:akunKode || "-",
 
-            kegiatan:
-                kegiatan ||
-                "-",
+    kegiatan:kegiatan || "-",
 
-            output:
-                output ||
-                "-",
+    output:output || "-",
 
-            komponen:
-                komponen ||
-                "-",
+    komponen:komponen || "-",
 
-            subKomponen:
-                subKomponen ||
-                "-",
+    subKomponen:subKomponen || "-",
 
-            akun:
-                akunNama ||
-                "-",
+    akun:akunNama || "-",
 
-            itemAkun:
-                itemFinal ||
-                "-",
+    itemAkun:itemFinal || "-",
 
-            rincianItem:
-                rincianFinal,
+    rincianItem:rincianFinal,
 
-            statusPagu:
-                statusPagu,
+    statusPagu:statusPagu,
 
-            pagu:
-                angka.pagu,
+    pagu:angka.pagu,
 
-            realisasi:
-                angka.realisasi,
+    realisasi:angka.realisasi,
 
-            sisa:
-                angka.sisa,
+    sisa:angka.sisa,
 
-            persen:
-                persen,
+    persen:persen,
 
-            // Digunakan untuk menghindari double count
-            isRincian:
-                rincian
+    isRincian:rincian
 
-        });
+});
+
+traceSelesai(i);
+         
 
     }
 
