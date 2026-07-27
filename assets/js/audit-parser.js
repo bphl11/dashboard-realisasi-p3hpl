@@ -14,6 +14,31 @@
 // ============================================================
 
 "use strict";
+// ============================================================
+// MEMBUAT AUDIT ID
+// ============================================================
+
+function buatAuditId(item){
+
+    return [
+
+        item.kegiatan || "",
+
+        item.output || "",
+
+        item.komponen || "",
+
+        item.subKomponen || "",
+
+        item.kode || "",
+
+        item.akun || "",
+
+        item.itemAkun || ""
+
+    ].join("|");
+
+}
 
 // ============================================================
 // FUNGSI UTAMA
@@ -90,20 +115,31 @@ function buatAudit(rawData, parserData){
 
     const parserMap=new Map();
 
-    parserData.forEach(function(item){
+    const auditMap=new Map();
 
-        const row=item.rowIndex;
+   parserData.forEach(function(item){
 
-        if(!parserMap.has(row)){
+    const row=item.rowIndex;
 
-            parserMap.set(row,[]);
+    if(!parserMap.has(row)){
 
-        }
+        parserMap.set(row,[]);
 
-        parserMap.get(row).push(item);
+    }
 
-    });
+    parserMap.get(row).push(item);
 
+    const auditId=buatAuditId(item);
+
+    if(!auditMap.has(auditId)){
+
+        auditMap.set(auditId,[]);
+
+    }
+
+    auditMap.get(auditId).push(item);
+
+});
     rawData.forEach(function(row,index){
         if (!row || row.length === 0) {
     return;
@@ -132,14 +168,10 @@ if (!uraian) {
 
             },0);
 
-        const statusExcel=
-
-            isDiblokir(row[1])
-
-            ?"Diblokir"
-
-            :"Normal";
-
+       const statusExcel =
+    isDiblokir(uraian)
+        ? "Diblokir"
+        : "Normal";
         const statusParser=
 
             parserRows.length
@@ -148,37 +180,44 @@ if (!uraian) {
 
             :"-";
 
-        hasil.push({
+hasil.push({
 
-            rowIndex:index,
+    auditId:
+        parserRows.length
+        ? buatAuditId(parserRows[0])
+        : "ROW_" + index,
 
-            uraian:clean(row[1]),
+    rowIndex: index,
 
-            paguExcel:paguExcel,
+    uraian: uraian,
 
-            paguParser:paguParser,
+    paguExcel: paguExcel,
 
-            count:parserRows.length,
+    paguParser: paguParser,
 
-            statusExcel:statusExcel,
+    count: parserRows.length,
 
-            statusParser:statusParser,
+    statusExcel: statusExcel,
 
-            terbaca:parserRows.length>0,
+    statusParser: statusParser,
 
-            doubleCount:parserRows.length>1,
+    terbaca: parserRows.length > 0,
 
-            bedaPagu:
+    doubleCount: parserRows.length > 1,
 
-                paguExcel!==paguParser,
+    bedaPagu: paguExcel !== paguParser,
 
-            salahStatus:
+    salahStatus: statusExcel !== statusParser,
 
-                statusExcel!==statusParser,
+    parserRows: parserRows,
 
-            parserRows:parserRows
+    severity: "OK",
 
-        });
+    errorList: [],
+
+    trace: getTrace(index) || null
+
+});
 
     });
 
@@ -196,7 +235,7 @@ function analisaAudit(hasilAudit){
     hasilAudit.forEach(function(item){
 
         item.errorList=[];
-
+       
         // ============================================
         // DOUBLE COUNT
         // ============================================
@@ -267,6 +306,41 @@ const rincian = rows.filter(
             );
 
         }
+
+        // ============================================
+// SEVERITY
+// ============================================
+
+if(item.errorList.length===0){
+
+    item.severity="OK";
+
+}
+else if(item.errorList.includes("Double Count")){
+
+    item.severity="CRITICAL";
+
+}
+else if(item.errorList.includes("Pagu Berbeda")){
+
+    item.severity="MAJOR";
+
+}
+else if(item.errorList.includes("Parent + Rincian")){
+
+    item.severity="MAJOR";
+
+}
+else if(item.errorList.includes("Status Berubah")){
+
+    item.severity="WARNING";
+
+}
+else{
+
+    item.severity="INFO";
+
+}
 
     });
 
@@ -381,33 +455,23 @@ function komponenError(data){
 
     data.forEach(function(item){
 
-        item.parserRows.forEach(function(row){
+       const rows = item.parserRows || [];
 
-            const nama=row.komponen||"-";
+rows.forEach(function(row){
 
-            if(!map.has(nama)){
+    const nama = row.komponen || "-";
 
-                map.set(nama,0);
+    if(!map.has(nama)){
+        map.set(nama,0);
+    }
 
-            }
+    map.set(
+        nama,
+        map.get(nama) +
+        Math.abs(item.paguParser - item.paguExcel)
+    );
 
-            map.set(
-
-                nama,
-
-                map.get(nama)+
-
-                Math.abs(
-
-                    item.paguParser-
-
-                    item.paguExcel
-
-                )
-
-            );
-
-        });
+});
 
     });
 
