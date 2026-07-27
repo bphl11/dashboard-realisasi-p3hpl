@@ -215,16 +215,6 @@ if (typeof validator === "function") {
 
 }
 
-// ============================================
-// AUDIT PARSER
-// ============================================
-
-if (typeof auditParser === "function") {
-
-    auditParser(rawData);
-
-}
-
         console.log(
             "Monitoring: jumlah data hasil parser:",
             dataMonitoring.length
