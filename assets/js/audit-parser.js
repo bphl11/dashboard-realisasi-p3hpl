@@ -19,58 +19,174 @@
 // FUNGSI UTAMA
 // ============================================================
 
-function auditParser(rawData) {
+function auditParser(rawData){
 
     console.clear();
 
-    console.log("========================================");
+    console.log("====================================");
+
     console.log("AUDIT PARSER V3");
-    console.log("========================================");
 
-    if (!Array.isArray(rawData)) {
+    console.log("====================================");
 
-        console.error("auditParser : rawData bukan array");
+    if(!Array.isArray(rawData)){
+
+        console.error("Raw data bukan array");
 
         return;
 
     }
 
-    // ===========================================
-    // Jalankan parser utama
-    // ===========================================
-
-    const parserData =
+    const parserData=
         parseDataMonitoring(rawData);
 
     console.log(
-        "Jumlah Data Parser :",
+        "Jumlah Parser",
         parserData.length
     );
 
-    // ===========================================
-    // Buat hasil audit
-    // ===========================================
-
-    const hasilAudit =
+    const hasilAudit=
         buatAudit(
             rawData,
             parserData
         );
 
-    console.log(
-        "Jumlah Audit :",
-        hasilAudit.length
+    analisaAudit(
+        hasilAudit
     );
 
-    // ===========================================
-    // Tampilkan ke UI
-    // ===========================================
+    const statistik=
+        statistikAudit(
+            hasilAudit
+        );
+
+    console.table(statistik);
+
+    console.table(
+        ringkasanSelisih(
+            hasilAudit
+        )
+    );
+
+    console.table(
+        komponenError(
+            hasilAudit
+        )
+    );
 
     tampilkanAudit(
         hasilAudit
     );
 
 }
+
+   // ============================================================
+// BUAT AUDIT
+// ============================================================
+
+function buatAudit(rawData, parserData){
+
+    const hasil=[];
+
+    const parserMap=new Map();
+
+    parserData.forEach(function(item){
+
+        const row=item.rowIndex;
+
+        if(!parserMap.has(row)){
+
+            parserMap.set(row,[]);
+
+        }
+
+        parserMap.get(row).push(item);
+
+    });
+
+    rawData.forEach(function(row,index){
+        if (!row || row.length === 0) {
+    return;
+}
+
+const uraian = clean(row[1] || "");
+
+if (!uraian) {
+    return;
+}
+
+        const parserRows=
+            parserMap.get(index)||[];
+
+        const paguExcel=
+            parseNumber(row[5])||0;
+        if (paguExcel <= 0) {
+    return;
+}
+
+        const paguParser=
+
+            parserRows.reduce(function(total,item){
+
+                return total+(Number(item.pagu)||0);
+
+            },0);
+
+        const statusExcel=
+
+            isDiblokir(row[1])
+
+            ?"Diblokir"
+
+            :"Normal";
+
+        const statusParser=
+
+            parserRows.length
+
+            ?parserRows[0].statusPagu
+
+            :"-";
+
+        hasil.push({
+
+            rowIndex:index,
+
+            uraian:clean(row[1]),
+
+            paguExcel:paguExcel,
+
+            paguParser:paguParser,
+
+            count:parserRows.length,
+
+            statusExcel:statusExcel,
+
+            statusParser:statusParser,
+
+            terbaca:parserRows.length>0,
+
+            doubleCount:parserRows.length>1,
+
+            bedaPagu:
+
+                paguExcel!==paguParser,
+
+            salahStatus:
+
+                statusExcel!==statusParser,
+
+            parserRows:parserRows
+
+        });
+
+    });
+
+    return hasil;
+
+}
+
+    
 // ============================================================
 // ANALISIS PENYEBAB ERROR
 // ============================================================
@@ -125,17 +241,16 @@ function analisaAudit(hasilAudit){
         // PARENT + RINCIAN
         // ============================================
 
-        const parent=item.parserRows.filter(
+        const rows = item.parserRows || [];
 
-            i=>i.isRincian===false
+const parent = rows.filter(
+    i => i.isRincian === false
+);
 
-        );
+const rincian = rows.filter(
+    i => i.isRincian === true
+);
 
-        const rincian=item.parserRows.filter(
-
-            i=>i.isRincian===true
-
-        );
 
         if(
 
@@ -305,68 +420,3 @@ function komponenError(data){
     );
 
 }
-const hasilAudit=
-
-buatAudit(
-
-    rawData,
-
-    parserData
-
-);
-
-// Analisis Error
-
-analisaAudit(
-
-    hasilAudit
-
-);
-
-// Statistik
-
-const statistik=
-
-statistikAudit(
-
-    hasilAudit
-
-);
-
-console.table(
-
-    statistik
-
-);
-
-// Ringkasan
-
-console.table(
-
-    ringkasanSelisih(
-
-        hasilAudit
-
-    )
-
-);
-
-// Komponen terbesar
-
-console.table(
-
-    komponenError(
-
-        hasilAudit
-
-    )
-
-);
-
-// Tampilkan
-
-tampilkanAudit(
-
-    hasilAudit
-
-);
