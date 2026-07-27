@@ -202,6 +202,28 @@ dataMonitoring =
     parseDataMonitoring(
         rawData
     );
+// ============================================
+// VALIDATOR
+// ============================================
+
+if (typeof validator === "function") {
+
+    validator(
+        rawData,
+        dataMonitoring
+    );
+
+}
+
+// ============================================
+// AUDIT PARSER
+// ============================================
+
+if (typeof auditParser === "function") {
+
+    auditParser(rawData);
+
+}
 
         console.log(
             "Monitoring: jumlah data hasil parser:",
