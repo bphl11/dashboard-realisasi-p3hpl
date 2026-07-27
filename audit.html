@@ -99,77 +99,35 @@
 <script src="assets/js/validator.js"></script>
 <script src="assets/js/audit-parser.js"></script>
 <script src="assets/js/audit-ui.js"></script>
-<script src="assets/js/parser.js"></script>
 <script>
-
 document.addEventListener("DOMContentLoaded", async function () {
 
-    try {
+    updateJam();
+    setInterval(updateJam,1000);
 
-        if (typeof showLoading === "function") {
+    try{
+
+        if(typeof showLoading==="function"){
             showLoading();
         }
 
-        console.log("=== MEMULAI AUDIT PARSER ===");
-
-        // Ambil data Google Sheet
-        const rawData = await getSheetData();
-
-        console.log("Jumlah baris:", rawData.length);
-
-        // Jalankan Audit
-        auditParser(rawData);
-
-        console.log("Audit selesai.");
-
-    } catch (err) {
-
-        console.error("ERROR AUDIT:", err);
-
-    } finally {
-
-        if (typeof hideLoading === "function") {
-            hideLoading();
-        }
-
-    }
-
-});
-<script>
-function updateJam(){
- const s=new Date();
- const t=document.getElementById("auditTanggal");
- const j=document.getElementById("auditJam");
- if(t) t.innerHTML=s.toLocaleDateString("id-ID");
- if(j) j.innerHTML=s.toLocaleTimeString("id-ID");
-}
-<script>
-
-document.addEventListener("DOMContentLoaded", async function () {
-
-    try {
-
-        if (typeof showLoading === "function") {
-            showLoading();
-        }
-
-        console.log("=== MEMULAI AUDIT PARSER ===");
+        console.log("=== MEMULAI AUDIT ===");
 
         const rawData = await getSheetData();
 
-        console.log("Jumlah baris:", rawData.length);
+        console.log("Jumlah baris :", rawData.length);
 
         auditParser(rawData);
 
-        console.log("Audit selesai.");
+        console.log("Audit selesai");
 
-    } catch (err) {
+    }catch(err){
 
-        console.error("ERROR AUDIT:", err);
+        console.error("ERROR AUDIT :",err);
 
-    } finally {
+    }finally{
 
-        if (typeof hideLoading === "function") {
+        if(typeof hideLoading==="function"){
             hideLoading();
         }
 
@@ -177,41 +135,42 @@ document.addEventListener("DOMContentLoaded", async function () {
 
 });
 
-</script>
-
-<script>
-
 function updateJam(){
 
-    const s = new Date();
+    const s=new Date();
 
-    const t = document.getElementById("auditTanggal");
+    const t=document.getElementById("auditTanggal");
+    const j=document.getElementById("auditJam");
 
-    const j = document.getElementById("auditJam");
-
-    if(t) t.innerHTML = s.toLocaleDateString("id-ID");
-
-    if(j) j.innerHTML = s.toLocaleTimeString("id-ID");
+    if(t) t.innerHTML=s.toLocaleDateString("id-ID");
+    if(j) j.innerHTML=s.toLocaleTimeString("id-ID");
 
 }
-
-setInterval(updateJam,1000);
 
 function bukaModal(html){
 
-    document.getElementById("detailContent").innerHTML = html;
-
-    document.getElementById("detailModal").style.display = "block";
+    document.getElementById("detailContent").innerHTML=html;
+    document.getElementById("detailModal").style.display="block";
 
 }
 
 function tutupModal(){
 
-    document.getElementById("detailModal").style.display = "none";
+    document.getElementById("detailModal").style.display="none";
 
 }
 
-</script>
+function showLoading(){
 
-</body>
-</html>
+    const x=document.getElementById("loading");
+    if(x) x.style.display="flex";
+
+}
+
+function hideLoading(){
+
+    const x=document.getElementById("loading");
+    if(x) x.style.display="none";
+
+}
+</script>
