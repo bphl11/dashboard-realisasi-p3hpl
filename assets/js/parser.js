@@ -1324,27 +1324,34 @@ if (filterStatus === "Diblokir") {
 
 if (filterStatus === "Normal") {
 
-    const dataNormal =
-        semuaDataHierarki.filter(function(item){
+    const hasilNormal = {
 
-            return (
-                item.statusPagu === "Normal"
-            );
+        pagu:
+            summaryHierarki.pagu -
+            ringkasanDiblokir.pagu,
 
-        });
+        realisasi:
+            summaryHierarki.realisasi -
+            ringkasanDiblokir.realisasi,
+
+        sisa:
+            summaryHierarki.sisa -
+            ringkasanDiblokir.sisa,
+
+        persen:
+            summaryHierarki.persen -
+            ringkasanDiblokir.persen,
+
+        index:
+            summaryHierarki.index,
+
+        nama:
+            summaryHierarki.nama
+
+    };
 
     console.log(
-        "Jumlah Data Normal :",
-        dataNormal.length
-    );
-
-    const hasilNormal =
-        hitungRingkasanDetail(
-            dataNormal
-        );
-
-    console.log(
-        "Ringkasan Normal :",
+        "Ringkasan Normal (Summary Hierarki - Diblokir):",
         hasilNormal
     );
 
