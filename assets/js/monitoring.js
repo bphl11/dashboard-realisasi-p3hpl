@@ -818,18 +818,17 @@ console.log(
 
 console.log("====================================");
 
-    const ringkasan =
+   const ringkasan =
     hitungRingkasanData(
         dataMonitoringFiltered,
         rawMonitoringData,
         {
-            adaFilter:
-                !!(
-                    komponen ||
-                    subKomponen ||
-                    akun ||
-                    status
-                ),
+            adaFilter: !!(
+                komponen ||
+                subKomponen ||
+                akun ||
+                status
+            ),
 
             komponen,
             subKomponen,
@@ -838,11 +837,12 @@ console.log("====================================");
         }
     );
 
+console.log("RINGKASAN AKHIR =", ringkasan);
 
-    const elPagu =
-        document.getElementById(
-            "monitorPagu"
-        );
+const elPagu =
+    document.getElementById(
+        "monitorPagu"
+    );
 
     const elRealisasi =
         document.getElementById(
