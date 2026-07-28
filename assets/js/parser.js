@@ -1438,6 +1438,26 @@ function buatRingkasanDariRawRow(
             : 0;
 
 
+    if (
+        level === "komponen" &&
+        nama.includes(
+            "Peta Arahan Pemanfaatan Hutan Produksi dan Hutan Lindung"
+        )
+    ) {
+
+        console.log({
+            rowIndex,
+            level,
+            nama,
+            pagu,
+            realisasi,
+            sisa,
+            row
+        });
+
+    }
+
+
     return {
 
         pagu:
