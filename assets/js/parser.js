@@ -1303,232 +1303,54 @@ console.log(
     "Ringkasan Diblokir:",
     ringkasanDiblokir
 );
-        // ====================================================
-        // STATUS DIBLOKIR
-        // ====================================================
+      // ====================================================
+// STATUS DIBLOKIR
+// ====================================================
 
-        if (
-            filterStatus ===
-            "Diblokir"
-        ) {
+if (filterStatus === "Diblokir") {
 
-            return {
+    console.log("Menggunakan data Diblokir hasil parser");
 
-                pagu:
+    return hitungRingkasanDetail(
+        dataDiblokir
+    );
 
-                    Math.min(
+}
 
-                        Number(
-                            ringkasanDiblokir.pagu
-                        ) || 0,
 
-                        Number(
-                            summaryHierarki.pagu
-                        ) || 0
+// ====================================================
+// STATUS NORMAL
+// ====================================================
 
-                    ),
+if (filterStatus === "Normal") {
 
+    const dataNormal =
+        semuaDataHierarki.filter(function(item){
 
-                realisasi:
-
-                    Math.min(
-
-                        Number(
-                            ringkasanDiblokir.realisasi
-                        ) || 0,
-
-                        Number(
-                            summaryHierarki.realisasi
-                        ) || 0
-
-                    ),
-
-
-                sisa:
-
-                    Math.max(
-
-                        (
-                            Number(
-                                ringkasanDiblokir.pagu
-                            ) || 0
-                        )
-
-                        -
-
-                        (
-                            Number(
-                                ringkasanDiblokir.realisasi
-                            ) || 0
-                        ),
-
-                        0
-
-                    ),
-
-
-                persen:
-
-                    (
-                        Number(
-                            ringkasanDiblokir.pagu
-                        ) || 0
-                    ) > 0
-
-                        ? (
-
-                            (
-                                Number(
-                                    ringkasanDiblokir.realisasi
-                                ) || 0
-                            )
-
-                            /
-
-                            (
-                                Number(
-                                    ringkasanDiblokir.pagu
-                                ) || 0
-                            )
-
-                        ) * 100
-
-                        : 0
-
-            };
-
-        }
-
-
-        // ====================================================
-        // STATUS NORMAL
-        //
-        // NORMAL = SUMMARY - DIBLOKIR
-        //
-        // Ini bagian penting yang mencegah:
-        //
-        // Summary Semua = Rp96.916.000
-        // tetapi Normal = Rp98.856.000
-        //
-        // Kondisi tersebut sekarang tidak mungkin terjadi.
-        // ====================================================
-
-        if (
-            filterStatus ===
-            "Normal"
-        ) {
-
-            const paguNormal =
-
-                Math.max(
-
-                    (
-                        Number(
-                            summaryHierarki.pagu
-                        ) || 0
-                    )
-
-                    -
-
-                    (
-                        Number(
-                            ringkasanDiblokir.pagu
-                        ) || 0
-                    ),
-
-                    0
-
-                );
-
-
-            const realisasiNormal =
-
-                Math.max(
-
-                    (
-                        Number(
-                            summaryHierarki.realisasi
-                        ) || 0
-                    )
-
-                    -
-
-                    (
-                        Number(
-                            ringkasanDiblokir.realisasi
-                        ) || 0
-                    ),
-
-                    0
-
-                );
-
-
-            const sisaNormal =
-
-                Math.max(
-
-                    paguNormal -
-
-                    realisasiNormal,
-
-                    0
-
-                );
-
-
-            const persenNormal =
-
-                paguNormal > 0
-
-                    ? (
-
-                        realisasiNormal /
-
-                        paguNormal
-
-                    ) * 100
-
-                    : 0;
-
-
-            const hasilNormal = {
-
-                pagu:
-                    paguNormal,
-
-                realisasi:
-                    realisasiNormal,
-
-                sisa:
-                    sisaNormal,
-
-                persen:
-                    persenNormal
-
-            };
-
-
-            console.log(
-
-                "Ringkasan Normal:",
-
-                hasilNormal
-
+            return (
+                item.statusPagu === "Normal"
             );
 
+        });
 
-            console.log(
+    console.log(
+        "Jumlah Data Normal :",
+        dataNormal.length
+    );
 
-                "===================================="
+    const hasilNormal =
+        hitungRingkasanDetail(
+            dataNormal
+        );
 
-            );
+    console.log(
+        "Ringkasan Normal :",
+        hasilNormal
+    );
 
+    return hasilNormal;
 
-            return hasilNormal;
-
-        }
-
+}
     }
 
 
