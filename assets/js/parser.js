@@ -716,7 +716,26 @@ traceSelesai(i);
         "TOTAL DATA HASIL PARSER:",
         hasil.length
     );
+    // ===============================
+// DEBUG HASIL PARSER
+// ===============================
+console.log("===== HASIL PARSER =====");
+console.log("Jumlah Record :", hasil.length);
+console.table(hasil);
 
+// Agar bisa diakses dari Browser Console
+window.hasilParser = hasil;
+
+// Download otomatis menjadi JSON (opsional)
+const blob = new Blob(
+    [JSON.stringify(hasil, null, 2)],
+    { type: "application/json" }
+);
+
+const a = document.createElement("a");
+a.href = URL.createObjectURL(blob);
+a.download = "hasilParser.json";
+a.click();
 
     return hasil;
 
