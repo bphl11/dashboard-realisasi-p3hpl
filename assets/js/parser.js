@@ -1012,7 +1012,7 @@ function hitungRingkasanData(
         status = "",
         cari = ""
     } = options;
-
+const totalGlobal = ambilTotalUtama(rawData);
 
     const filterKomponen =
         clean(komponen);
@@ -1133,252 +1133,156 @@ function hitungRingkasanData(
     }
 
 
-    // ========================================================
+   // ========================================================
 // 4. FILTER STATUS PADA KOMPONEN / SUB KOMPONEN
 //
-// ATURAN:
-//
-// Semua     = Summary Excel
-//
-// Diblokir  = nilai detail yang benar-benar diblokir
-//
-// Normal    = Summary Excel - Diblokir
-//
-// Dengan demikian:
-//
-// Normal + Diblokir = Semua
-//
-// dan Normal tidak mungkin lebih besar dari Summary.
+// Semua     = Summary
+// Diblokir  = Detail Diblokir
+// Normal    = Summary - Diblokir
 // ========================================================
 
-console.log("=== CEK KONDISI STATUS ===");
-console.log({
-    summaryHierarki: !!summaryHierarki,
-    filterStatus,
-    filterAkun,
-    filterCari
-});
-
 if (
-    summaryHierarki &&
     filterStatus &&
     !filterAkun &&
     !filterCari
 ) {
 
-    console.log(">>> MASUK BLOK STATUS <<<");
+    console.log("===== FILTER STATUS =====");
+    console.log("Status :", filterStatus);
 
-    // ====================================================
-    // AMBIL SEMUA DATA DALAM HIERARKI
-    // ====================================================
+    // ---------------------------------------------
+    // Ambil seluruh data hierarki
+    // ---------------------------------------------
 
     let semuaDataHierarki =
-
-        Array.isArray(
-            window.dataLaporan
-        )
-
+        Array.isArray(window.dataLaporan)
             ? window.dataLaporan
-
             : [];
 
+    if (
+        !Array.isArray(semuaDataHierarki) ||
+        semuaDataHierarki.length === 0
+    ) {
 
-        // ====================================================
-        // FALLBACK
-        //
-        // Pada deklarasi global dengan let, window.dataLaporan
-        // bisa tidak tersedia.
-        //
-        // Maka parse ulang rawData.
-        // ====================================================
+        semuaDataHierarki =
+            parseDataMonitoring(rawData);
 
-        if (
-            !Array.isArray(
-                semuaDataHierarki
-            ) ||
-            semuaDataHierarki.length === 0
-        ) {
-
-            semuaDataHierarki =
-
-                parseDataMonitoring(
-
-                    rawData
-
-                );
-
-        }
-
-
-        // ====================================================
-        // FILTER KOMPONEN
-        // ====================================================
-
-        if (filterKomponen) {
-
-            semuaDataHierarki =
-
-                semuaDataHierarki.filter(
-
-                    function (item) {
-
-                        return (
-
-                            item.komponen ===
-                            filterKomponen
-
-                        );
-
-                    }
-
-                );
-
-        }
-
-
-        // ====================================================
-        // FILTER SUB KOMPONEN
-        // ====================================================
-
-        if (filterSubKomponen) {
-
-            semuaDataHierarki =
-
-                semuaDataHierarki.filter(
-
-                    function (item) {
-
-                        return (
-
-                            item.subKomponen ===
-                            filterSubKomponen
-
-                        );
-
-                    }
-
-                );
-
-        }
-
-// ====================================================
-// AMBIL HANYA DATA DIBLOKIR
-// ====================================================
-
-console.log("====================================");
-console.log("PARSER - STATUS");
-
-console.log("Filter Status :", filterStatus);
-
-console.log(
-    "Jumlah semuaDataHierarki :",
-    semuaDataHierarki.length
-);
-
-console.log(
-    "Summary Hierarki :",
-    summaryHierarki
-);
-
-console.log("====================================");
-
-const dataDiblokir =
-    semuaDataHierarki.filter(function (item) {
-
-        return (
-            item.statusPagu === "Diblokir"
-        );
-
-    });
-
-console.log(
-    "Jumlah Data Diblokir :",
-    dataDiblokir.length
-);
-
-// ====================================================
-// HITUNG TOTAL DIBLOKIR
-//
-// Menggunakan mekanisme anti double-count.
-// ====================================================
-
-const ringkasanDiblokir =
-    hitungRingkasanDetail(
-        dataDiblokir
-    );
-
-console.log("====================================");
-
-console.log(
-    "PERHITUNGAN STATUS HIERARKI"
-);
-
-console.log(
-    "Summary Semua:",
-    summaryHierarki
-);
-
-console.log(
-    "Ringkasan Diblokir:",
-    ringkasanDiblokir
-);
-      // ====================================================
-// STATUS DIBLOKIR
-// ====================================================
-
-if (filterStatus === "Diblokir") {
-
-    console.log("Menggunakan data Diblokir hasil parser");
-
-    return hitungRingkasanDetail(
-        dataDiblokir
-    );
-
-}
-
-
-// ====================================================
-// STATUS NORMAL
-// ====================================================
-
-if (filterStatus === "Normal") {
-
-    const hasilNormal = {
-
-        pagu:
-            summaryHierarki.pagu -
-            ringkasanDiblokir.pagu,
-
-        realisasi:
-            summaryHierarki.realisasi -
-            ringkasanDiblokir.realisasi,
-
-        sisa:
-            summaryHierarki.sisa -
-            ringkasanDiblokir.sisa,
-
-        persen:
-            summaryHierarki.persen -
-            ringkasanDiblokir.persen,
-
-        index:
-            summaryHierarki.index,
-
-        nama:
-            summaryHierarki.nama
-
-    };
-
-    console.log(
-        "Ringkasan Normal (Summary Hierarki - Diblokir):",
-        hasilNormal
-    );
-
-    return hasilNormal;
-
-}
     }
 
+    // ---------------------------------------------
+    // Filter Komponen
+    // ---------------------------------------------
+
+    if (filterKomponen) {
+
+        semuaDataHierarki =
+            semuaDataHierarki.filter(item =>
+                item.komponen === filterKomponen
+            );
+
+    }
+
+    // ---------------------------------------------
+    // Filter Sub Komponen
+    // ---------------------------------------------
+
+    if (filterSubKomponen) {
+
+        semuaDataHierarki =
+            semuaDataHierarki.filter(item =>
+                item.subKomponen === filterSubKomponen
+            );
+
+    }
+
+    // ---------------------------------------------
+    // Summary yang dipakai
+    // ---------------------------------------------
+
+    const summaryDipakai =
+    summaryHierarki || totalGlobal;
+
+console.log("===== TOTAL GLOBAL =====");
+console.log(totalGlobal);
+
+console.log("===== SUMMARY HIERARKI =====");
+console.log(summaryHierarki);
+
+console.log("===== SUMMARY DIPAKAI =====");
+console.log(summaryDipakai);
+
+    // ---------------------------------------------
+    // Data Diblokir
+    // ---------------------------------------------
+
+    const dataDiblokir =
+        semuaDataHierarki.filter(item =>
+            item.statusPagu === "Diblokir"
+        );
+const ringkasanDiblokir =
+    hitungRingkasanDetail(dataDiblokir);
+
+console.log("===== SUMMARY DIPAKAI =====");
+console.log(summaryDipakai);
+
+console.log("===== RINGKASAN DIBLOKIR =====");
+console.log(ringkasanDiblokir);
+
+    // ---------------------------------------------
+    // STATUS DIBLOKIR
+    // ---------------------------------------------
+
+    if (filterStatus === "Diblokir") {
+
+        console.log("STATUS : DIBLOKIR");
+
+        return ringkasanDiblokir;
+
+    }
+
+    // ---------------------------------------------
+    // STATUS NORMAL
+    // ---------------------------------------------
+
+    if (filterStatus === "Normal") {
+
+        console.log("STATUS : NORMAL");
+
+        const pagu =
+            summaryDipakai.pagu -
+            ringkasanDiblokir.pagu;
+
+        const realisasi =
+            summaryDipakai.realisasi -
+            ringkasanDiblokir.realisasi;
+
+        const sisa =
+            pagu - realisasi;
+
+        const persen =
+            pagu > 0
+                ? (realisasi / pagu) * 100
+                : 0;
+
+        return {
+
+            pagu,
+
+            realisasi,
+
+            sisa,
+
+            persen,
+
+            index: summaryDipakai.index,
+
+            nama: summaryDipakai.nama
+
+        };
+
+    }
+
+}
 
     // ========================================================
     // 5. FILTER AKUN / PENCARIAN
@@ -2011,7 +1915,9 @@ function hitungRingkasanDetail(
         }
 
     );
-
+    console.log("===== DATA HITUNG =====");
+console.log("Jumlah dataHitung:", dataHitung.length);
+console.table(dataHitung);
 
     // ========================================================
     // HITUNG
