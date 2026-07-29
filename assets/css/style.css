@@ -28,16 +28,15 @@ body{
     padding:25px 20px;
 }
 
-.logo{
-    margin-bottom:40px;
+.logo {
+    text-align: center;
+    padding: 15px 10px;
 }
 
-.logo h4{
-    font-weight:bold;
-}
-
-.logo small{
-    color:#d7ffd9;
+.logo-sidebar {
+    width: 170px;
+    max-width: 100%;
+    height: auto;
 }
 
 .sidebar ul{
