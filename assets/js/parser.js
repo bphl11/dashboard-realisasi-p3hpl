@@ -2904,3 +2904,21 @@ function hitungCalculationEngine(rawData, parsedData) {
 function hitungRingkasanAnggaran(rawData, parsedData) {
     return hitungCalculationEngine(rawData, parsedData);
 }
+
+
+// ============================================================
+// CONSISTENCY CHECK
+// Dipanggil setelah semua halaman menghitung ringkasan.
+// ============================================================
+function cekKonsistensiCalculationEngine(rawData, parsedData, summaries) {
+    const engine = hitungCalculationEngine(rawData, parsedData);
+    const hasil = {};
+    Object.keys(summaries || {}).forEach(function (nama) {
+        const nilai = summaries[nama] || {};
+        const sama = ["pagu", "realisasi", "sisa"].every(function (k) {
+            return Math.abs((Number(nilai[k]) || 0) - (Number(engine.total[k]) || 0)) < 0.01;
+        });
+        hasil[nama] = { sama: sama, nilai: nilai, acuan: engine.total };
+    });
+    return hasil;
+}
