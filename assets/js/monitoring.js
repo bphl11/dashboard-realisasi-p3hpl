@@ -206,14 +206,9 @@ dataMonitoring =
 // VALIDATOR
 // ============================================
 
-if (typeof validatorAudit === "function") {
-
-    // Validator audit bekerja pada data hasil audit. Monitoring hanya
-    // melakukan pengecekan jika modul audit menyediakan fungsi auditParser.
-    if (typeof auditParser === "function") {
-        auditParser(rawData);
-    }
-
+// Audit UI hanya dijalankan pada audit.html.
+if (document.getElementById("summary") && typeof auditParser === "function") {
+    auditParser(rawData);
 }
 
         console.log(
