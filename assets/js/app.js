@@ -97,8 +97,11 @@ document.addEventListener(
             // TAMPILKAN GRAFIK BULANAN
             // =================================================
 
+            // Gunakan ringkasan Calculation Engine sebagai fallback agar
+            // grafik tetap memiliki sumber total yang sama dengan kartu.
             tampilkanGrafikBulanan(
-                dashboardRawData
+                dashboardRawData,
+                totalSemua
             );
 
             tampilkanDashboardKomponen(
