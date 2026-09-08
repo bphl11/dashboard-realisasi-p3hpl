@@ -102,7 +102,7 @@ document.addEventListener(
             );
 
             tampilkanDashboardKomponen(
-                dashboardRawData
+                parsedDashboardData
             );
 
 
@@ -747,47 +747,12 @@ function hitungDashboardTanpaBlokir(
 // TAMPILKAN CARD DASHBOARD
 // ============================================================
 
-function tampilkanCardDashboard(
-    total
-) {
-
-    setTextDashboard(
-        "totalPagu",
-        formatRupiahDashboard(
-            total.pagu
-        )
-    );
-
-
-    setTextDashboard(
-        "totalRealisasi",
-        formatRupiahDashboard(
-            total.realisasi
-        )
-    );
-
-
-    setTextDashboard(
-        "sisaAnggaran",
-        formatRupiahDashboard(
-            total.sisa
-        )
-    );
-
-
-    setTextDashboard(
-        "persentase",
-        formatPersenDashboard(
-            total.persen
-        )
-    );
-
+function tampilkanCardDashboard(total) {
+    const element = document.getElementById("realisasiTanpaBlokir");
+    if (element) {
+        element.innerText = formatRupiahDashboard(Number(total?.realisasi) || 0);
+    }
 }
-
-
-// ============================================================
-// TAMPILKAN GRAFIK BULANAN
-// ============================================================
 
 function tampilkanGrafikBulanan(
     data
@@ -1057,193 +1022,25 @@ function tampilkanGrafikBulanan(
 // ============================================================
 
 function tampilkanMonitoringDashboard(rawData) {
-
-    const container =
-        document.getElementById("monitoringDashboard");
-
+    const container = document.getElementById("monitoringDashboard");
     if (!container) return;
-
-    if (typeof parseDataMonitoring !== "function") {
-
-        container.innerHTML =
-            "Parser tidak ditemukan.";
-
-        return;
-
-    }
-
-    const data =
-        parseDataMonitoring(rawData);
-
-    const subMap = new Map();
-
-    data.forEach(item => {
-
-        if (!item.subKomponen) return;
-
-        const key =
-            item.komponen +
-            "||" +
-            item.subKomponen;
-
-        if (!subMap.has(key)) {
-
-            let summary = null;
-
-            if (
-                typeof cariRingkasanHierarki ===
-                "function"
-            ) {
-
-                summary =
-                    cariRingkasanHierarki(
-
-                        rawData,
-
-                        "subKomponen",
-
-                        item.subKomponen,
-
-                        item.komponen
-
-                    );
-
-            }
-
-            subMap.set(key, {
-
-                komponen:
-                    item.komponen,
-
-                subKomponen:
-                    item.subKomponen,
-
-                pagu:
-                    summary
-                        ? Number(summary.pagu) || 0
-                        : 0,
-
-                realisasi:
-                    summary
-                        ? Number(summary.realisasi) || 0
-                        : 0,
-
-                realisasiDiblokir:
-                    0
-
-            });
-
-        }
-
-        if (
-            item.statusPagu ===
-            "Diblokir"
-        ) {
-
-            subMap.get(key)
-                .realisasiDiblokir +=
-                    Number(item.realisasi) || 0;
-
-        }
-
+    const parsed = typeof parseDataMonitoring === "function" ? parseDataMonitoring(rawData) : [];
+    const normal = parsed.filter(item => item && item.statusPagu === "Normal");
+    const map = new Map();
+    normal.forEach(item => {
+        const komponen = item.komponen || "-";
+        const subKomponen = item.subKomponen || "-";
+        const key = komponen + "||" + subKomponen;
+        if (!map.has(key)) map.set(key, []);
+        map.get(key).push(item);
     });
-
-    let html = `
-
-<div class="table-responsive">
-
-<table class="table table-striped table-bordered">
-
-<thead>
-
-<tr>
-
-<th>Komponen</th>
-
-<th>Sub Komponen</th>
-
-<th>Pagu</th>
-
-<th>Realisasi</th>
-
-<th>%</th>
-
-</tr>
-
-</thead>
-
-<tbody>
-
-`;
-
-    subMap.forEach(item => {
-
-        const realisasiTanpaBlokir =
-            Math.max(
-                item.realisasi -
-                item.realisasiDiblokir,
-                0
-            );
-
-        const persen =
-            item.pagu > 0
-                ? (
-                    realisasiTanpaBlokir /
-                    item.pagu
-                  ) * 100
-                : 0;
-
-        html += `
-
-<tr>
-
-<td>${escapeHtmlDashboard(item.komponen)}</td>
-
-<td>${escapeHtmlDashboard(item.subKomponen)}</td>
-
-<td>${formatRupiahDashboard(item.pagu)}</td>
-
-<td>${formatRupiahDashboard(realisasiTanpaBlokir)}</td>
-
-<td>${formatPersenDashboard(persen)}</td>
-
-</tr>
-
-`;
-
-    });
-
-    html += `
-
-</tbody>
-
-</table>
-
-</div>
-
-<div class="text-end mt-3">
-
-<a
-href="monitoring.html"
-class="btn btn-success btn-sm">
-
-Lihat Semua Monitoring
-
-</a>
-
-</div>
-
-`;
-
-    container.innerHTML =
-        html;
-
+    const rows = Array.from(map.entries()).map(([key, items]) => {
+        const [komponen, subKomponen] = key.split("||");
+        const ringkasan = typeof hitungRingkasanDetail === "function" ? hitungRingkasanDetail(items) : { realisasi: 0 };
+        return { komponen, subKomponen, realisasi: Number(ringkasan.realisasi) || 0 };
+    }).filter(item => item.realisasi > 0).sort((a,b) => b.realisasi-a.realisasi);
+    container.innerHTML = `<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th>Komponen</th><th>Sub Komponen</th><th class="text-end">Realisasi Tanpa Blokir</th></tr></thead><tbody>${rows.length ? rows.map(item => `<tr><td>${escapeHtmlDashboard(item.komponen)}</td><td>${escapeHtmlDashboard(item.subKomponen)}</td><td class="text-end">${formatRupiahDashboard(item.realisasi)}</td></tr>`).join("") : '<tr><td colspan="3" class="text-center text-muted">Tidak ada realisasi tanpa blokir.</td></tr>'}</tbody></table></div>`;
 }
-
-
-// ============================================================
-// ERROR DASHBOARD
-// ============================================================
 
 function tampilkanErrorDashboard(
     error
@@ -1579,168 +1376,18 @@ function escapeHtmlDashboard(
 // DASHBOARD CARD PER KOMPONEN
 // ============================================================
 
-function tampilkanDashboardKomponen(rawData) {
-
-    const container =
-        document.getElementById("dashboardKomponen");
-
+function tampilkanDashboardKomponen(parsedData) {
+    const container = document.getElementById("dashboardKomponen");
     if (!container) return;
-
-    if (typeof parseDataMonitoring !== "function") {
-
-        container.innerHTML =
-            `<div class="alert alert-warning">
-                Parser tidak ditemukan.
-            </div>`;
-
-        return;
-    }
-
-    const data = parseDataMonitoring(rawData);
-
-// daftar komponen unik sesuai urutan parser
-const daftarKomponen = [];
-
-data.forEach(item => {
-
-    if (!item.komponen) return;
-
-    if (!daftarKomponen.includes(item.komponen)) {
-        daftarKomponen.push(item.komponen);
-    }
-
-});
-
-const komponenMap = new Map();
-
-daftarKomponen.forEach(namaKomponen => {
-
-    let ringkasan = null;
-
-    if (typeof cariRingkasanHierarki === "function") {
-
-        ringkasan = cariRingkasanHierarki(
-            rawData,
-            "komponen",
-            namaKomponen
-        );
-
-    }
-
-    if (!ringkasan) {
-
-        ringkasan = {
-            pagu: 0,
-            realisasi: 0
-        };
-
-    }
-
-    komponenMap.set(
-        namaKomponen,
-        {
-            pagu: Number(ringkasan.pagu) || 0,
-            realisasi: Number(ringkasan.realisasi) || 0
-        }
-    );
-
-});
-    let html = "";
-
-    komponenMap.forEach((nilai, nama) => {
-
-        const persen =
-            nilai.pagu > 0
-            ? (nilai.realisasi / nilai.pagu) * 100
-            : 0;
-
-        html += `
-
-<div class="col-lg-4 col-md-6">
-
-<div class="card shadow-sm border-0 h-100">
-
-<div class="card-body">
-
-<h5 class="fw-bold text-success">
-
-<i class="bi bi-folder2-open"></i>
-
-${escapeHtmlDashboard(nama)}
-
-</h5>
-
-<hr>
-
-<p class="mb-2">
-
-<small class="text-muted">
-Pagu
-</small>
-
-<br>
-
-<strong>
-
-${formatRupiahDashboard(
-    nilai.pagu
-)}
-
-</strong>
-
-</p>
-
-<p class="mb-3">
-
-<small class="text-muted">
-Realisasi
-</small>
-
-<br>
-
-<strong class="text-success">
-
-${formatRupiahDashboard(
-    nilai.realisasi
-)}
-
-</strong>
-
-</p>
-
-<div class="progress mb-2"
-style="height:10px">
-
-<div
-class="progress-bar bg-success"
-style="width:${persen}%">
-
-</div>
-
-</div>
-
-<div class="text-end">
-
-<strong>
-
-${formatPersenDashboard(
-    persen
-)}
-
-</strong>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-`;
-
+    const normal = Array.isArray(parsedData) ? parsedData.filter(item => item && item.statusPagu === "Normal" && item.komponen && item.komponen !== "-") : [];
+    const map = new Map();
+    normal.forEach(item => {
+        if (!map.has(item.komponen)) map.set(item.komponen, []);
+        map.get(item.komponen).push(item);
     });
-
-    container.innerHTML = html;
-
+    const cards = Array.from(map.entries()).map(([nama, items]) => {
+        const ringkasan = typeof hitungRingkasanDetail === "function" ? hitungRingkasanDetail(items) : { realisasi: 0 };
+        return { nama, realisasi: Number(ringkasan.realisasi) || 0 };
+    }).filter(item => item.realisasi > 0).sort((a,b) => b.realisasi-a.realisasi);
+    container.innerHTML = cards.length ? cards.map(item => `<div class="col-md-6 col-xl-4"><div class="card dashboard-card h-100"><h6><i class="bi bi-folder"></i> ${escapeHtmlDashboard(item.nama)}</h6><hr><small class="text-muted">Realisasi Tanpa Blokir</small><h4>${formatRupiahDashboard(item.realisasi)}</h4></div></div>`).join("") : '<div class="col-12 text-muted">Tidak ada realisasi tanpa blokir.</div>';
 }
