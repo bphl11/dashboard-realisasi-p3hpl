@@ -984,7 +984,6 @@ function hitungRingkasanData(
     rawData,
     options = {}
 ) {
-
     const {
         adaFilter = false,
         komponen = "",
@@ -993,293 +992,96 @@ function hitungRingkasanData(
         status = "",
         cari = ""
     } = options;
-const totalGlobal = ambilTotalUtama(rawData);
 
-    const filterKomponen =
-        clean(komponen);
-
-    const filterSubKomponen =
-        clean(subKomponen);
-
-    const filterAkun =
-        clean(akun);
-
-    const filterStatus =
-        clean(status);
-
-    const filterCari =
-        clean(cari);
-
-
-    // ========================================================
-    // 1. TANPA FILTER
-    // ========================================================
-
-    if (
-        !adaFilter ||
-        (
-            !filterKomponen &&
-            !filterSubKomponen &&
-            !filterAkun &&
-            !filterStatus &&
-            !filterCari
-        )
-    ) {
-
-        return ambilTotalUtama(
-            rawData
-        );
-
-    }
-
-
-    // ========================================================
-    // 2. TENTUKAN SUMMARY HIERARKI
-    //
-    // Summary dipakai sebagai batas maksimum angka.
-    // ========================================================
-
-    let summaryHierarki =
-        null;
-
-
-    // ========================================================
-    // SUB KOMPONEN
-    // ========================================================
-
-    if (filterSubKomponen) {
-
-        summaryHierarki =
-            cariRingkasanHierarki(
-
-                rawData,
-
-                "subKomponen",
-
-                filterSubKomponen,
-
-                filterKomponen
-
-            );
-
-    }
-
-
-    // ========================================================
-    // KOMPONEN
-    // ========================================================
-
-    else if (filterKomponen) {
-
-        summaryHierarki =
-            cariRingkasanHierarki(
-
-                rawData,
-
-                "komponen",
-
-                filterKomponen
-
-            );
-
-    }
-
-
-    // ========================================================
-    // 3. HANYA FILTER HIERARKI
-    //
-    // Tidak ada Akun / Status / Pencarian.
-    //
-    // WAJIB menggunakan summary Excel.
-    // ========================================================
-
-    if (
-        summaryHierarki &&
-        !filterAkun &&
-        !filterStatus &&
-        !filterCari
-    ) {
-
-        console.log(
-
-            "Ringkasan menggunakan summary hierarki Excel:",
-
-            summaryHierarki
-
-        );
-
-
-        return summaryHierarki;
-
-    }
-
-
-   // ========================================================
-// 4. FILTER STATUS PADA KOMPONEN / SUB KOMPONEN
-//
-// Semua     = Summary
-// Diblokir  = Detail Diblokir
-// Normal    = Summary - Diblokir
-// ========================================================
-
-if (
-    filterStatus &&
-    !filterAkun &&
-    !filterCari
-) {
-
-    console.log("===== FILTER STATUS =====");
-    console.log("Status :", filterStatus);
-
-    // ---------------------------------------------
-    // Ambil seluruh data hierarki
-    // ---------------------------------------------
-
-    let semuaDataHierarki =
-        Array.isArray(window.dataLaporan)
-            ? window.dataLaporan
-            : [];
-
-    if (
-        !Array.isArray(semuaDataHierarki) ||
-        semuaDataHierarki.length === 0
-    ) {
-
-        semuaDataHierarki =
-            parseDataMonitoring(rawData);
-
-    }
-
-    // ---------------------------------------------
-    // Filter Komponen
-    // ---------------------------------------------
-
-    if (filterKomponen) {
-
-        semuaDataHierarki =
-            semuaDataHierarki.filter(item =>
-                item.komponen === filterKomponen
-            );
-
-    }
-
-    // ---------------------------------------------
-    // Filter Sub Komponen
-    // ---------------------------------------------
-
-    if (filterSubKomponen) {
-
-        semuaDataHierarki =
-            semuaDataHierarki.filter(item =>
-                item.subKomponen === filterSubKomponen
-            );
-
-    }
-
-    // ---------------------------------------------
-    // Summary yang dipakai
-    // ---------------------------------------------
-
-    const summaryDipakai =
-    summaryHierarki || totalGlobal;
-
-console.log("===== TOTAL GLOBAL =====");
-console.log(totalGlobal);
-
-console.log("===== SUMMARY HIERARKI =====");
-console.log(summaryHierarki);
-
-console.log("===== SUMMARY DIPAKAI =====");
-console.log(summaryDipakai);
-
-    // ---------------------------------------------
-    // Data Diblokir
-    // ---------------------------------------------
-
-    const dataDiblokir =
-        semuaDataHierarki.filter(item =>
-            item.statusPagu === "Diblokir"
-        );
-const ringkasanDiblokir =
-    hitungRingkasanDetail(dataDiblokir);
-
-console.log("===== SUMMARY DIPAKAI =====");
-console.log(summaryDipakai);
-
-console.log("===== RINGKASAN DIBLOKIR =====");
-console.log(ringkasanDiblokir);
-
-    // ---------------------------------------------
-    // STATUS DIBLOKIR
-    // ---------------------------------------------
-
-    if (filterStatus === "Diblokir") {
-
-        console.log("STATUS : DIBLOKIR");
-
-        return ringkasanDiblokir;
-
-    }
-
-    // ---------------------------------------------
-    // STATUS NORMAL
-    // ---------------------------------------------
-
-    if (filterStatus === "Normal") {
-
-        console.log("STATUS : NORMAL");
-
-        const pagu =
-            summaryDipakai.pagu -
-            ringkasanDiblokir.pagu;
-
-        const realisasi =
-            summaryDipakai.realisasi -
-            ringkasanDiblokir.realisasi;
-
-        const sisa =
-            pagu - realisasi;
-
-        const persen =
-            pagu > 0
-                ? (realisasi / pagu) * 100
-                : 0;
-
-        return {
-
-            pagu,
-
-            realisasi,
-
-            sisa,
-
-            persen,
-
-            index: summaryDipakai.index,
-
-            nama: summaryDipakai.nama
-
-        };
-
-    }
-
-}
-
-    // ========================================================
-    // 5. FILTER AKUN / PENCARIAN
-    //
-    // Untuk filter detail tetap menggunakan data yang sudah
-    // difilter laporan.js.
-    // ========================================================
-
-    return hitungRingkasanDetail(
-
-        dataDetail
-
+    const filterKomponen = clean(komponen);
+    const filterSubKomponen = clean(subKomponen);
+    const filterAkun = clean(akun);
+    const filterStatus = clean(status);
+    const filterCari = clean(cari);
+
+    const adaFilterAktif = Boolean(
+        adaFilter ||
+        filterKomponen ||
+        filterSubKomponen ||
+        filterAkun ||
+        filterStatus ||
+        filterCari
     );
 
-}
+    // Tanpa filter: gunakan total utama Google Sheet.
+    if (!adaFilterAktif) {
+        return ambilTotalUtama(rawData);
+    }
 
+    // PENTING: semua ringkasan harus dihitung dari scope yang
+    // sama dengan tabel Monitoring yang sedang ditampilkan.
+    let scoped = Array.isArray(dataDetail) ? [...dataDetail] : [];
+
+    if (filterKomponen) {
+        scoped = scoped.filter(item => item.komponen === filterKomponen);
+    }
+
+    if (filterSubKomponen) {
+        scoped = scoped.filter(item => item.subKomponen === filterSubKomponen);
+    }
+
+    if (filterAkun) {
+        scoped = scoped.filter(item => item.akun === filterAkun);
+    }
+
+    if (filterStatus) {
+        scoped = scoped.filter(item => item.statusPagu === filterStatus);
+    }
+
+    if (filterCari) {
+        const q = normalisasiNamaUntukPencarian(filterCari);
+        scoped = scoped.filter(item =>
+            normalisasiNamaUntukPencarian([
+                item.kegiatan,
+                item.output,
+                item.subOutput,
+                item.komponen,
+                item.subKomponen,
+                item.akun,
+                item.itemAkun,
+                item.rincianItem
+            ].join(" ")).includes(q)
+        );
+    }
+
+    // Hanya filter hierarki tanpa akun/status/pencarian boleh memakai
+    // summary Excel. Begitu Status Normal/Diblokir dipilih, angka wajib
+    // berasal dari detail yang sudah berada dalam scope filter.
+    if (
+        !filterAkun &&
+        !filterStatus &&
+        !filterCari &&
+        (filterKomponen || filterSubKomponen)
+    ) {
+        let summaryHierarki = null;
+
+        if (filterSubKomponen) {
+            summaryHierarki = cariRingkasanHierarki(
+                rawData,
+                "subKomponen",
+                filterSubKomponen,
+                filterKomponen
+            );
+        } else if (filterKomponen) {
+            summaryHierarki = cariRingkasanHierarki(
+                rawData,
+                "komponen",
+                filterKomponen
+            );
+        }
+
+        if (summaryHierarki) {
+            return summaryHierarki;
+        }
+    }
+
+    return hitungRingkasanDetail(scoped);
+}
 
 
 // ============================================================
