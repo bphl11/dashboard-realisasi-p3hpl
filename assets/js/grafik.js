@@ -361,6 +361,21 @@ document.addEventListener(
 // ============================================================
 
 function ambilDataUtamaGrafik(data) {
+
+    // DATA_APLIKASI: data bulanan dijumlahkan berdasarkan nama header.
+    if (typeof isDataAplikasi === "function" && isDataAplikasi(data) &&
+        typeof ambilBulananDataAplikasi === "function") {
+        const totalBulanan = ambilBulananDataAplikasi(data);
+        const bulan = [
+            "Januari","Februari","Maret","April","Mei","Juni",
+            "Juli","Agustus","September","Oktober","November","Desember"
+        ];
+        return {
+            bulanan: bulan.map(function (nama) {
+                return Number(totalBulanan[nama]) || 0;
+            })
+        };
+    }
     // Fungsi ini sekarang hanya bertanggung jawab mengambil data bulanan.
     // Nilai total Pagu/Realisasi/Sisa selalu berasal dari Calculation Engine.
     let rowTerbaik = null;
