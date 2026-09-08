@@ -19,6 +19,13 @@ document.addEventListener("DOMContentLoaded", async function () {
             ? parseDataMonitoring(dashboardRawData)
             : [];
 
+        // Kode Sub Komponen dipakai khusus untuk tata letak Dashboard.
+        // Tidak mengubah Calculation Engine maupun nilai anggaran.
+        lengkapiKodeSubKomponenDashboard(
+            dashboardParsedData,
+            dashboardRawData
+        );
+
         const normalData = dashboardParsedData.filter(function (item) {
             return item && item.statusPagu === "Normal";
         });
@@ -226,27 +233,120 @@ function metricDashboard(label, value, className) {
     return '<div class="metric-item ' + className + '"><span>' + label + '</span><strong>' + value + '</strong></div>';
 }
 
+function lengkapiKodeSubKomponenDashboard(items, rawData) {
+    if (!Array.isArray(items) || !Array.isArray(rawData)) return;
+
+    const context = typeof konteksDataAplikasi === "function"
+        ? konteksDataAplikasi(rawData)
+        : null;
+
+    if (!context || typeof nilaiHeaderDataAplikasi !== "function") return;
+
+    items.forEach(function (item) {
+        if (!item || !Number.isInteger(item.rowIndex)) return;
+
+        const row = Array.isArray(rawData[item.rowIndex])
+            ? rawData[item.rowIndex]
+            : [];
+
+        const kode = nilaiHeaderDataAplikasi(row, context.map, [
+            "Kode Sub Komponen",
+            "Kode Subkomponen",
+            "KodeSubKomponen"
+        ]);
+
+        item.kodeSubKomponen = kode || item.kodeSubKomponen || "-";
+    });
+}
+
+function bandingkanTeksDashboard(a, b) {
+    return String(a ?? "").localeCompare(
+        String(b ?? ""),
+        "id",
+        { numeric: true, sensitivity: "base" }
+    );
+}
+
 function tampilkanSubKomponenDashboard(items) {
     const container = document.getElementById("dashboardSubKomponen");
     const count = document.getElementById("jumlahSubKomponen");
     if (!container) return;
 
-    const groups = buatKelompokDashboard(items, ["komponen", "subKomponen"])
-        .sort(function (a, b) { return b.total.realisasi - a.total.realisasi; });
+    const groups = buatKelompokDashboard(items, [
+        "kodeKomponen",
+        "komponen",
+        "kodeSubKomponen",
+        "subKomponen"
+    ]).sort(function (a, b) {
+        return (
+            bandingkanTeksDashboard(a.values[0], b.values[0]) ||
+            bandingkanTeksDashboard(a.values[1], b.values[1]) ||
+            bandingkanTeksDashboard(a.values[2], b.values[2]) ||
+            bandingkanTeksDashboard(a.values[3], b.values[3])
+        );
+    });
 
     if (count) count.textContent = groups.length + " Sub Komponen";
 
+    const componentGroups = new Map();
+
+    groups.forEach(function (group) {
+        const kodeKomponen = group.values[0] === "Tidak Teridentifikasi"
+            ? "-"
+            : group.values[0];
+
+        const namaKomponen = group.values[1];
+        const key = kodeKomponen + "||" + namaKomponen;
+
+        if (!componentGroups.has(key)) {
+            componentGroups.set(key, {
+                kode: kodeKomponen,
+                nama: namaKomponen,
+                subKomponen: []
+            });
+        }
+
+        componentGroups.get(key).subKomponen.push(group);
+    });
+
     container.innerHTML = groups.length
-        ? groups.map(function (group) {
-            const total = group.total;
-            return '<tr>' +
-                '<td class="component-cell">' + escapeHtmlDashboard(group.values[0]) + '</td>' +
-                '<td class="subcomponent-cell">' + escapeHtmlDashboard(group.values[1]) + '</td>' +
-                '<td class="text-end">' + formatRupiahDashboard(total.pagu) + '</td>' +
-                '<td class="text-end text-success fw-semibold">' + formatRupiahDashboard(total.realisasi) + '</td>' +
-                '<td class="text-end text-danger-emphasis">' + formatRupiahDashboard(total.sisa) + '</td>' +
-                '<td class="text-end"><span class="percent-pill">' + formatPersenDashboard(total.persen) + '</span></td>' +
-            '</tr>';
+        ? Array.from(componentGroups.values()).map(function (component) {
+            const kodeKomponen = component.kode && component.kode !== "-"
+                ? component.kode + " - "
+                : "";
+
+            const componentHeader =
+                '<tr class="component-group-row">' +
+                    '<td colspan="6">' +
+                        '<span class="component-group-label">Komponen</span>' +
+                        '<strong>' +
+                            escapeHtmlDashboard(kodeKomponen + component.nama) +
+                        '</strong>' +
+                    '</td>' +
+                '</tr>';
+
+            const rows = component.subKomponen.map(function (group) {
+                const total = group.total;
+                const kodeSub = group.values[2] === "Tidak Teridentifikasi"
+                    ? ""
+                    : group.values[2];
+
+                const namaSub = group.values[3];
+                const subLabel = kodeSub
+                    ? kodeSub + " - " + namaSub
+                    : namaSub;
+
+                return '<tr>' +
+                    '<td class="subcomponent-indent"><span class="subcomponent-marker"><i class="bi bi-arrow-return-right"></i></span></td>' +
+                    '<td class="subcomponent-cell">' + escapeHtmlDashboard(subLabel) + '</td>' +
+                    '<td class="text-end">' + formatRupiahDashboard(total.pagu) + '</td>' +
+                    '<td class="text-end text-success fw-semibold">' + formatRupiahDashboard(total.realisasi) + '</td>' +
+                    '<td class="text-end text-danger-emphasis">' + formatRupiahDashboard(total.sisa) + '</td>' +
+                    '<td class="text-end"><span class="percent-pill">' + formatPersenDashboard(total.persen) + '</span></td>' +
+                '</tr>';
+            }).join("");
+
+            return componentHeader + rows;
         }).join("")
         : '<tr><td colspan="6" class="text-center text-muted py-4">Data sub komponen belum tersedia.</td></tr>';
 }
