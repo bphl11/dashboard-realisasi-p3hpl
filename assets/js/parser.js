@@ -86,20 +86,24 @@ function angkaDataAplikasi(value) {
     let text = String(value).trim();
     if (!text || text === "-") return 0;
 
-    text = text.replace(/Rp/gi, "").replace(/\s/g, "");
+    // DATA_APLIKASI adalah data anggaran dalam rupiah bulat.
+    // Google Sheet/CSV dapat mengirim pemisah ribuan dengan titik,
+    // koma, atau campuran keduanya. Parser lama gagal pada nilai
+    // seperti "13,984,002" sehingga nilainya menjadi 0.
+    // Normalisasi seluruh pemisah ribuan terlebih dahulu.
+    const negative = /^\s*-/.test(text);
 
-    if (text.includes(",")) {
-        text = text.replace(/\./g, "").replace(",", ".");
-    } else {
-        const dotCount = (text.match(/\./g) || []).length;
-        if (dotCount > 1 || /^-?\d{1,3}(\.\d{3})+$/.test(text)) {
-            text = text.replace(/\./g, "");
-        }
-    }
+    text = text
+        .replace(/Rp/gi, "")
+        .replace(/[^0-9.,]/g, "")
+        .replace(/[.,]/g, "");
 
-    text = text.replace(/[^0-9.-]/g, "");
+    if (!text) return 0;
+
     const number = Number(text);
-    return Number.isFinite(number) ? number : 0;
+    if (!Number.isFinite(number)) return 0;
+
+    return negative ? -number : number;
 }
 
 function statusDataAplikasi(value) {
