@@ -64,8 +64,6 @@ a.onchange=()=>{
 };
 
 ia.onchange=()=>{
-  reset(5);
-  opt(ia,filtered().map(r=>r.itemAkun),"Pilih Item Akun",!!a.value);
   opt(ri,filtered().map(r=>r.rincianItem),"Pilih Rincian Item",!!ia.value);
   wait("Pilih Rincian Item.");
 };
