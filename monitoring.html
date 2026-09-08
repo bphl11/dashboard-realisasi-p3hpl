@@ -103,7 +103,46 @@
         ================================================= */
 
         .monitoring-card {
-            border-radius: 12px;
+            border-radius: 16px;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        /* Monitoring harus tetap berada di area konten dan tidak
+           mendorong seluruh halaman ke kanan. */
+        body {
+            overflow-x: hidden;
+        }
+
+        .content {
+            min-width: 0;
+            overflow-x: hidden;
+        }
+
+        .dataTables_wrapper,
+        .table-responsive {
+            width: 100%;
+            max-width: 100%;
+        }
+
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        #tblMonitoring td {
+            white-space: normal;
+            word-break: normal;
+        }
+
+        @media (max-width: 991px) {
+            .content {
+                padding: 20px 14px;
+            }
+
+            .filter-area > div {
+                margin-bottom: 0;
+            }
         }
 
     </style>
@@ -166,19 +205,22 @@
             </li>
 
 
+            <!-- INPUT DATA -->
+
+            <li>
+                <a href="input-data.html">
+                    <i class="bi bi-pencil-square"></i>
+                    Input Data
+                </a>
+            </li>
+
             <!-- GRAFIK -->
 
             <li>
-
-                <li><a href="input-data.html"><i class="bi bi-pencil-square"></i> Input Data</a></li>
-<a href="grafik.html">
-
+                <a href="grafik.html">
                     <i class="bi bi-bar-chart"></i>
-
                     Grafik
-
                 </a>
-
             </li>
 
 
@@ -623,7 +665,7 @@
 <script src="assets/js/parser.js"></script>
 
 <!-- MONITORING -->
-<script src="assets/js/monitoring.js"></script></script>
+<script src="assets/js/monitoring.js"></script>
 
 
 </body>
