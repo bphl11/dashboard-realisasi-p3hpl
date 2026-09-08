@@ -1509,11 +1509,10 @@ function cariRingkasanHierarki(
                     kode
                 )
         ) {
-            // Sub Output menjadi konteks parent untuk Komponen.
-            komponenAktif =
-                namaBersih ||
-                namaAsli;
-
+            // 7279.BDB.001 = Sub Output / parent level.
+            // Bukan Komponen. Reset konteks Komponen agar data
+            // sibling tidak membawa parent sebelumnya.
+            komponenAktif = "";
             subKomponenKodeAktif = "";
 
             continue;
@@ -1526,6 +1525,9 @@ function cariRingkasanHierarki(
         //
         // Contoh:
         // 7279.BDB.001.051
+        //
+        // Ini harus menjadi konteks parent bagi Sub Komponen
+        // huruf yang muncul setelahnya.
         // ====================================================
 
         if (
@@ -1538,6 +1540,15 @@ function cariRingkasanHierarki(
             const komponenKode =
                 namaBersih ||
                 namaAsli;
+
+            // Penting: simpan konteks sebelum continue.
+            // Sebelumnya konteks ini tidak pernah diisi sehingga
+            // pencarian ringkasan Sub Komponen gagal dan Dashboard
+            // menampilkan Rp0.
+            komponenAktif =
+                komponenKode;
+
+            subKomponenKodeAktif = "";
 
             if (
                 level === "komponen" &&
@@ -1554,82 +1565,34 @@ function cariRingkasanHierarki(
                 );
             }
 
-            continue;
-
-        }
-
-
-        // ====================================================
-        // SUB KOMPONEN BERKODE
-        //
-        // Contoh:
-        // 7279.BDB.001.051
-        //
-        // Tetap didukung jika nama ini digunakan sebagai
-        // Sub Komponen pada filter.
-        // ====================================================
-
-        if (
-            /^\d{4}\.[A-Z0-9]+\.\d{3}\.\d{3}$/i
-                .test(
-                    kode
-                )
-        ) {
-
-            subKomponenKodeAktif =
-                namaBersih ||
-                namaAsli;
-
-
+            // Tetap mendukung bila level lama meminta kode ini
+            // sebagai Sub Komponen.
             if (
-                level ===
-                "subKomponen"
+                level === "subKomponen"
             ) {
 
                 const cocokNama =
                     namaSama(
-
-                        subKomponenKodeAktif,
-
+                        komponenKode,
                         target
-
                     );
-
 
                 const cocokParent =
-
-                    !parentTarget ||
-
-                    namaSama(
-
-                        komponenAktif,
-
-                        parentTarget
-
-                    );
-
+                    !parentTarget;
 
                 if (
                     cocokNama &&
                     cocokParent
                 ) {
-
                     return buatRingkasanDariRawRow(
-
                         row,
-
                         i,
-
-                        subKomponenKodeAktif,
-
+                        komponenKode,
                         "subKomponen"
-
                     );
-
                 }
 
             }
-
 
             continue;
 
@@ -2832,8 +2795,30 @@ function hitungCalculationEngine(rawData, parsedData) {
         ? parsedData
         : (typeof parseDataMonitoring === "function" ? parseDataMonitoring(rawData) : []);
 
-    const totalPagu = Number(total.pagu) || 0;
-    const totalRealisasi = Number(total.realisasi) || 0;
+    let totalPagu = Number(total.pagu) || 0;
+    let totalRealisasi = Number(total.realisasi) || 0;
+
+    // Jika Google Sheet aktif tidak memuat baris summary utama pada
+    // posisi kolom yang diharapkan, gunakan parser detail yang sama
+    // dengan Monitoring. Ini mencegah Dashboard kosong/Rp0.
+    if (
+        totalPagu <= 0 &&
+        totalRealisasi <= 0 &&
+        data.length > 0 &&
+        typeof hitungRingkasanDetail === "function"
+    ) {
+
+        const fallbackTotal =
+            hitungRingkasanDetail(data) ||
+            {};
+
+        totalPagu =
+            Number(fallbackTotal.pagu) || 0;
+
+        totalRealisasi =
+            Number(fallbackTotal.realisasi) || 0;
+
+    }
 
     const diblokirRows = data.filter(function (item) {
         return item && item.statusPagu === "Diblokir";
