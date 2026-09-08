@@ -2757,7 +2757,22 @@ function hitungCalculationEngine(rawData, parsedData) {
         },
         meta: {
             jumlahDetail: data.length,
-            jumlahDiblokir: diblokirRows.length
+            jumlahDiblokir: Array.isArray(rawData)
+                ? rawData.filter(function (row) {
+                    if (!Array.isArray(row)) return false;
+
+                    const nama = String(row[1] || "");
+                    const nilaiPagu = parseNumber(row[5]) || 0;
+                    const volume = parseNumber(row[2]);
+                    const hargaSatuan = parseNumber(row[4]);
+
+                    return (
+                        isDiblokir(nama) &&
+                        nilaiPagu > 0 &&
+                        (volume !== null || hargaSatuan !== null)
+                    );
+                }).length
+                : 0
         }
     };
 }
