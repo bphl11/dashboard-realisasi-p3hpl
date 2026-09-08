@@ -54,12 +54,37 @@ function konteksDataAplikasi(data) {
             if (key) map[key] = index;
         });
 
-        if (
-            Object.prototype.hasOwnProperty.call(map, "kode kegiatan") &&
-            Object.prototype.hasOwnProperty.call(map, "kegiatan") &&
-            Object.prototype.hasOwnProperty.call(map, "pagu") &&
-            Object.prototype.hasOwnProperty.call(map, "realisasi")
-        ) {
+        // DATA_APLIKASI versi baru dimulai dari level Sub Output.
+        // Kolom Kode Kegiatan, Kegiatan, Kode Output, dan Output dapat
+        // dihapus tanpa membuat parser gagal mendeteksi sumber data.
+        const punyaPagu = Object.prototype.hasOwnProperty.call(map, "pagu");
+        const punyaRealisasi =
+            Object.prototype.hasOwnProperty.call(map, "realisasi") ||
+            Object.prototype.hasOwnProperty.call(map, "jumlah realisasi");
+
+        const punyaIdentitasHierarki = [
+            "sub output",
+            "suboutput",
+            "nama sub output",
+            "nama suboutput",
+            "kode sub output",
+            "kode suboutput",
+            "komponen",
+            "nama komponen",
+            "sub komponen",
+            "subkomponen",
+            "nama sub komponen",
+            "akun belanja",
+            "akun",
+            "item akun",
+            "item",
+            "rincian item",
+            "rincian"
+        ].some(function (key) {
+            return Object.prototype.hasOwnProperty.call(map, key);
+        });
+
+        if (punyaPagu && punyaRealisasi && punyaIdentitasHierarki) {
             return { headerIndex: i, map: map };
         }
     }
@@ -127,12 +152,25 @@ function parseDataAplikasi(data) {
         const row = Array.isArray(data[i]) ? data[i] : [];
         if (!row.some(function (value) { return String(value ?? "").trim() !== ""; })) continue;
 
+        // Kolom sebelum Sub Output bersifat opsional pada DATA_APLIKASI baru.
         const kegiatan = nilaiHeaderDataAplikasi(row, map, ["Kegiatan"]);
         const kodeKegiatan = nilaiHeaderDataAplikasi(row, map, ["Kode Kegiatan"]);
         const output = nilaiHeaderDataAplikasi(row, map, ["Output"]);
         const kodeOutput = nilaiHeaderDataAplikasi(row, map, ["Kode Output"]);
-        const subOutput = nilaiHeaderDataAplikasi(row, map, ["Sub Output", "Kode Sub Output", "Kode Suboutput"]);
-        const kodeSubOutput = nilaiHeaderDataAplikasi(row, map, ["Kode Sub Output", "Kode Suboutput"]);
+
+        // Jangan pernah memakai kode sebagai nama Sub Output. Pada versi
+        // sebelumnya "Kode Sub Output" ikut terbaca sebagai subOutput sehingga
+        // grouping Dashboard/Komponen dapat salah.
+        const subOutput = nilaiHeaderDataAplikasi(row, map, [
+            "Sub Output",
+            "Suboutput",
+            "Nama Sub Output",
+            "Nama Suboutput"
+        ]);
+        const kodeSubOutput = nilaiHeaderDataAplikasi(row, map, [
+            "Kode Sub Output",
+            "Kode Suboutput"
+        ]);
 
         const komponen = nilaiHeaderDataAplikasi(row, map, ["Komponen", "Nama Komponen"]);
         const subKomponen = nilaiHeaderDataAplikasi(row, map, ["Sub Komponen", "Subkomponen", "Nama Sub Komponen"]);
