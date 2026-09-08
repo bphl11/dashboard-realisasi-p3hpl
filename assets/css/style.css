@@ -158,3 +158,43 @@ padding:20px;
 }
 
 }
+
+
+/* ==========================================================
+   DASHBOARD BARU - RINGKASAN TANPA BLOKIR
+   ========================================================== */
+.dashboard-page{max-width:1900px;margin:0 auto;}
+.dashboard-header{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:24px;}
+.dashboard-header h2{font-size:2rem;letter-spacing:.1px;margin-bottom:4px;}
+.dashboard-header p{margin:0;color:#6b7280;}
+.dashboard-badge{display:flex;align-items:center;gap:8px;background:#eaf4eb;color:#236c32;border:1px solid #cce3d0;padding:10px 14px;border-radius:10px;font-size:.9rem;font-weight:600;}
+.dashboard-highlight{background:linear-gradient(135deg,#ffffff 0%,#f8fbf8 100%);border:1px solid #e4e9e4;border-radius:18px;padding:25px 30px;margin-bottom:20px;box-shadow:0 7px 20px rgba(16,24,40,.06);}
+.highlight-label{font-size:1rem;font-weight:600;color:#667085;margin-bottom:6px;}
+.highlight-value{font-size:2.35rem;font-weight:800;line-height:1.1;color:#1f2937;letter-spacing:-.5px;}
+.highlight-text{margin-top:10px;color:#667085;font-size:.94rem;}
+.summary-card{height:100%;background:#fff;border:1px solid #e6e9ee;border-radius:14px;padding:18px;display:flex;align-items:center;gap:14px;box-shadow:0 4px 14px rgba(16,24,40,.05);}
+.summary-icon{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.25rem;}
+.summary-blue .summary-icon{background:#eaf1ff;color:#3563b8}.summary-green .summary-icon{background:#e9f7ef;color:#27804a}.summary-red .summary-icon{background:#fff0ef;color:#bd4a43}.summary-gold .summary-icon{background:#fff7df;color:#b5811d}
+.summary-label{font-size:.82rem;color:#667085;margin-bottom:4px;}.summary-value{font-size:1.18rem;font-weight:800;color:#243142;white-space:nowrap;}
+.dashboard-section{background:#fff;border:1px solid #e5e9ee;border-radius:16px;padding:18px;margin-top:20px;box-shadow:0 5px 16px rgba(16,24,40,.045);}
+.section-title{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:16px;}
+.section-title h4{font-size:1.08rem;margin:0 0 4px;color:#273444;font-weight:750;}.section-title h4 i{color:#3d7a4d;margin-right:7px;}.section-title p{margin:0;color:#7a8491;font-size:.84rem;}
+.section-count{white-space:nowrap;background:#f1f7f2;color:#356c42;padding:6px 10px;border-radius:20px;font-size:.78rem;font-weight:700;}
+.monthly-card{min-height:270px;padding:10px 5px 0;overflow-x:auto;}
+.monthly-chart{height:250px;min-width:760px;display:flex;align-items:stretch;gap:14px;border-bottom:1px solid #e5e7eb;padding:0 8px;}
+.month-column{flex:1;min-width:48px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;position:relative;}
+.month-bar-area{height:205px;width:100%;display:flex;align-items:flex-end;justify-content:center;background:repeating-linear-gradient(to top,transparent 0,transparent 49px,#f1f3f5 50px);border-radius:7px 7px 0 0;}
+.month-bar{width:62%;min-height:0;background:linear-gradient(180deg,#5d8b67,#2e6a3c);border-radius:7px 7px 2px 2px;transition:height .35s ease;}
+.month-name{font-size:.76rem;color:#667085;margin-top:8px;}
+.month-tooltip{position:absolute;bottom:235px;left:50%;transform:translateX(-50%);z-index:3;display:none;white-space:nowrap;background:#243142;color:#fff;border-radius:7px;padding:7px 9px;font-size:.72rem;box-shadow:0 5px 15px rgba(0,0,0,.16);}
+.month-column:hover .month-tooltip{display:block;}
+.component-card{background:#fff;border:1px solid #e5e9ee;border-radius:14px;padding:17px;box-shadow:0 4px 12px rgba(16,24,40,.035);}
+.component-card-title{display:flex;gap:10px;align-items:flex-start;margin-bottom:15px;}.component-card-title h5{font-size:.94rem;line-height:1.4;margin:2px 0 0;color:#2b3747;font-weight:700;}
+.component-icon{width:34px;height:34px;flex:0 0 34px;border-radius:9px;background:#edf6ee;color:#347042;display:flex;align-items:center;justify-content:center;}
+.component-metrics{display:grid;grid-template-columns:1fr;gap:8px;border-top:1px solid #eef0f2;padding-top:12px;}
+.metric-item{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:.8rem;}.metric-item span{color:#7a8491;}.metric-item strong{font-size:.82rem;white-space:nowrap;}.metric-blue strong{color:#3563b8}.metric-green strong{color:#2d7a46}.metric-red strong{color:#b94742}
+.progress-label{display:flex;justify-content:space-between;font-size:.78rem;color:#6b7280;margin-top:13px;margin-bottom:6px;}.progress-label strong{color:#7b5a15;}.component-progress{height:7px;background:#edf1ed;}.component-progress .progress-bar{background:#3d7a4d;}
+.dashboard-table-wrap{border:1px solid #e8ebef;border-radius:12px;overflow:hidden;}
+.dashboard-table{font-size:.82rem;}.dashboard-table thead th{background:#f5f7f9;color:#495566;font-weight:750;border-bottom:1px solid #dde2e7;white-space:nowrap;padding:12px 11px;}.dashboard-table td{padding:11px;border-color:#edf0f2;color:#465160;vertical-align:middle;}.dashboard-table tbody tr:hover{background:#f9fbfa;}.component-cell{font-weight:650;color:#334155!important;}.subcomponent-cell{color:#5d6876!important;}.percent-pill{display:inline-block;padding:4px 7px;border-radius:6px;background:#eef6ef;color:#357043;font-size:.76rem;font-weight:700;}.empty-dashboard{padding:35px;text-align:center;color:#7b8490;background:#fafbfc;border:1px dashed #d7dce2;border-radius:12px;}
+@media(max-width:991px){.dashboard-header{display:block}.dashboard-badge{display:inline-flex;margin-top:12px}.summary-value{font-size:1.05rem;}.dashboard-section{padding:14px;}.content{padding:18px;}}
+@media(max-width:575px){.highlight-value{font-size:1.7rem}.section-title{display:block}.section-count{display:inline-block;margin-top:10px}.dashboard-highlight{padding:20px;}.summary-card{padding:14px;}}
