@@ -26,11 +26,225 @@
 
 
 
+
+// ============================================================
+// DATA_APLIKASI ADAPTER
+// Format baru dibaca berdasarkan NAMA HEADER, bukan posisi kolom.
+// ============================================================
+
+function normalisasiHeaderDataAplikasi(value) {
+    return String(value ?? "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+        .replace(/[._-]/g, " ");
+}
+
+function konteksDataAplikasi(data) {
+    if (!Array.isArray(data)) return null;
+
+    const max = Math.min(data.length, 10);
+
+    for (let i = 0; i < max; i++) {
+        const row = Array.isArray(data[i]) ? data[i] : [];
+        const map = {};
+
+        row.forEach(function (value, index) {
+            const key = normalisasiHeaderDataAplikasi(value);
+            if (key) map[key] = index;
+        });
+
+        if (
+            Object.prototype.hasOwnProperty.call(map, "kode kegiatan") &&
+            Object.prototype.hasOwnProperty.call(map, "kegiatan") &&
+            Object.prototype.hasOwnProperty.call(map, "pagu") &&
+            Object.prototype.hasOwnProperty.call(map, "realisasi")
+        ) {
+            return { headerIndex: i, map: map };
+        }
+    }
+
+    return null;
+}
+
+function indeksHeaderDataAplikasi(map, aliases) {
+    for (const alias of aliases) {
+        const key = normalisasiHeaderDataAplikasi(alias);
+        if (Object.prototype.hasOwnProperty.call(map, key)) return map[key];
+    }
+    return -1;
+}
+
+function nilaiHeaderDataAplikasi(row, map, aliases) {
+    const index = indeksHeaderDataAplikasi(map, aliases);
+    return index >= 0 ? String(row[index] ?? "").trim() : "";
+}
+
+function angkaDataAplikasi(value) {
+    if (value === null || value === undefined) return 0;
+
+    let text = String(value).trim();
+    if (!text || text === "-") return 0;
+
+    text = text.replace(/Rp/gi, "").replace(/\s/g, "");
+
+    if (text.includes(",")) {
+        text = text.replace(/\./g, "").replace(",", ".");
+    } else {
+        const dotCount = (text.match(/\./g) || []).length;
+        if (dotCount > 1 || /^-?\d{1,3}(\.\d{3})+$/.test(text)) {
+            text = text.replace(/\./g, "");
+        }
+    }
+
+    text = text.replace(/[^0-9.-]/g, "");
+    const number = Number(text);
+    return Number.isFinite(number) ? number : 0;
+}
+
+function statusDataAplikasi(value) {
+    const text = String(value ?? "").trim().toLowerCase();
+    return text.includes("blok") ? "Diblokir" : "Normal";
+}
+
+function parseDataAplikasi(data) {
+    const context = konteksDataAplikasi(data);
+    if (!context) return null;
+
+    const hasil = [];
+    const map = context.map;
+
+    const bulan = [
+        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ];
+
+    for (let i = context.headerIndex + 1; i < data.length; i++) {
+        const row = Array.isArray(data[i]) ? data[i] : [];
+        if (!row.some(function (value) { return String(value ?? "").trim() !== ""; })) continue;
+
+        const kegiatan = nilaiHeaderDataAplikasi(row, map, ["Kegiatan"]);
+        const kodeKegiatan = nilaiHeaderDataAplikasi(row, map, ["Kode Kegiatan"]);
+        const output = nilaiHeaderDataAplikasi(row, map, ["Output"]);
+        const kodeOutput = nilaiHeaderDataAplikasi(row, map, ["Kode Output"]);
+        const subOutput = nilaiHeaderDataAplikasi(row, map, ["Sub Output", "Kode Sub Output", "Kode Suboutput"]);
+        const kodeSubOutput = nilaiHeaderDataAplikasi(row, map, ["Kode Sub Output", "Kode Suboutput"]);
+
+        const komponen = nilaiHeaderDataAplikasi(row, map, ["Komponen", "Nama Komponen"]);
+        const subKomponen = nilaiHeaderDataAplikasi(row, map, ["Sub Komponen", "Subkomponen", "Nama Sub Komponen"]);
+        const akun = nilaiHeaderDataAplikasi(row, map, ["Akun Belanja", "Akun"]);
+        const itemAkun = nilaiHeaderDataAplikasi(row, map, ["Item Akun", "Item"]);
+        const rincianItem = nilaiHeaderDataAplikasi(row, map, ["Rincian Item", "Rincian"]);
+
+        const pagu = angkaDataAplikasi(nilaiHeaderDataAplikasi(row, map, ["Pagu"]));
+        const realisasi = angkaDataAplikasi(nilaiHeaderDataAplikasi(row, map, ["Realisasi", "Jumlah Realisasi"]));
+        const sisaRaw = nilaiHeaderDataAplikasi(row, map, ["Sisa", "Sisa Anggaran"]);
+        const sisa = sisaRaw === "" || sisaRaw === "-" ? Math.max(pagu - realisasi, 0) : angkaDataAplikasi(sisaRaw);
+        const statusPagu = statusDataAplikasi(nilaiHeaderDataAplikasi(row, map, ["Status Pagu", "Status"]));
+
+        const hasIdentity = kegiatan || kodeKegiatan || output || kodeOutput || subOutput || kodeSubOutput || komponen || subKomponen || akun || itemAkun || rincianItem;
+        if (!hasIdentity && pagu === 0 && realisasi === 0) continue;
+
+        const item = {
+            rowIndex: i,
+            sourceFormat: "DATA_APLIKASI",
+            kode: akun || kodeKegiatan || kodeSubOutput || kodeOutput || "-",
+            kodeKegiatan: kodeKegiatan || "-",
+            kegiatan: kegiatan || "-",
+            kodeOutput: kodeOutput || "-",
+            output: output || "-",
+            subOutput: subOutput || kodeSubOutput || "-",
+            komponen: komponen || "-",
+            subKomponen: subKomponen || "-",
+            akun: akun || "-",
+            itemAkun: itemAkun || "-",
+            rincianItem: rincianItem || "-",
+            statusPagu: statusPagu,
+            pagu: pagu,
+            realisasi: realisasi,
+            sisa: sisa,
+            persen: pagu > 0 ? (realisasi / pagu) * 100 : 0,
+            isRincian: Boolean(rincianItem && rincianItem !== "-"),
+            bulanan: {}
+        };
+
+        bulan.forEach(function (namaBulan) {
+            item.bulanan[namaBulan] = angkaDataAplikasi(
+                nilaiHeaderDataAplikasi(row, map, [namaBulan])
+            );
+        });
+
+        hasil.push(item);
+    }
+
+    console.log("FORMAT DATA: DATA_APLIKASI");
+    console.log("TOTAL DATA HASIL PARSER:", hasil.length);
+
+    return hasil;
+}
+
+function totalDataAplikasi(data) {
+    const parsed = Array.isArray(data) && data.length && data[0] && data[0].sourceFormat === "DATA_APLIKASI"
+        ? data
+        : parseDataAplikasi(data);
+
+    if (!Array.isArray(parsed)) return null;
+
+    return ringkasDataAplikasi(parsed);
+}
+
+function ringkasDataAplikasi(items) {
+    const rows = Array.isArray(items) ? items : [];
+
+    let pagu = 0;
+    let realisasi = 0;
+
+    rows.forEach(function (item) {
+        pagu += Number(item?.pagu) || 0;
+        realisasi += Number(item?.realisasi) || 0;
+    });
+
+    return {
+        pagu: pagu,
+        realisasi: realisasi,
+        sisa: Math.max(pagu - realisasi, 0),
+        persen: pagu > 0 ? (realisasi / pagu) * 100 : 0
+    };
+}
+
+function isDataAplikasi(data) {
+    return Boolean(konteksDataAplikasi(data));
+}
+
+function ambilBulananDataAplikasi(data) {
+    const parsed = Array.isArray(data) && data.length && data[0] && data[0].sourceFormat === "DATA_APLIKASI"
+        ? data
+        : parseDataAplikasi(data);
+
+    const bulan = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+    const hasil = {};
+    bulan.forEach(function (nama) { hasil[nama] = 0; });
+
+    (parsed || []).forEach(function (item) {
+        bulan.forEach(function (nama) {
+            hasil[nama] += Number(item?.bulanan?.[nama]) || 0;
+        });
+    });
+
+    return hasil;
+}
+
 // ============================================================
 // 1. PARSER DATA MONITORING
 // ============================================================
 
 function parseDataMonitoring(data) {
+
+    // DATA_APLIKASI adalah sumber standar baru.
+    // Jika header terdeteksi, jangan gunakan parser hierarki lama.
+    if (isDataAplikasi(data)) {
+        return parseDataAplikasi(data) || [];
+    }
 
     const hasil = [];
 
@@ -738,6 +952,12 @@ window.hasilParser = hasil;
 
 function ambilTotalUtama(data) {
 
+    // Total DATA_APLIKASI dihitung dari seluruh baris detail flat.
+    const totalDataBaru = totalDataAplikasi(data);
+    if (totalDataBaru) {
+        return totalDataBaru;
+    }
+
     if (!Array.isArray(data)) {
 
         return buatTotalKosong();
@@ -984,6 +1204,14 @@ function hitungRingkasanData(
     rawData,
     options = {}
 ) {
+
+    // DATA_APLIKASI sudah berupa baris detail final.
+    // Ringkasan harus selalu berasal dari scope yang sama dengan tabel.
+    if (Array.isArray(dataDetail) && dataDetail.some(function (item) {
+        return item && item.sourceFormat === "DATA_APLIKASI";
+    })) {
+        return ringkasDataAplikasi(dataDetail);
+    }
     const {
         adaFilter = false,
         komponen = "",
@@ -2700,6 +2928,36 @@ function hitungBlokirDariRawData(rawData) {
 // ============================================================
 
 function hitungCalculationEngine(rawData, parsedData) {
+
+    // Calculation engine khusus DATA_APLIKASI.
+    // Status Pagu tersedia langsung di sumber sehingga tidak perlu
+    // lagi inferensi blokir dari teks hierarki Excel lama.
+    if (isDataAplikasi(rawData)) {
+        const detail = Array.isArray(parsedData) && parsedData.some(function (item) {
+            return item && item.sourceFormat === "DATA_APLIKASI";
+        })
+            ? parsedData
+            : (parseDataAplikasi(rawData) || []);
+
+        const normal = detail.filter(function (item) {
+            return item.statusPagu === "Normal";
+        });
+
+        const diblokir = detail.filter(function (item) {
+            return item.statusPagu === "Diblokir";
+        });
+
+        return {
+            total: ringkasDataAplikasi(detail),
+            diblokir: ringkasDataAplikasi(diblokir),
+            tanpaBlokir: ringkasDataAplikasi(normal),
+            meta: {
+                jumlahDetail: detail.length,
+                jumlahDiblokir: diblokir.length,
+                sourceFormat: "DATA_APLIKASI"
+            }
+        };
+    }
 
     const total = typeof ambilTotalUtama === "function"
         ? (ambilTotalUtama(rawData) || {})
