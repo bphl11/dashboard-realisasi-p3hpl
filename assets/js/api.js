@@ -6,6 +6,112 @@
 
 
 // ============================================================
+// AMBIL TRANSAKSI INPUT_REALISASI
+//
+// Endpoint Google Apps Script mengembalikan JSON:
+// {
+//   success: true,
+//   data: [
+//     {
+//       id_input,
+//       index_record,
+//       bulan,
+//       nominal_realisasi,
+//       keterangan
+//     }
+//   ]
+// }
+// ============================================================
+
+async function fetchInputRealisasi() {
+
+    if (
+        typeof CONFIG === "undefined" ||
+        !CONFIG.INPUT_REALISASI_URL
+    ) {
+
+        return [];
+
+    }
+
+
+    const separator =
+        CONFIG.INPUT_REALISASI_URL.includes("?")
+            ? "&"
+            : "?";
+
+
+    const url =
+        CONFIG.INPUT_REALISASI_URL +
+        separator +
+        "action=list";
+
+
+    const response = await fetch(
+        url,
+        {
+            cache: "no-store"
+        }
+    );
+
+
+    if (!response.ok) {
+
+        throw new Error(
+            "Gagal mengambil INPUT_REALISASI. HTTP " +
+            response.status
+        );
+
+    }
+
+
+    const text =
+        await response.text();
+
+
+    let payload;
+
+    try {
+
+        payload =
+            JSON.parse(
+                text
+            );
+
+    } catch (error) {
+
+        throw new Error(
+            "Respons INPUT_REALISASI bukan JSON yang valid."
+        );
+
+    }
+
+
+    if (
+        !payload ||
+        payload.success !== true
+    ) {
+
+        throw new Error(
+            payload?.message ||
+            "Endpoint INPUT_REALISASI mengembalikan respons gagal."
+        );
+
+    }
+
+
+    return Array.isArray(
+        payload.data
+    )
+
+        ? payload.data
+
+        : [];
+
+}
+
+
+// ============================================================
 // AMBIL DATA GOOGLE SHEET
 // ============================================================
 
@@ -25,11 +131,20 @@ async function fetchSheetData() {
         }
 
 
-        const response = await fetch(
-            CONFIG.SHEET_URL,
-            {
-                cache: "no-store"
-            }
+        const [
+            response,
+            inputRealisasi
+        ] = await Promise.all(
+            [
+                fetch(
+                    CONFIG.SHEET_URL,
+                    {
+                        cache: "no-store"
+                    }
+                ),
+
+                fetchInputRealisasi()
+            ]
         );
 
 
@@ -58,9 +173,21 @@ async function fetchSheetData() {
         const data = csvToArray(csv);
 
 
+        // Transaksi tambahan disimpan sebagai metadata pada array raw.
+        // Bentuk utama tetap Array agar seluruh halaman lama tidak perlu
+        // diubah. parser.js akan menggabungkannya berdasarkan INDEX_RECORD.
+        data.__inputRealisasi =
+            inputRealisasi;
+
+
         console.log(
             "JUMLAH BARIS GOOGLE SHEET:",
             data.length
+        );
+
+        console.log(
+            "JUMLAH TRANSAKSI INPUT_REALISASI:",
+            inputRealisasi.length
         );
 
 

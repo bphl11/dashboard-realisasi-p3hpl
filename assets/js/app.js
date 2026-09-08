@@ -23,14 +23,22 @@ document.addEventListener("DOMContentLoaded", async function () {
             return item && item.statusPagu === "Normal";
         });
 
-        // Angka kartu utama harus mengikuti DATA_APLIKASI secara langsung.
-        // Jangan bergantung pada hasil parser untuk total, karena parser hanya
-        // dipakai untuk struktur/hierarki Komponen dan Sub Komponen.
-        const total = ringkasDashboardRawNormal(dashboardRawData);
+        // Semua kartu Dashboard wajib memakai Calculation Engine yang sama
+        // dengan Grafik, Komponen, Monitoring, dan Laporan. Untuk DATA_APLIKASI,
+        // parser sudah menggabungkan INPUT_REALISASI ke Realisasi Final per record.
+        // Dengan demikian setiap transaksi INPUT_REALISASI hanya masuk satu kali.
+        const calculation = typeof hitungCalculationEngine === "function"
+            ? hitungCalculationEngine(dashboardRawData, dashboardParsedData)
+            : null;
 
-        console.log("DASHBOARD NORMAL (RAW DATA_APLIKASI):", {
+        const total = calculation && calculation.tanpaBlokir
+            ? calculation.tanpaBlokir
+            : ringkasDashboard(normalData);
+
+        console.log("DASHBOARD TANPA BLOKIR (CALCULATION ENGINE):", {
             jumlahDataParser: normalData.length,
-            total: total
+            total: total,
+            calculation: calculation
         });
 
         tampilkanRingkasanDashboard(total);

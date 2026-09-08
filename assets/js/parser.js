@@ -223,6 +223,15 @@ function parseDataAplikasi(data) {
         hasil.push(item);
     }
 
+
+    gabungkanInputRealisasi(
+        hasil,
+        ambilInputRealisasiDariRaw(
+            data
+        )
+    );
+
+
     console.log("FORMAT DATA: DATA_APLIKASI");
     console.log("TOTAL DATA HASIL PARSER:", hasil.length);
 
@@ -279,6 +288,286 @@ function ambilBulananDataAplikasi(data) {
 
     return hasil;
 }
+
+
+// ============================================================
+// INPUT_REALISASI ADAPTER
+//
+// INPUT_REALISASI adalah transaksi tambahan dan tidak mengganti
+// nilai DATA_APLIKASI. Setiap transaksi dicocokkan dengan rowIndex
+// DATA_APLIKASI melalui INDEX_RECORD.
+// ============================================================
+
+function normalisasiBulanInputRealisasi(value) {
+
+    const nama =
+        String(
+            value ?? ""
+        )
+            .trim()
+            .toLowerCase();
+
+
+    const bulan = {
+        januari: "Januari",
+        februari: "Februari",
+        maret: "Maret",
+        april: "April",
+        mei: "Mei",
+        juni: "Juni",
+        juli: "Juli",
+        agustus: "Agustus",
+        september: "September",
+        oktober: "Oktober",
+        november: "November",
+        desember: "Desember"
+    };
+
+
+    return (
+        bulan[
+            nama
+        ] ||
+        ""
+    );
+
+}
+
+
+function ambilInputRealisasiDariRaw(data) {
+
+    if (
+        !Array.isArray(
+            data
+        )
+    ) {
+
+        return [];
+
+    }
+
+
+    const input =
+        data.__inputRealisasi;
+
+
+    return Array.isArray(
+        input
+    )
+
+        ? input
+
+        : [];
+
+}
+
+
+function gabungkanInputRealisasi(
+    items,
+    inputRealisasi
+) {
+
+    if (
+        !Array.isArray(
+            items
+        )
+    ) {
+
+        return [];
+
+    }
+
+
+    if (
+        !Array.isArray(
+            inputRealisasi
+        ) ||
+        !inputRealisasi.length
+    ) {
+
+        return items;
+
+    }
+
+
+    const byIndex =
+        new Map();
+
+
+    items.forEach(
+        function (
+            item
+        ) {
+
+            byIndex.set(
+                Number(
+                    item.rowIndex
+                ),
+                item
+            );
+
+        }
+    );
+
+
+    let diterapkan =
+        0;
+
+
+    let diabaikan =
+        0;
+
+
+    inputRealisasi.forEach(
+        function (
+            transaksi
+        ) {
+
+            const indexRecord =
+                Number(
+                    transaksi?.index_record ??
+                    transaksi?.INDEX_RECORD ??
+                    transaksi?.indexRecord
+                );
+
+
+            const bulan =
+                normalisasiBulanInputRealisasi(
+                    transaksi?.bulan ??
+                    transaksi?.BULAN
+                );
+
+
+            const nominal =
+                angkaDataAplikasi(
+                    transaksi?.nominal_realisasi ??
+                    transaksi?.NOMINAL_REALISASI ??
+                    transaksi?.nominalRealisasi
+                );
+
+
+            const item =
+                byIndex.get(
+                    indexRecord
+                );
+
+
+            if (
+                !item ||
+                !bulan ||
+                !Number.isFinite(
+                    nominal
+                ) ||
+                nominal <= 0
+            ) {
+
+                diabaikan++;
+
+                return;
+
+            }
+
+
+            item.bulanan =
+                item.bulanan ||
+                {};
+
+
+            item.bulanan[
+                bulan
+            ] =
+                (
+                    Number(
+                        item.bulanan[
+                            bulan
+                        ]
+                    ) ||
+                    0
+                ) +
+                nominal;
+
+
+            item.realisasi =
+                (
+                    Number(
+                        item.realisasi
+                    ) ||
+                    0
+                ) +
+                nominal;
+
+
+            item.sisa =
+                Math.max(
+                    (
+                        Number(
+                            item.pagu
+                        ) ||
+                        0
+                    ) -
+                    (
+                        Number(
+                            item.realisasi
+                        ) ||
+                        0
+                    ),
+                    0
+                );
+
+
+            item.persen =
+                (
+                    Number(
+                        item.pagu
+                    ) ||
+                    0
+                ) > 0
+
+                    ? (
+                        (
+                            Number(
+                                item.realisasi
+                            ) ||
+                            0
+                        ) /
+                        Number(
+                            item.pagu
+                        )
+                    ) *
+                    100
+
+                    : 0;
+
+
+            diterapkan++;
+
+        }
+    );
+
+
+    console.log(
+        "INPUT_REALISASI diterapkan:",
+        diterapkan
+    );
+
+
+    if (
+        diabaikan > 0
+    ) {
+
+        console.warn(
+            "INPUT_REALISASI diabaikan:",
+            diabaikan
+        );
+
+    }
+
+
+    return items;
+
+}
+
+
 
 // ============================================================
 // 1. PARSER DATA MONITORING
