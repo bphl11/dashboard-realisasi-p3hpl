@@ -174,7 +174,9 @@ document.addEventListener(
             // khusus karena membutuhkan Januari - Desember.
             // =================================================
 
-            const calculation = hitungCalculationEngine(grafikRawData, grafikParsedData);\n\n            const totalData = { ...calculation.total, bulanan: ambilDataUtamaGrafik(grafikRawData).bulanan };
+            const calculation = hitungCalculationEngine(grafikRawData, grafikParsedData);
+
+            const totalData = { ...calculation.total, bulanan: ambilDataUtamaGrafik(grafikRawData).bulanan };
 
 
             console.log(
