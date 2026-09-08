@@ -15,6 +15,11 @@ document.addEventListener("DOMContentLoaded", async function () {
   const inputNominal = document.getElementById("inputNominal");
   const inputKeterangan = document.getElementById("inputKeterangan");
   const realisasiFormMessage = document.getElementById("realisasiFormMessage");
+  const btnSimpanRealisasi = document.getElementById("btnSimpanRealisasi");
+  const inputIdPreview = document.getElementById("inputIdPreview");
+
+  // Endpoint Google Apps Script untuk penyimpanan INPUT_REALISASI.
+  const INPUT_REALISASI_ENDPOINT = "https://script.google.com/macros/s/AKfycbzdDEvYU0r_9qKeQQZSdcPRtgz01kFsHdMm6PM5nj8K21c28oV4k53co6cCJC8risZScQ/exec";
 
   let rows = [];
 
@@ -33,6 +38,8 @@ document.addEventListener("DOMContentLoaded", async function () {
     inputNominal.value="";
     inputKeterangan.value="";
     realisasiFormMessage.textContent="";
+    inputIdPreview.value="Dibuat otomatis saat disimpan";
+    btnSimpanRealisasi.disabled=true;
   }
 
   function showRealisasiForm(record){
@@ -40,7 +47,9 @@ document.addEventListener("DOMContentLoaded", async function () {
     inputBulan.value="";
     inputNominal.value="";
     inputKeterangan.value="";
-    realisasiFormMessage.textContent="Form siap digunakan. Penyimpanan masih belum aktif pada tahap ini.";
+    inputIdPreview.value="Dibuat otomatis saat disimpan";
+    realisasiFormMessage.textContent="Form siap digunakan. Data akan disimpan ke sheet INPUT_REALISASI.";
+    btnSimpanRealisasi.disabled=false;
     realisasiFormCard.classList.remove("d-none");
   }
 
@@ -148,9 +157,80 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
   };
 
-  realisasiForm.addEventListener("submit", event=>{
+  realisasiForm.addEventListener("submit", async event=>{
     event.preventDefault();
-    realisasiFormMessage.textContent="Penyimpanan belum aktif. Pada tahap berikutnya tombol ini akan menulis ID_INPUT, INDEX_RECORD, BULAN, NOMINAL_REALISASI, dan KETERANGAN ke sheet INPUT_REALISASI.";
+
+    const indexRecord=Number(inputIndexRecord.value);
+    const bulan=clean(inputBulan.value);
+    const nominalRealisasi=Number(inputNominal.value);
+    const keterangan=clean(inputKeterangan.value);
+
+    if(!indexRecord){
+      realisasiFormMessage.className="small mt-3 text-danger";
+      realisasiFormMessage.textContent="INDEX_RECORD tidak valid. Pilih kembali record yang akan direalisasikan.";
+      return;
+    }
+    if(!bulan){
+      realisasiFormMessage.className="small mt-3 text-danger";
+      realisasiFormMessage.textContent="Pilih bulan realisasi terlebih dahulu.";
+      inputBulan.focus();
+      return;
+    }
+    if(!Number.isFinite(nominalRealisasi)||nominalRealisasi<=0){
+      realisasiFormMessage.className="small mt-3 text-danger";
+      realisasiFormMessage.textContent="Nominal realisasi harus berupa angka lebih dari 0.";
+      inputNominal.focus();
+      return;
+    }
+
+    const payload={
+      index_record:indexRecord,
+      bulan:bulan,
+      nominal_realisasi:nominalRealisasi,
+      keterangan:keterangan
+    };
+
+    const originalHtml=btnSimpanRealisasi.innerHTML;
+    btnSimpanRealisasi.disabled=true;
+    btnSimpanRealisasi.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Menyimpan...';
+    realisasiFormMessage.className="small mt-3 text-muted";
+    realisasiFormMessage.textContent="Mengirim transaksi ke INPUT_REALISASI...";
+
+    try{
+      const response=await fetch(INPUT_REALISASI_ENDPOINT,{
+        method:"POST",
+        headers:{
+          "Content-Type":"text/plain;charset=utf-8"
+        },
+        body:JSON.stringify(payload)
+      });
+
+      const responseText=await response.text();
+      let result;
+      try{
+        result=JSON.parse(responseText);
+      }catch(parseError){
+        throw new Error("Respons endpoint tidak dapat dibaca. Pastikan deployment Apps Script menggunakan URL /exec dan akses 'Siapa saja'.");
+      }
+
+      if(!response.ok||!result.success){
+        throw new Error(result?.message||"Penyimpanan realisasi gagal.");
+      }
+
+      inputIdPreview.value=result?.data?.id_input||"Berhasil disimpan";
+      inputNominal.value="";
+      inputKeterangan.value="";
+      inputBulan.value="";
+      realisasiFormMessage.className="small mt-3 text-success";
+      realisasiFormMessage.innerHTML='<i class="bi bi-check-circle-fill me-1"></i>Realisasi berhasil disimpan ke INPUT_REALISASI.';
+    }catch(error){
+      console.error("Gagal menyimpan INPUT_REALISASI:",error);
+      realisasiFormMessage.className="small mt-3 text-danger";
+      realisasiFormMessage.innerHTML='<i class="bi bi-x-circle-fill me-1"></i>'+String(error.message||"Gagal menyimpan realisasi.");
+    }finally{
+      btnSimpanRealisasi.disabled=false;
+      btnSimpanRealisasi.innerHTML=originalHtml;
+    }
   });
 
   try{
