@@ -69,8 +69,13 @@ function konteksDataAplikasi(data) {
             "nama suboutput",
             "kode sub output",
             "kode suboutput",
+            "kode komponen",
+            "kodekomponen",
             "komponen",
             "nama komponen",
+            "kode sub komponen",
+            "kode subkomponen",
+            "kodesubkomponen",
             "sub komponen",
             "subkomponen",
             "nama sub komponen",
@@ -176,6 +181,7 @@ function parseDataAplikasi(data) {
 
         const kodeKomponen = nilaiHeaderDataAplikasi(row, map, ["Kode Komponen", "KodeKomponen"]);
         const komponen = nilaiHeaderDataAplikasi(row, map, ["Komponen", "Nama Komponen"]);
+        const kodeSubKomponen = nilaiHeaderDataAplikasi(row, map, ["Kode Sub Komponen", "Kode Subkomponen", "KodeSubKomponen"]);
         const subKomponen = nilaiHeaderDataAplikasi(row, map, ["Sub Komponen", "Subkomponen", "Nama Sub Komponen"]);
         const akun = nilaiHeaderDataAplikasi(row, map, ["Akun Belanja", "Akun"]);
         const itemAkun = nilaiHeaderDataAplikasi(row, map, ["Item Akun", "Item"]);
@@ -188,7 +194,7 @@ function parseDataAplikasi(data) {
         const sisa = sisaRaw === "" || sisaRaw === "-" ? Math.max(pagu - realisasi, 0) : angkaDataAplikasi(sisaRaw);
         const statusPagu = statusDataAplikasi(nilaiHeaderDataAplikasi(row, map, ["Status Pagu", "Status"]));
 
-        const hasIdentity = kegiatan || kodeKegiatan || output || kodeOutput || subOutput || kodeSubOutput || kodeKomponen || komponen || subKomponen || akun || itemAkun || detilAkun || rincianItem;
+        const hasIdentity = kegiatan || kodeKegiatan || output || kodeOutput || subOutput || kodeSubOutput || kodeKomponen || komponen || kodeSubKomponen || subKomponen || akun || itemAkun || detilAkun || rincianItem;
         if (!hasIdentity && pagu === 0 && realisasi === 0) continue;
 
         const item = {
@@ -202,6 +208,7 @@ function parseDataAplikasi(data) {
             subOutput: subOutput || kodeSubOutput || "-",
             kodeKomponen: kodeKomponen || "-",
             komponen: komponen || "-",
+            kodeSubKomponen: kodeSubKomponen || "-",
             subKomponen: subKomponen || "-",
             akun: akun || "-",
             itemAkun: itemAkun || "-",
