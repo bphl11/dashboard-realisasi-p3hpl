@@ -2832,8 +2832,26 @@ function hitungCalculationEngine(rawData, parsedData) {
         ? parsedData
         : (typeof parseDataMonitoring === "function" ? parseDataMonitoring(rawData) : []);
 
-    const totalPagu = Number(total.pagu) || 0;
-    const totalRealisasi = Number(total.realisasi) || 0;
+    // Total utama idealnya berasal dari summary Excel. Namun beberapa
+    // publikasi Google Sheet tidak membawa baris summary tersebut dengan
+    // angka pada indeks yang sama. Jangan biarkan Dashboard menjadi Rp0:
+    // gunakan ringkasan detail anti-double-count sebagai fallback.
+    let totalPagu = Number(total.pagu) || 0;
+    let totalRealisasi = Number(total.realisasi) || 0;
+
+    if ((totalPagu <= 0 && totalRealisasi <= 0) && data.length > 0 &&
+        typeof hitungRingkasanDetail === "function") {
+
+        const fallbackTotal = hitungRingkasanDetail(data) || {};
+
+        totalPagu = Number(fallbackTotal.pagu) || 0;
+        totalRealisasi = Number(fallbackTotal.realisasi) || 0;
+
+        console.warn(
+            "Calculation Engine: summary utama tidak ditemukan, menggunakan fallback detail.",
+            { totalPagu, totalRealisasi }
+        );
+    }
 
     const diblokirRows = data.filter(function (item) {
         return item && item.statusPagu === "Diblokir";
