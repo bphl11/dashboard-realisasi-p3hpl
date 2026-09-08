@@ -1287,63 +1287,20 @@ function updateRingkasanLaporan() {
 
     // ========================================================
     // TANPA FILTER
-    //
-    // Total utama harus mengikuti baris total Excel.
+    // Semua halaman wajib memakai Calculation Engine yang sama.
     // ========================================================
 
-    if (!adaFilter) {
+    if (!adaFilter && typeof hitungCalculationEngine === "function") {
 
-        console.log(
-
-            "Ringkasan Laporan: menggunakan ambilTotalUtama()"
-
+        const engine = hitungCalculationEngine(
+            rawDataLaporan,
+            dataLaporan
         );
 
-
-        const totalUtama =
-
-            ambilTotalUtama(
-
-                rawDataLaporan
-
-            );
-
-
-        ringkasan = {
-
-            pagu:
-
-                Number(
-                    totalUtama.pagu
-                ) || 0,
-
-
-            realisasi:
-
-                Number(
-                    totalUtama.realisasi
-                ) || 0,
-
-
-            sisa:
-
-                Number(
-                    totalUtama.sisa
-                ) || 0,
-
-
-            persen:
-
-                Number(
-                    totalUtama.persen
-                ) || 0
-
-        };
+        ringkasan = engine.total;
 
     }
-
-
-    // ========================================================
+// ========================================================
     // DENGAN FILTER
     // ========================================================
 

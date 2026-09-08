@@ -58,10 +58,11 @@ document.addEventListener(
             // AMBIL TOTAL UTAMA
             // =================================================
 
-            const totalSemua =
-                ambilTotalDashboard(
-                    dashboardRawData
-                );
+            const parsedDashboardData = parseDataMonitoring(dashboardRawData);
+
+            const calculation = hitungCalculationEngine(dashboardRawData, parsedDashboardData);
+
+            const totalSemua = calculation.total;
 
 
             console.log(
@@ -74,11 +75,7 @@ document.addEventListener(
             // HITUNG DASHBOARD TANPA BLOKIR
             // =================================================
 
-            const totalTanpaBlokir =
-                hitungDashboardTanpaBlokir(
-                    dashboardRawData,
-                    totalSemua
-                );
+            const totalTanpaBlokir = calculation.tanpaBlokir;
 
 
             console.log(

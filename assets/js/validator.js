@@ -52,7 +52,12 @@ function duplicateDetector(data){
 
     data.forEach(function(item){
 
-        const key = item.auditId || "";
+        const key = String(item.auditId || "").trim();
+
+        // Audit ID kosong bukan identitas yang sama; jangan menandainya sebagai duplikat.
+        if (!key) {
+            return;
+        }
 
         if(!map.has(key)){
 

@@ -2821,3 +2821,128 @@ function escapeHtml(
         );
 
 }
+
+
+// ============================================================
+// CALCULATION ENGINE
+// Single Source of Truth untuk Dashboard, Monitoring, Grafik dan Laporan.
+//
+// Aturan:
+// 1. Total selalu berasal dari summary utama Excel (ambilTotalUtama).
+// 2. Nilai diblokir berasal dari detail parser dengan perlindungan anti
+//    double count (hitungRingkasanDetail).
+// 3. Nilai tanpa blokir = Total - Diblokir.
+// ============================================================
+
+function hitungCalculationEngine(rawData, parsedData) {
+
+    const total = typeof ambilTotalUtama === "function"
+        ? (ambilTotalUtama(rawData) || {})
+        : {};
+
+    const data = Array.isArray(parsedData)
+        ? parsedData
+        : (typeof parseDataMonitoring === "function" ? parseDataMonitoring(rawData) : []);
+
+    const totalPagu = Number(total.pagu) || 0;
+    const totalRealisasi = Number(total.realisasi) || 0;
+
+    const diblokirRows = data.filter(function (item) {
+        return item && item.statusPagu === "Diblokir";
+    });
+
+    let diblokirDetail = { pagu: 0, realisasi: 0 };
+
+    if (typeof hitungRingkasanDetail === "function") {
+        diblokirDetail = hitungRingkasanDetail(diblokirRows) || diblokirDetail;
+    }
+
+    const paguDiblokir = Math.min(
+        Math.max(Number(diblokirDetail.pagu) || 0, 0),
+        totalPagu
+    );
+
+    const realisasiDiblokir = Math.min(
+        Math.max(Number(diblokirDetail.realisasi) || 0, 0),
+        totalRealisasi
+    );
+
+    const paguTanpaBlokir = Math.max(totalPagu - paguDiblokir, 0);
+    const realisasiTanpaBlokir = Math.max(totalRealisasi - realisasiDiblokir, 0);
+
+    const totalSisa = Math.max(totalPagu - totalRealisasi, 0);
+    const sisaDiblokir = Math.max(paguDiblokir - realisasiDiblokir, 0);
+    const sisaTanpaBlokir = Math.max(paguTanpaBlokir - realisasiTanpaBlokir, 0);
+
+    return {
+        total: {
+            pagu: totalPagu,
+            realisasi: totalRealisasi,
+            sisa: totalSisa,
+            persen: totalPagu > 0 ? (totalRealisasi / totalPagu) * 100 : 0
+        },
+        diblokir: {
+            pagu: paguDiblokir,
+            realisasi: realisasiDiblokir,
+            sisa: sisaDiblokir,
+            persen: paguDiblokir > 0 ? (realisasiDiblokir / paguDiblokir) * 100 : 0
+        },
+        tanpaBlokir: {
+            pagu: paguTanpaBlokir,
+            realisasi: realisasiTanpaBlokir,
+            sisa: sisaTanpaBlokir,
+            persen: paguTanpaBlokir > 0 ? (realisasiTanpaBlokir / paguTanpaBlokir) * 100 : 0
+        },
+        meta: {
+            jumlahDetail: data.length,
+            jumlahDiblokir: diblokirRows.length
+        }
+    };
+}
+
+// Alias singkat untuk pemakaian lintas halaman.
+function hitungRingkasanAnggaran(rawData, parsedData) {
+    return hitungCalculationEngine(rawData, parsedData);
+}
+
+
+// ============================================================
+// CONSISTENCY CHECK
+// Dipanggil setelah semua halaman menghitung ringkasan.
+// ============================================================
+function cekKonsistensiCalculationEngine(rawData, parsedData, summaries) {
+    const engine = hitungCalculationEngine(rawData, parsedData);
+    const hasil = {};
+    Object.keys(summaries || {}).forEach(function (nama) {
+        const nilai = summaries[nama] || {};
+        const sama = ["pagu", "realisasi", "sisa"].every(function (k) {
+            return Math.abs((Number(nilai[k]) || 0) - (Number(engine.total[k]) || 0)) < 0.01;
+        });
+        hasil[nama] = { sama: sama, nilai: nilai, acuan: engine.total };
+    });
+    return hasil;
+}
+
+
+// ============================================================
+// FINAL VERIFICATION REPORT
+// Digunakan untuk mencatat satu snapshot angka dari Google Sheet aktif.
+// ============================================================
+function buatLaporanVerifikasiAkhir(rawData, parsedData) {
+    const engine = hitungCalculationEngine(rawData, parsedData);
+    const snapshot = {
+        paguTotal: engine.total.pagu,
+        paguDiblokir: engine.diblokir.pagu,
+        paguTanpaBlokir: engine.tanpaBlokir.pagu,
+        realisasiTotal: engine.total.realisasi,
+        realisasiDiblokir: engine.diblokir.realisasi,
+        realisasiTanpaBlokir: engine.tanpaBlokir.realisasi
+    };
+    return {
+        snapshot,
+        identities: {
+            pagu: Math.abs(snapshot.paguTotal - (snapshot.paguDiblokir + snapshot.paguTanpaBlokir)) < 0.01,
+            realisasi: Math.abs(snapshot.realisasiTotal - (snapshot.realisasiDiblokir + snapshot.realisasiTanpaBlokir)) < 0.01
+        }
+    };
+}

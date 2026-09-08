@@ -509,3 +509,22 @@ rows.forEach(function(row){
     );
 
 }
+
+// ============================================================
+// STATUS BLOKIR AUDIT
+// Mengikuti konteks parent, bukan hanya teks pada baris aktif.
+// ============================================================
+function resolveStatusBlokirHierarki(rawData, rowIndex) {
+    let diblokir = false;
+    for (let i = 0; i <= rowIndex; i++) {
+        const row = rawData[i] || [];
+        const kode = typeof clean === "function" ? clean(row[0]) : String(row[0] || "").trim();
+        const nama = typeof clean === "function" ? clean(row[1]) : String(row[1] || "").trim();
+        if (!kode && !nama) continue;
+        if (typeof isDiblokir === "function" && isDiblokir(nama)) diblokir = true;
+        if (/^\d{4}$/.test(kode) || /^\d{4}\.[A-Z0-9]+$/i.test(kode)) {
+            diblokir = typeof isDiblokir === "function" && isDiblokir(nama);
+        }
+    }
+    return diblokir ? "Diblokir" : "Normal";
+}
