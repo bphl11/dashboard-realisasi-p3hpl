@@ -1110,6 +1110,27 @@ function tampilkanMonitoringDashboard(rawData) {
 
             }
 
+            // Jika summary Excel tidak ditemukan karena struktur baris
+            // berbeda, hitung hanya detail milik pasangan Komponen +
+            // Sub Komponen dengan anti-double-count.
+            if (!summary) {
+
+                const detailSub =
+                    data.filter(x =>
+                        x.komponen === item.komponen &&
+                        x.subKomponen === item.subKomponen
+                    );
+
+                summary =
+                    typeof hitungRingkasanDetail === "function"
+                        ? hitungRingkasanDetail(detailSub)
+                        : {
+                            pagu: 0,
+                            realisasi: 0
+                        };
+
+            }
+
             subMap.set(key, {
 
                 komponen:
@@ -1119,14 +1140,10 @@ function tampilkanMonitoringDashboard(rawData) {
                     item.subKomponen,
 
                 pagu:
-                    summary
-                        ? Number(summary.pagu) || 0
-                        : 0,
+                    Number(summary.pagu) || 0,
 
                 realisasi:
-                    summary
-                        ? Number(summary.realisasi) || 0
-                        : 0,
+                    Number(summary.realisasi) || 0,
 
                 realisasiDiblokir:
                     0
@@ -1603,7 +1620,7 @@ const daftarKomponen = [];
 
 data.forEach(item => {
 
-    if (!item.komponen) return;
+    if (!item.komponen || item.komponen === "-") return;
 
     if (!daftarKomponen.includes(item.komponen)) {
         daftarKomponen.push(item.komponen);
@@ -1629,10 +1646,19 @@ daftarKomponen.forEach(namaKomponen => {
 
     if (!ringkasan) {
 
-        ringkasan = {
-            pagu: 0,
-            realisasi: 0
-        };
+        // Fallback yang tetap memakai data parser dan anti-double-count.
+        const detailKomponen =
+            data.filter(item =>
+                item.komponen === namaKomponen
+            );
+
+        ringkasan =
+            typeof hitungRingkasanDetail === "function"
+                ? hitungRingkasanDetail(detailKomponen)
+                : {
+                    pagu: 0,
+                    realisasi: 0
+                };
 
     }
 
