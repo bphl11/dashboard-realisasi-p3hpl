@@ -198,3 +198,43 @@ padding:20px;
 .dashboard-table{font-size:.82rem;}.dashboard-table thead th{background:#f5f7f9;color:#495566;font-weight:750;border-bottom:1px solid #dde2e7;white-space:nowrap;padding:12px 11px;}.dashboard-table td{padding:11px;border-color:#edf0f2;color:#465160;vertical-align:middle;}.dashboard-table tbody tr:hover{background:#f9fbfa;}.component-cell{font-weight:650;color:#334155!important;}.subcomponent-cell{color:#5d6876!important;}.percent-pill{display:inline-block;padding:4px 7px;border-radius:6px;background:#eef6ef;color:#357043;font-size:.76rem;font-weight:700;}.empty-dashboard{padding:35px;text-align:center;color:#7b8490;background:#fafbfc;border:1px dashed #d7dce2;border-radius:12px;}
 @media(max-width:991px){.dashboard-header{display:block}.dashboard-badge{display:inline-flex;margin-top:12px}.summary-value{font-size:1.05rem;}.dashboard-section{padding:14px;}.content{padding:18px;}}
 @media(max-width:575px){.highlight-value{font-size:1.7rem}.section-title{display:block}.section-count{display:inline-block;margin-top:10px}.dashboard-highlight{padding:20px;}.summary-card{padding:14px;}}
+
+/* ==========================================================
+   RINGKASAN SUB KOMPONEN - HIERARKI PER KOMPONEN
+   ========================================================== */
+.dashboard-table .component-group-row td{
+    background:#eef5ef!important;
+    color:#285f36!important;
+    padding:11px 14px!important;
+    border-top:2px solid #d8e7da!important;
+    border-bottom:1px solid #d8e7da!important;
+}
+.component-group-label{
+    display:inline-block;
+    margin-right:10px;
+    padding:3px 8px;
+    border-radius:999px;
+    background:#dcecdf;
+    color:#356c42;
+    font-size:.7rem;
+    font-weight:800;
+    letter-spacing:.02em;
+    text-transform:uppercase;
+}
+.component-group-row strong{
+    font-weight:800;
+}
+.subcomponent-indent{
+    width:44px;
+    padding-left:18px!important;
+    padding-right:4px!important;
+    text-align:center;
+}
+.subcomponent-marker{
+    color:#7a9a80;
+    font-size:.9rem;
+}
+.dashboard-table .subcomponent-cell{
+    padding-left:4px!important;
+    font-weight:600;
+}
