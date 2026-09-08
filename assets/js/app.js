@@ -231,24 +231,45 @@ function tampilkanSubKomponenDashboard(items) {
     const count = document.getElementById("jumlahSubKomponen");
     if (!container) return;
 
-    const groups = buatKelompokDashboard(items, ["komponen", "subKomponen"])
-        .sort(function (a, b) { return b.total.realisasi - a.total.realisasi; });
+    const groups = buatKelompokDashboard(items, ["kodeKomponen", "komponen", "kodeSubKomponen", "subKomponen"])
+        .sort(function (a, b) {
+            const kodeKomponenA = a.values[0] === "Tidak Teridentifikasi" ? "ZZZZ" : a.values[0];
+            const kodeKomponenB = b.values[0] === "Tidak Teridentifikasi" ? "ZZZZ" : b.values[0];
+            const urutKomponen = kodeKomponenA.localeCompare(kodeKomponenB, "id", { numeric: true, sensitivity: "base" });
+            if (urutKomponen !== 0) return urutKomponen;
+
+            const namaKomponenA = a.values[1] === "Tidak Teridentifikasi" ? "ZZZZ" : a.values[1];
+            const namaKomponenB = b.values[1] === "Tidak Teridentifikasi" ? "ZZZZ" : b.values[1];
+            const urutNamaKomponen = namaKomponenA.localeCompare(namaKomponenB, "id", { numeric: true, sensitivity: "base" });
+            if (urutNamaKomponen !== 0) return urutNamaKomponen;
+
+            const kodeSubA = a.values[2] === "Tidak Teridentifikasi" ? "ZZZZ" : a.values[2];
+            const kodeSubB = b.values[2] === "Tidak Teridentifikasi" ? "ZZZZ" : b.values[2];
+            const urutSub = kodeSubA.localeCompare(kodeSubB, "id", { numeric: true, sensitivity: "base" });
+            if (urutSub !== 0) return urutSub;
+
+            return a.values[3].localeCompare(b.values[3], "id", { numeric: true, sensitivity: "base" });
+        });
 
     if (count) count.textContent = groups.length + " Sub Komponen";
 
     container.innerHTML = groups.length
         ? groups.map(function (group) {
             const total = group.total;
+            const kodeKomponen = group.values[0] === "Tidak Teridentifikasi" ? "-" : group.values[0];
+            const kodeSubKomponen = group.values[2] === "Tidak Teridentifikasi" ? "-" : group.values[2];
             return '<tr>' +
-                '<td class="component-cell">' + escapeHtmlDashboard(group.values[0]) + '</td>' +
-                '<td class="subcomponent-cell">' + escapeHtmlDashboard(group.values[1]) + '</td>' +
+                '<td class="text-nowrap fw-semibold">' + escapeHtmlDashboard(kodeKomponen) + '</td>' +
+                '<td class="component-cell">' + escapeHtmlDashboard(group.values[1]) + '</td>' +
+                '<td class="text-nowrap fw-semibold">' + escapeHtmlDashboard(kodeSubKomponen) + '</td>' +
+                '<td class="subcomponent-cell">' + escapeHtmlDashboard(group.values[3]) + '</td>' +
                 '<td class="text-end">' + formatRupiahDashboard(total.pagu) + '</td>' +
                 '<td class="text-end text-success fw-semibold">' + formatRupiahDashboard(total.realisasi) + '</td>' +
                 '<td class="text-end text-danger-emphasis">' + formatRupiahDashboard(total.sisa) + '</td>' +
                 '<td class="text-end"><span class="percent-pill">' + formatPersenDashboard(total.persen) + '</span></td>' +
             '</tr>';
         }).join("")
-        : '<tr><td colspan="6" class="text-center text-muted py-4">Data sub komponen belum tersedia.</td></tr>';
+        : '<tr><td colspan="8" class="text-center text-muted py-4">Data sub komponen belum tersedia.</td></tr>';
 }
 
 function tampilkanMonitoringDashboard(items) {
