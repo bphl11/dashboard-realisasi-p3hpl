@@ -2922,3 +2922,27 @@ function cekKonsistensiCalculationEngine(rawData, parsedData, summaries) {
     });
     return hasil;
 }
+
+
+// ============================================================
+// FINAL VERIFICATION REPORT
+// Digunakan untuk mencatat satu snapshot angka dari Google Sheet aktif.
+// ============================================================
+function buatLaporanVerifikasiAkhir(rawData, parsedData) {
+    const engine = hitungCalculationEngine(rawData, parsedData);
+    const snapshot = {
+        paguTotal: engine.total.pagu,
+        paguDiblokir: engine.diblokir.pagu,
+        paguTanpaBlokir: engine.tanpaBlokir.pagu,
+        realisasiTotal: engine.total.realisasi,
+        realisasiDiblokir: engine.diblokir.realisasi,
+        realisasiTanpaBlokir: engine.tanpaBlokir.realisasi
+    };
+    return {
+        snapshot,
+        identities: {
+            pagu: Math.abs(snapshot.paguTotal - (snapshot.paguDiblokir + snapshot.paguTanpaBlokir)) < 0.01,
+            realisasi: Math.abs(snapshot.realisasiTotal - (snapshot.realisasiDiblokir + snapshot.realisasiTanpaBlokir)) < 0.01
+        }
+    };
+}
