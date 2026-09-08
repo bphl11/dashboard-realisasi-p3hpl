@@ -758,6 +758,36 @@ function tampilkanGrafikBulanan(
     data
 ) {
 
+    // DATA_APLIKASI: jumlahkan setiap bulan dari seluruh baris detail.
+    if (typeof isDataAplikasi === "function" && isDataAplikasi(data) &&
+        typeof ambilBulananDataAplikasi === "function") {
+        const totalBulanan = ambilBulananDataAplikasi(data);
+        const container = document.getElementById("grafikBulanan");
+        if (!container) return;
+
+        const namaBulan = [
+            "Januari","Februari","Maret","April","Mei","Juni",
+            "Juli","Agustus","September","Oktober","November","Desember"
+        ];
+        const nilaiBulanan = namaBulan.map(function (bulan) {
+            return Number(totalBulanan[bulan]) || 0;
+        });
+        const maxValue = Math.max.apply(null, nilaiBulanan.concat([1]));
+
+        let html = "";
+        namaBulan.forEach(function (bulan, index) {
+            const nilai = nilaiBulanan[index];
+            const persen = (nilai / maxValue) * 100;
+            html += '<div class="dashboard-month-row">' +
+                '<div class="dashboard-month-name">' + bulan + '</div>' +
+                '<div class="dashboard-month-track"><div class="dashboard-month-bar" style="width:' + persen + '%"></div></div>' +
+                '<div class="dashboard-month-value">' + formatRupiahDashboard(nilai) + '</div>' +
+                '</div>';
+        });
+        container.innerHTML = html;
+        return;
+    }
+
     const container =
         document.getElementById(
             "grafikBulanan"
