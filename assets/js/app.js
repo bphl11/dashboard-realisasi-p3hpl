@@ -23,10 +23,13 @@ document.addEventListener("DOMContentLoaded", async function () {
             return item && item.statusPagu === "Normal";
         });
 
-        const total = ringkasDashboard(normalData);
+        // Angka kartu utama harus mengikuti DATA_APLIKASI secara langsung.
+        // Jangan bergantung pada hasil parser untuk total, karena parser hanya
+        // dipakai untuk struktur/hierarki Komponen dan Sub Komponen.
+        const total = ringkasDashboardRawNormal(dashboardRawData);
 
-        console.log("DASHBOARD NORMAL:", {
-            jumlahData: normalData.length,
+        console.log("DASHBOARD NORMAL (RAW DATA_APLIKASI):", {
+            jumlahDataParser: normalData.length,
             total: total
         });
 
@@ -41,6 +44,59 @@ document.addEventListener("DOMContentLoaded", async function () {
         tampilkanErrorDashboard(error);
     }
 });
+
+// ============================================================
+// SUMBER ANGKA RESMI DASHBOARD
+// Menjumlahkan langsung kolom Pagu dan Realisasi dari DATA_APLIKASI
+// dengan Status Pagu = Normal. Ini mencegah baris valid hilang karena
+// proses pengelompokan/hierarki parser.
+// ============================================================
+function ringkasDashboardRawNormal(rawData) {
+    const context = typeof konteksDataAplikasi === "function"
+        ? konteksDataAplikasi(rawData)
+        : null;
+
+    if (!context) {
+        return ringkasDashboard([]);
+    }
+
+    let pagu = 0;
+    let realisasi = 0;
+
+    for (let i = context.headerIndex + 1; i < rawData.length; i++) {
+        const row = Array.isArray(rawData[i]) ? rawData[i] : [];
+        if (!row.some(function (value) { return String(value ?? "").trim() !== ""; })) continue;
+
+        const statusRaw = typeof nilaiHeaderDataAplikasi === "function"
+            ? nilaiHeaderDataAplikasi(row, context.map, ["Status Pagu", "Status"])
+            : "";
+
+        // Hanya status Normal yang masuk "Tanpa Blokir".
+        if (String(statusRaw).trim().toLowerCase() !== "normal") continue;
+
+        const paguRaw = typeof nilaiHeaderDataAplikasi === "function"
+            ? nilaiHeaderDataAplikasi(row, context.map, ["Pagu"])
+            : "";
+
+        const realisasiRaw = typeof nilaiHeaderDataAplikasi === "function"
+            ? nilaiHeaderDataAplikasi(row, context.map, ["Realisasi", "Jumlah Realisasi"])
+            : "";
+
+        const toNumber = typeof angkaDataAplikasi === "function"
+            ? angkaDataAplikasi
+            : function (value) { return Number(value) || 0; };
+
+        pagu += toNumber(paguRaw);
+        realisasi += toNumber(realisasiRaw);
+    }
+
+    return {
+        pagu: pagu,
+        realisasi: realisasi,
+        sisa: Math.max(pagu - realisasi, 0),
+        persen: pagu > 0 ? (realisasi / pagu) * 100 : 0
+    };
+}
 
 function ringkasDashboard(items) {
     if (typeof ringkasDataAplikasi === "function" &&
@@ -63,7 +119,6 @@ function ringkasDashboard(items) {
 }
 
 function tampilkanRingkasanDashboard(total) {
-    setTextDashboard("realisasiTanpaBlokir", formatRupiahDashboard(total.realisasi));
     setTextDashboard("totalPagu", formatRupiahDashboard(total.pagu));
     setTextDashboard("totalRealisasi", formatRupiahDashboard(total.realisasi));
     setTextDashboard("totalSisa", formatRupiahDashboard(total.sisa));
