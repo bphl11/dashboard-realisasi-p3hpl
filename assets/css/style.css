@@ -238,3 +238,107 @@ padding:20px;
     padding-left:4px!important;
     font-weight:600;
 }
+
+
+/* ==========================================================
+   IDENTITAS APLIKASI - KEMENTERIAN KEHUTANAN
+   ========================================================== */
+.sidebar{
+    width:290px;
+    padding:22px 18px;
+}
+
+.logo.app-brand{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    text-align:left;
+    padding:8px 6px 24px;
+    margin-bottom:8px;
+    border-bottom:1px solid rgba(255,255,255,.16);
+}
+
+.brand-mark{
+    width:58px;
+    height:58px;
+    flex:0 0 58px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:5px;
+    border-radius:14px;
+    background:rgba(255,255,255,.96);
+    box-shadow:0 5px 14px rgba(0,0,0,.14);
+}
+
+.logo.app-brand .logo-sidebar{
+    width:100%;
+    height:100%;
+    max-width:none;
+    object-fit:contain;
+    display:block;
+}
+
+.brand-text{
+    min-width:0;
+    line-height:1.2;
+}
+
+.brand-ministry{
+    font-size:.58rem;
+    font-weight:800;
+    letter-spacing:.08em;
+    color:#dfeee1;
+    white-space:nowrap;
+}
+
+.brand-title{
+    margin-top:4px;
+    font-size:.9rem;
+    font-weight:800;
+    letter-spacing:.035em;
+    color:#fff;
+    white-space:nowrap;
+}
+
+.brand-subtitle{
+    margin-top:4px;
+    font-size:.72rem;
+    color:#c6d9c9;
+}
+
+.sidebar li a{
+    display:block;
+    color:inherit;
+    text-decoration:none;
+}
+
+.sidebar li a:hover{
+    color:inherit;
+}
+
+@media(max-width:991px){
+    .sidebar{
+        width:290px;
+    }
+}
+
+@media(max-width:575px){
+    .logo.app-brand{
+        gap:10px;
+    }
+
+    .brand-mark{
+        width:52px;
+        height:52px;
+        flex-basis:52px;
+    }
+
+    .brand-ministry{
+        font-size:.53rem;
+    }
+
+    .brand-title{
+        font-size:.8rem;
+    }
+}
