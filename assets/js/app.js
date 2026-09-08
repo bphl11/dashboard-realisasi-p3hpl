@@ -195,18 +195,20 @@ function tampilkanKomponenDashboard(items) {
     const count = document.getElementById("jumlahKomponen");
     if (!container) return;
 
-    const groups = buatKelompokDashboard(items, ["komponen"])
+    const groups = buatKelompokDashboard(items, ["kodeKomponen", "komponen"])
         .sort(function (a, b) { return b.total.realisasi - a.total.realisasi; });
 
     if (count) count.textContent = groups.length + " Komponen";
 
     container.innerHTML = groups.length
         ? groups.map(function (group) {
-            const nama = group.values[0];
+            const kode = group.values[0] === "Tidak Teridentifikasi" ? "" : group.values[0];
+            const nama = group.values[1];
+            const judul = kode ? kode + " - " + nama : nama;
             const total = group.total;
             return '<div class="col-12 col-lg-6 col-xxl-4">' +
                 '<article class="component-card h-100">' +
-                    '<div class="component-card-title"><span class="component-icon"><i class="bi bi-folder2-open"></i></span><h5>' + escapeHtmlDashboard(nama) + '</h5></div>' +
+                    '<div class="component-card-title"><span class="component-icon"><i class="bi bi-folder2-open"></i></span><h5>' + escapeHtmlDashboard(judul) + '</h5></div>' +
                     '<div class="component-metrics">' +
                         metricDashboard("Pagu", formatRupiahDashboard(total.pagu), "metric-blue") +
                         metricDashboard("Realisasi", formatRupiahDashboard(total.realisasi), "metric-green") +
