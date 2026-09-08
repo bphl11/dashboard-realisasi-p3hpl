@@ -784,120 +784,23 @@ function jalankanFilterMonitoring() {
 // ============================================================
 
 function updateRingkasanMonitoring() {
-
-    const komponen =
-        document.getElementById(
-            "filterKomponen"
-        )?.value || "";
-
-    const subKomponen =
-        document.getElementById(
-            "filterSubKomponen"
-        )?.value || "";
-
-    const akun =
-        document.getElementById(
-            "filterAkun"
-        )?.value || "";
-
-    const status =
-        document.getElementById(
-            "filterStatus"
-        )?.value || "";
-    console.log("====================================");
-console.log("MONITORING - PARAMETER");
-
-console.log("Komponen :", komponen);
-console.log("Sub Komponen :", subKomponen);
-console.log("Akun :", akun);
-console.log("Status :", status);
-
-console.log(
-    "Jumlah dataMonitoringFiltered :",
-    dataMonitoringFiltered.length
-);
-
-console.log("====================================");
-
-   const ringkasan =
-    hitungRingkasanData(
-        dataMonitoringFiltered,
-        rawMonitoringData,
-        {
-            adaFilter: !!(
-                komponen ||
-                subKomponen ||
-                akun ||
-                status
-            ),
-
-            komponen,
-            subKomponen,
-            akun,
-            status
-        }
-    );
-
-console.log("RINGKASAN AKHIR =", ringkasan);
-
-const elPagu =
-    document.getElementById(
-        "monitorPagu"
-    );
-
-    const elRealisasi =
-        document.getElementById(
-            "monitorRealisasi"
-        );
-
-    const elSisa =
-        document.getElementById(
-            "monitorSisa"
-        );
-
-    const elPersen =
-        document.getElementById(
-            "monitorPersen"
-        );
-
-
-    if (elPagu) {
-
-        elPagu.textContent =
-            formatRupiah(
-                ringkasan.pagu
-            );
-
+    const komponen = document.getElementById("filterKomponen")?.value || "";
+    const subKomponen = document.getElementById("filterSubKomponen")?.value || "";
+    const akun = document.getElementById("filterAkun")?.value || "";
+    const status = document.getElementById("filterStatus")?.value || "";
+    const adaFilter = Boolean(komponen || subKomponen || akun || status);
+    let ringkasan;
+    if (!adaFilter && typeof hitungCalculationEngine === "function") {
+        ringkasan = hitungCalculationEngine(rawMonitoringData, dataMonitoring).total;
+    } else {
+        ringkasan = hitungRingkasanData(dataMonitoringFiltered, rawMonitoringData, { adaFilter, komponen, subKomponen, akun, status });
     }
-
-    if (elRealisasi) {
-
-        elRealisasi.textContent =
-            formatRupiah(
-                ringkasan.realisasi
-            );
-
-    }
-
-    if (elSisa) {
-
-    elSisa.textContent =
-        formatRupiah(
-            ringkasan.sisa
-        );
-
+    document.getElementById("monitorPagu").textContent = formatRupiah(ringkasan.pagu);
+    document.getElementById("monitorRealisasi").textContent = formatRupiah(ringkasan.realisasi);
+    document.getElementById("monitorSisa").textContent = formatRupiah(ringkasan.sisa);
+    document.getElementById("monitorPersen").textContent = formatPersen(ringkasan.persen);
 }
 
-    if (elPersen) {
-
-        elPersen.textContent =
-            formatPersen(
-                ringkasan.persen
-            );
-
-    }
-
-}
 // ============================================================
 // RENDER TABEL MONITORING
 // ============================================================
