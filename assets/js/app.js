@@ -58,7 +58,11 @@ document.addEventListener(
             // AMBIL TOTAL UTAMA
             // =================================================
 
-            const parsedDashboardData = parseDataMonitoring(dashboardRawData);\n\n            const calculation = hitungCalculationEngine(dashboardRawData, parsedDashboardData);\n\n            const totalSemua = calculation.total;
+            const parsedDashboardData = parseDataMonitoring(dashboardRawData);
+
+            const calculation = hitungCalculationEngine(dashboardRawData, parsedDashboardData);
+
+            const totalSemua = calculation.total;
 
 
             console.log(
