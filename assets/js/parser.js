@@ -2821,3 +2821,86 @@ function escapeHtml(
         );
 
 }
+
+
+// ============================================================
+// CALCULATION ENGINE
+// Single Source of Truth untuk Dashboard, Monitoring, Grafik dan Laporan.
+//
+// Aturan:
+// 1. Total selalu berasal dari summary utama Excel (ambilTotalUtama).
+// 2. Nilai diblokir berasal dari detail parser dengan perlindungan anti
+//    double count (hitungRingkasanDetail).
+// 3. Nilai tanpa blokir = Total - Diblokir.
+// ============================================================
+
+function hitungCalculationEngine(rawData, parsedData) {
+
+    const total = typeof ambilTotalUtama === "function"
+        ? (ambilTotalUtama(rawData) || {})
+        : {};
+
+    const data = Array.isArray(parsedData)
+        ? parsedData
+        : (typeof parseDataMonitoring === "function" ? parseDataMonitoring(rawData) : []);
+
+    const totalPagu = Number(total.pagu) || 0;
+    const totalRealisasi = Number(total.realisasi) || 0;
+
+    const diblokirRows = data.filter(function (item) {
+        return item && item.statusPagu === "Diblokir";
+    });
+
+    let diblokirDetail = { pagu: 0, realisasi: 0 };
+
+    if (typeof hitungRingkasanDetail === "function") {
+        diblokirDetail = hitungRingkasanDetail(diblokirRows) || diblokirDetail;
+    }
+
+    const paguDiblokir = Math.min(
+        Math.max(Number(diblokirDetail.pagu) || 0, 0),
+        totalPagu
+    );
+
+    const realisasiDiblokir = Math.min(
+        Math.max(Number(diblokirDetail.realisasi) || 0, 0),
+        totalRealisasi
+    );
+
+    const paguTanpaBlokir = Math.max(totalPagu - paguDiblokir, 0);
+    const realisasiTanpaBlokir = Math.max(totalRealisasi - realisasiDiblokir, 0);
+
+    const totalSisa = Math.max(totalPagu - totalRealisasi, 0);
+    const sisaDiblokir = Math.max(paguDiblokir - realisasiDiblokir, 0);
+    const sisaTanpaBlokir = Math.max(paguTanpaBlokir - realisasiTanpaBlokir, 0);
+
+    return {
+        total: {
+            pagu: totalPagu,
+            realisasi: totalRealisasi,
+            sisa: totalSisa,
+            persen: totalPagu > 0 ? (totalRealisasi / totalPagu) * 100 : 0
+        },
+        diblokir: {
+            pagu: paguDiblokir,
+            realisasi: realisasiDiblokir,
+            sisa: sisaDiblokir,
+            persen: paguDiblokir > 0 ? (realisasiDiblokir / paguDiblokir) * 100 : 0
+        },
+        tanpaBlokir: {
+            pagu: paguTanpaBlokir,
+            realisasi: realisasiTanpaBlokir,
+            sisa: sisaTanpaBlokir,
+            persen: paguTanpaBlokir > 0 ? (realisasiTanpaBlokir / paguTanpaBlokir) * 100 : 0
+        },
+        meta: {
+            jumlahDetail: data.length,
+            jumlahDiblokir: diblokirRows.length
+        }
+    };
+}
+
+// Alias singkat untuk pemakaian lintas halaman.
+function hitungRingkasanAnggaran(rawData, parsedData) {
+    return hitungCalculationEngine(rawData, parsedData);
+}
