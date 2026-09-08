@@ -78,6 +78,8 @@ function konteksDataAplikasi(data) {
             "akun",
             "item akun",
             "item",
+            "detil akun",
+            "detail akun",
             "rincian item",
             "rincian"
         ].some(function (key) {
@@ -176,6 +178,7 @@ function parseDataAplikasi(data) {
         const subKomponen = nilaiHeaderDataAplikasi(row, map, ["Sub Komponen", "Subkomponen", "Nama Sub Komponen"]);
         const akun = nilaiHeaderDataAplikasi(row, map, ["Akun Belanja", "Akun"]);
         const itemAkun = nilaiHeaderDataAplikasi(row, map, ["Item Akun", "Item"]);
+        const detilAkun = nilaiHeaderDataAplikasi(row, map, ["Detil Akun", "Detail Akun", "Detil"]);
         const rincianItem = nilaiHeaderDataAplikasi(row, map, ["Rincian Item", "Rincian"]);
 
         const pagu = angkaDataAplikasi(nilaiHeaderDataAplikasi(row, map, ["Pagu"]));
@@ -184,7 +187,7 @@ function parseDataAplikasi(data) {
         const sisa = sisaRaw === "" || sisaRaw === "-" ? Math.max(pagu - realisasi, 0) : angkaDataAplikasi(sisaRaw);
         const statusPagu = statusDataAplikasi(nilaiHeaderDataAplikasi(row, map, ["Status Pagu", "Status"]));
 
-        const hasIdentity = kegiatan || kodeKegiatan || output || kodeOutput || subOutput || kodeSubOutput || komponen || subKomponen || akun || itemAkun || rincianItem;
+        const hasIdentity = kegiatan || kodeKegiatan || output || kodeOutput || subOutput || kodeSubOutput || komponen || subKomponen || akun || itemAkun || detilAkun || rincianItem;
         if (!hasIdentity && pagu === 0 && realisasi === 0) continue;
 
         const item = {
@@ -200,6 +203,7 @@ function parseDataAplikasi(data) {
             subKomponen: subKomponen || "-",
             akun: akun || "-",
             itemAkun: itemAkun || "-",
+            detilAkun: detilAkun || "-",
             rincianItem: rincianItem || "-",
             statusPagu: statusPagu,
             pagu: pagu,
