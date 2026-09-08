@@ -1013,6 +1013,26 @@ function hitungRingkasanData(
         return ambilTotalUtama(rawData);
     }
 
+    // Status global Normal/Diblokir harus identik dengan Calculation Engine.
+    if (
+        filterStatus &&
+        !filterKomponen &&
+        !filterSubKomponen &&
+        !filterAkun &&
+        !filterCari &&
+        typeof hitungCalculationEngine === "function"
+    ) {
+        const engine = hitungCalculationEngine(rawData, dataDetail);
+
+        if (filterStatus === "Normal") {
+            return engine.tanpaBlokir || buatTotalKosong();
+        }
+
+        if (filterStatus === "Diblokir") {
+            return engine.diblokir || buatTotalKosong();
+        }
+    }
+
     // PENTING: semua ringkasan harus dihitung dari scope yang
     // sama dengan tabel Monitoring yang sedang ditampilkan.
     let scoped = Array.isArray(dataDetail) ? [...dataDetail] : [];
@@ -2614,6 +2634,61 @@ function escapeHtml(
 
 
 // ============================================================
+// HITUNG BLOKIR LANGSUNG DARI RAW GOOGLE SHEET
+//
+// Sumber status blokir adalah tanda (*) / (**) / (***) pada
+// baris rincian anggaran. Perhitungan ini sengaja TIDAK memakai
+// hasil grouping parser, karena grouping item/rincian dapat
+// menghilangkan sebagian baris blokir ketika nama item sama.
+//
+// Hanya baris transaksi atomik yang dihitung: baris harus memiliki
+// pagu dan Volume atau Harga Satuan. Dengan demikian baris summary
+// Program/Output/Komponen/Akun tidak ikut dijumlahkan.
+// ============================================================
+
+function hitungBlokirDariRawData(rawData) {
+
+    let pagu = 0;
+    let realisasi = 0;
+
+    if (!Array.isArray(rawData)) {
+        return { pagu, realisasi };
+    }
+
+    rawData.forEach(row => {
+
+        if (!Array.isArray(row)) {
+            return;
+        }
+
+        const nama = String(row[1] || "");
+
+        if (!isDiblokir(nama)) {
+            return;
+        }
+
+        const nilaiPagu = parseNumber(row[5]) || 0;
+        const volume = parseNumber(row[2]);
+        const hargaSatuan = parseNumber(row[4]);
+
+        const transaksiAtomik =
+            volume !== null ||
+            hargaSatuan !== null;
+
+        if (!transaksiAtomik || nilaiPagu <= 0) {
+            return;
+        }
+
+        pagu += nilaiPagu;
+        realisasi += parseNumber(row[18]) || 0;
+
+    });
+
+    return { pagu, realisasi };
+}
+
+
+// ============================================================
 // CALCULATION ENGINE
 // Single Source of Truth untuk Dashboard, Monitoring, Grafik dan Laporan.
 //
@@ -2637,23 +2712,20 @@ function hitungCalculationEngine(rawData, parsedData) {
     const totalPagu = Number(total.pagu) || 0;
     const totalRealisasi = Number(total.realisasi) || 0;
 
-    const diblokirRows = data.filter(function (item) {
-        return item && item.statusPagu === "Diblokir";
-    });
-
-    let diblokirDetail = { pagu: 0, realisasi: 0 };
-
-    if (typeof hitungRingkasanDetail === "function") {
-        diblokirDetail = hitungRingkasanDetail(diblokirRows) || diblokirDetail;
-    }
+    // Status blokir global dihitung langsung dari raw Google Sheet.
+    // Ini mencegah grouping parsedData membuang sebagian rincian bertanda (*).
+    const diblokirRaw =
+        typeof hitungBlokirDariRawData === "function"
+            ? hitungBlokirDariRawData(rawData)
+            : { pagu: 0, realisasi: 0 };
 
     const paguDiblokir = Math.min(
-        Math.max(Number(diblokirDetail.pagu) || 0, 0),
+        Math.max(Number(diblokirRaw.pagu) || 0, 0),
         totalPagu
     );
 
     const realisasiDiblokir = Math.min(
-        Math.max(Number(diblokirDetail.realisasi) || 0, 0),
+        Math.max(Number(diblokirRaw.realisasi) || 0, 0),
         totalRealisasi
     );
 
