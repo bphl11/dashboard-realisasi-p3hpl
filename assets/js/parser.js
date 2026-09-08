@@ -41,6 +41,7 @@ function parseDataMonitoring(data) {
 
     let kegiatan = "";
     let output = "";
+    let subOutput = "";
     let komponen = "";
     let subKomponen = "";
 
@@ -58,6 +59,7 @@ function parseDataMonitoring(data) {
 
     let kegiatanDiblokir = false;
     let outputDiblokir = false;
+    let subOutputDiblokir = false;
     let komponenDiblokir = false;
     let subKomponenDiblokir = false;
     let akunDiblokir = false;
@@ -183,6 +185,7 @@ traceTambah(
             // Reset child
 
             output = "";
+            subOutput = "";
             komponen = "";
             subKomponen = "";
 
@@ -193,6 +196,8 @@ traceTambah(
 
 
             outputDiblokir = false;
+            subOutputDiblokir = false;
+            subOutputDiblokir = false;
             komponenDiblokir = false;
             subKomponenDiblokir = false;
             akunDiblokir = false;
@@ -237,6 +242,7 @@ traceTambah(
 
             // Reset child
 
+            subOutput = "";
             komponen = "";
             subKomponen = "";
 
@@ -258,10 +264,15 @@ traceTambah(
 
 
         // ====================================================
-        // KOMPONEN
+        // SUB OUTPUT
         //
         // Contoh:
         // 7279.BDB.001
+        //
+        // Hierarki Excel:
+        // Program/Kegiatan/Output/Sub Output/Komponen/Sub Komponen.
+        // Karena itu .001 bukan Komponen. Menyimpan .001 sebagai
+        // Sub Output mencegah .001.052 salah masuk ke Komponen .001.051.
         // ====================================================
 
         if (
@@ -271,39 +282,26 @@ traceTambah(
                 )
         ) {
 
-            komponen =
+            subOutput =
                 nama ||
                 namaAsli;
-            traceTambah(
-    i,
-    "Deteksi Komponen",
-    komponen
-);
 
-
-            komponenDiblokir =
-
+            subOutputDiblokir =
                 kegiatanDiblokir ||
-
                 outputDiblokir ||
-
                 barisDiblokir;
 
-
             // Reset child
-
+            komponen = "";
             subKomponen = "";
-
             akunKode = "";
             akunNama = "";
-
             itemAkun = "";
 
-
+            komponenDiblokir = false;
             subKomponenDiblokir = false;
             akunDiblokir = false;
             itemUtamaDiblokir = false;
-
 
             continue;
 
@@ -311,10 +309,12 @@ traceTambah(
 
 
         // ====================================================
-        // SUB KOMPONEN FORMAT KODE
+        // KOMPONEN FORMAT KODE
         //
         // Contoh:
         // 7279.BDB.001.051
+        //
+        // Level ini adalah Komponen untuk filter Monitoring.
         // ====================================================
 
         if (
@@ -324,37 +324,25 @@ traceTambah(
                 )
         ) {
 
-            subKomponen =
+            komponen =
                 nama ||
                 namaAsli;
-            traceTambah(
-    i,
-    "Deteksi Sub Komponen",
-    subKomponen
-);
 
-
-            subKomponenDiblokir =
-
+            komponenDiblokir =
                 kegiatanDiblokir ||
-
                 outputDiblokir ||
-
-                komponenDiblokir ||
-
+                subOutputDiblokir ||
                 barisDiblokir;
 
-
             // Reset child
-
+            subKomponen = "";
             akunKode = "";
             akunNama = "";
-
             itemAkun = "";
 
+            subKomponenDiblokir = false;
             akunDiblokir = false;
             itemUtamaDiblokir = false;
-
 
             continue;
 
@@ -626,6 +614,8 @@ traceTambah(
 
             outputDiblokir ||
 
+            subOutputDiblokir ||
+
             komponenDiblokir ||
 
             subKomponenDiblokir ||
@@ -681,6 +671,8 @@ hasil.push({
     kegiatan:kegiatan || "-",
 
     output:output || "-",
+
+    subOutput:subOutput || "-",
 
     komponen:komponen || "-",
 
@@ -1505,13 +1497,10 @@ function cariRingkasanHierarki(
 
 
         // ====================================================
-        // KOMPONEN
+        // SUB OUTPUT
         //
         // Contoh:
         // 7279.BDB.001
-        //
-        // Angka ringkasan Komponen diambil LANGSUNG
-        // dari baris ini.
         // ====================================================
 
         if (
@@ -1520,51 +1509,50 @@ function cariRingkasanHierarki(
                     kode
                 )
         ) {
-
+            // Sub Output menjadi konteks parent untuk Komponen.
             komponenAktif =
                 namaBersih ||
                 namaAsli;
-            console.log("KOMPONEN RAW =", komponenAktif);
+
+            subKomponenKodeAktif = "";
+
+            continue;
+
+        }
 
 
-            subKomponenKodeAktif =
-                "";
+        // ====================================================
+        // KOMPONEN
+        //
+        // Contoh:
+        // 7279.BDB.001.051
+        // ====================================================
 
+        if (
+            /^\d{4}\.[A-Z0-9]+\.\d{3}\.\d{3}$/i
+                .test(
+                    kode
+                )
+        ) {
+
+            const komponenKode =
+                namaBersih ||
+                namaAsli;
 
             if (
-                level ===
-                "komponen"
+                level === "komponen" &&
+                namaSama(
+                    komponenKode,
+                    target
+                )
             ) {
-                console.log(
-    "BANDINGKAN:",
-    komponenAktif,
-    "<->",
-    target
-);
-                if (
-                    namaSama(
-                        komponenAktif,
-                        target
-                    )
-                    
-                ) {
-
-                    return buatRingkasanDariRawRow(
-
-                        row,
-
-                        i,
-
-                        komponenAktif,
-
-                        "komponen"
-
-                    );
-
-                }
-
+                return buatRingkasanDariRawRow(
+                    row,
+                    i,
+                    komponenKode,
+                    "komponen"
+                );
             }
-
 
             continue;
 
