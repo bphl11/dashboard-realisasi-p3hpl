@@ -1179,9 +1179,53 @@ if (
     // ---------------------------------------------
     // Summary yang dipakai
     // ---------------------------------------------
+    //
+    // PENTING:
+    // Jika pengguna sudah memilih Komponen/Sub Komponen,
+    // summary TIDAK BOLEH jatuh kembali ke Total Global.
+    //
+    // Fallback ke Total Global hanya valid ketika tidak ada
+    // filter hierarki. Untuk filter hierarki yang belum memiliki
+    // baris summary Excel, gunakan detail pada scope hierarki
+    // yang sama dengan anti-double-count.
+    // ---------------------------------------------
 
-    const summaryDipakai =
-    summaryHierarki || totalGlobal;
+    let summaryDipakai =
+        summaryHierarki;
+
+    if (!summaryDipakai) {
+
+        const adaFilterHierarki =
+            Boolean(
+                filterKomponen ||
+                filterSubKomponen
+            );
+
+        if (adaFilterHierarki) {
+
+            summaryDipakai =
+                hitungRingkasanDetail(
+                    semuaDataHierarki
+                );
+
+            console.warn(
+                "Summary hierarki Excel tidak ditemukan. " +
+                "Menggunakan fallback detail dalam scope filter.",
+                {
+                    filterKomponen,
+                    filterSubKomponen,
+                    summaryDipakai
+                }
+            );
+
+        } else {
+
+            summaryDipakai =
+                totalGlobal;
+
+        }
+
+    }
 
 console.log("===== TOTAL GLOBAL =====");
 console.log(totalGlobal);
