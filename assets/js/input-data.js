@@ -7,6 +7,15 @@ document.addEventListener("DOMContentLoaded", async function () {
   const status = document.getElementById("verifyStatus");
   const msg = document.getElementById("verifyMessage");
   const out = document.getElementById("verifyResult");
+
+  const realisasiFormCard = document.getElementById("realisasiFormCard");
+  const realisasiForm = document.getElementById("realisasiForm");
+  const inputIndexRecord = document.getElementById("inputIndexRecord");
+  const inputBulan = document.getElementById("inputBulan");
+  const inputNominal = document.getElementById("inputNominal");
+  const inputKeterangan = document.getElementById("inputKeterangan");
+  const realisasiFormMessage = document.getElementById("realisasiFormMessage");
+
   let rows = [];
 
   function rawValue(v){ const x=clean(v); return x && x!=="-" ? x : ""; }
@@ -16,6 +25,24 @@ document.addEventListener("DOMContentLoaded", async function () {
     return rawValue(value)===selected;
   }
   function labelValue(v){ return v===EMPTY ? "— Tidak ada data pada level ini —" : v; }
+
+  function hideRealisasiForm(){
+    realisasiFormCard.classList.add("d-none");
+    inputIndexRecord.value="";
+    inputBulan.value="";
+    inputNominal.value="";
+    inputKeterangan.value="";
+    realisasiFormMessage.textContent="";
+  }
+
+  function showRealisasiForm(record){
+    inputIndexRecord.value=record.rowIndex ?? "";
+    inputBulan.value="";
+    inputNominal.value="";
+    inputKeterangan.value="";
+    realisasiFormMessage.textContent="Form siap digunakan. Penyimpanan masih belum aktif pada tahap ini.";
+    realisasiFormCard.classList.remove("d-none");
+  }
 
   function opt(el, values, placeholder, enabled){
     const valuesClean=[], seen=new Set();
@@ -33,6 +60,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   }
 
   function wait(text){
+    hideRealisasiForm();
     status.className="verify-badge";
     status.innerHTML='<i class="bi bi-hourglass-split"></i> Belum diverifikasi';
     msg.textContent=text; out.innerHTML="";
@@ -87,6 +115,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   da.onchange=()=>{ ri.value=""; opt(ri,filtered().map(r=>r.rincianItem),placeholders[6],!!da.value); wait("Pilih Rincian Item."); };
 
   ri.onchange=()=>{
+    hideRealisasiForm();
     const found=filtered();
     if(found.length===1){
       const r=found[0];
@@ -110,6 +139,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         ["Index Record",r.rowIndex]
       ];
       out.innerHTML=fields.map(([label,value])=>'<div class="result-item"><div class="result-label">'+label+'</div><div class="result-value">'+String(value??"")+'</div></div>').join("");
+      showRealisasiForm(r);
     } else {
       status.className="verify-badge "+(found.length?"warn":"error");
       status.innerHTML='<i class="bi bi-exclamation-triangle-fill"></i> '+found.length+" record ditemukan";
@@ -117,6 +147,11 @@ document.addEventListener("DOMContentLoaded", async function () {
       out.innerHTML="";
     }
   };
+
+  realisasiForm.addEventListener("submit", event=>{
+    event.preventDefault();
+    realisasiFormMessage.textContent="Penyimpanan belum aktif. Pada tahap berikutnya tombol ini akan menulis ID_INPUT, INDEX_RECORD, BULAN, NOMINAL_REALISASI, dan KETERANGAN ke sheet INPUT_REALISASI.";
+  });
 
   try{
     const raw=await fetchSheetData();
@@ -141,6 +176,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     wait("Pilih Sub Output untuk memulai verifikasi.");
   }catch(e){
     console.error(e);
+    hideRealisasiForm();
     status.className="verify-badge error";
     status.innerHTML='<i class="bi bi-x-circle-fill"></i> GAGAL MEMUAT DATA';
     msg.textContent=e.message||"Tidak dapat membaca DATA_APLIKASI.";
