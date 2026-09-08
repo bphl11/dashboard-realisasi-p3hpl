@@ -174,13 +174,7 @@ document.addEventListener(
             // khusus karena membutuhkan Januari - Desember.
             // =================================================
 
-            const totalData =
-
-                ambilDataUtamaGrafik(
-
-                    grafikRawData
-
-                );
+            const calculation = hitungCalculationEngine(grafikRawData, grafikParsedData);\n\n            const totalData = { ...calculation.total, bulanan: ambilDataUtamaGrafik(grafikRawData).bulanan };
 
 
             console.log(
@@ -196,15 +190,7 @@ document.addEventListener(
             // HITUNG STATUS NORMAL VS DIBLOKIR
             // =================================================
 
-            const dataStatus =
-
-                hitungStatusAnggaranGrafik(
-
-                    grafikParsedData,
-
-                    totalData
-
-                );
+            const dataStatus = { normal: calculation.tanpaBlokir, diblokir: calculation.diblokir, total: calculation.total };
 
 
             console.log(
