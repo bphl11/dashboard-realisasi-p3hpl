@@ -60,6 +60,9 @@ const directValueLabelsPlugin = {
 
     afterDatasetsDraw: function (chart) {
         const ctx = chart.ctx;
+        const chartArea = chart.chartArea;
+
+        if (!chartArea) return;
 
         ctx.save();
 
@@ -70,29 +73,31 @@ const directValueLabelsPlugin = {
 
             meta.data.forEach(function (element, index) {
                 const value = Number(dataset.data[index]) || 0;
+
+                // Nilai 0 tidak perlu ditulis agar grafik tetap bersih.
+                if (value === 0) return;
+
                 const text = formatSingkatRupiah(value);
+                const position = element.tooltipPosition();
+
+                ctx.font = "700 11px system-ui, sans-serif";
+                ctx.fillStyle = "#243142";
+                ctx.textAlign = "center";
 
                 if (chart.config.type === "doughnut" || chart.config.type === "pie") {
-                    const point = element.tooltipPosition();
-
-                    ctx.font = "600 11px system-ui, sans-serif";
-                    ctx.fillStyle = "#334155";
-                    ctx.textAlign = "center";
                     ctx.textBaseline = "middle";
-                    ctx.fillText(text, point.x, point.y);
+                    ctx.fillText(text, position.x, position.y);
                     return;
                 }
 
-                const position = element.tooltipPosition();
-
-                ctx.font = "600 11px system-ui, sans-serif";
-                ctx.fillStyle = "#334155";
-                ctx.textAlign = "center";
                 ctx.textBaseline = "bottom";
 
-                const y = value === 0
-                    ? chart.chartArea.bottom - 4
-                    : position.y - 6;
+                // Pastikan label tetap berada di dalam area chart,
+                // termasuk untuk batang yang sangat tinggi.
+                const y = Math.max(
+                    chartArea.top + 14,
+                    position.y - 8
+                );
 
                 ctx.fillText(text, position.x, y);
             });
@@ -101,10 +106,6 @@ const directValueLabelsPlugin = {
         ctx.restore();
     }
 };
-
-if (typeof Chart !== "undefined") {
-    Chart.register(directValueLabelsPlugin);
-}
 
 
 // ============================================================
@@ -620,6 +621,8 @@ function buatGrafikBulanan(
 
             {
 
+                plugins: [directValueLabelsPlugin],
+
                 type:
                     "bar",
 
@@ -844,6 +847,8 @@ function buatGrafikStatusAnggaran(
             canvas,
 
             {
+
+                plugins: [directValueLabelsPlugin],
 
                 type:
                     "bar",
@@ -1171,6 +1176,8 @@ function buatGrafikPerbandingan(
 
             {
 
+                plugins: [directValueLabelsPlugin],
+
                 type:
                     "bar",
 
@@ -1382,6 +1389,8 @@ function buatGrafikPersentase(
             canvas,
 
             {
+
+                plugins: [directValueLabelsPlugin],
 
                 type:
                     "doughnut",
