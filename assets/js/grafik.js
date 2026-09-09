@@ -48,6 +48,64 @@ let chartPerbandingan = null;
 let chartPersentase = null;
 
 
+// ============================================================
+// LABEL NILAI LANGSUNG PADA DIAGRAM
+//
+// Menampilkan nominal tanpa harus mengarahkan kursor.
+// Berlaku untuk seluruh diagram Chart.js pada halaman Grafik.
+// ============================================================
+
+const directValueLabelsPlugin = {
+    id: "directValueLabels",
+
+    afterDatasetsDraw: function (chart) {
+        const ctx = chart.ctx;
+
+        ctx.save();
+
+        chart.data.datasets.forEach(function (dataset, datasetIndex) {
+            const meta = chart.getDatasetMeta(datasetIndex);
+
+            if (meta.hidden) return;
+
+            meta.data.forEach(function (element, index) {
+                const value = Number(dataset.data[index]) || 0;
+                const text = formatSingkatRupiah(value);
+
+                if (chart.config.type === "doughnut" || chart.config.type === "pie") {
+                    const point = element.tooltipPosition();
+
+                    ctx.font = "600 11px system-ui, sans-serif";
+                    ctx.fillStyle = "#334155";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText(text, point.x, point.y);
+                    return;
+                }
+
+                const position = element.tooltipPosition();
+
+                ctx.font = "600 11px system-ui, sans-serif";
+                ctx.fillStyle = "#334155";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "bottom";
+
+                const y = value === 0
+                    ? chart.chartArea.bottom - 4
+                    : position.y - 6;
+
+                ctx.fillText(text, position.x, y);
+            });
+        });
+
+        ctx.restore();
+    }
+};
+
+if (typeof Chart !== "undefined") {
+    Chart.register(directValueLabelsPlugin);
+}
+
 
 // ============================================================
 // LOAD HALAMAN GRAFIK
