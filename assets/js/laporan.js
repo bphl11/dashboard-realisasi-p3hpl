@@ -2161,7 +2161,7 @@ function downloadExcelLaporan() {
     dataLaporanFiltered.forEach(function (item, index) {
         dataExcel.push([
             index + 1,
-            item.kode || "-",
+            (item.kodeSubOutput && item.kodeSubOutput !== "-" ? item.kodeSubOutput : (item.kodeKomponen && item.kodeKomponen !== "-" ? item.kodeKomponen : (item.kode || "-"))),
             item.komponen || "-",
             item.subKomponen || "-",
             item.akun || "-",
