@@ -183,7 +183,8 @@ padding:20px;
 .monthly-card{min-height:270px;padding:10px 5px 0;overflow-x:auto;}
 .monthly-chart{height:250px;min-width:760px;display:flex;align-items:stretch;gap:14px;border-bottom:1px solid #e5e7eb;padding:0 8px;}
 .month-column{flex:1;min-width:48px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;position:relative;}
-.month-bar-area{height:205px;width:100%;display:flex;align-items:flex-end;justify-content:center;background:repeating-linear-gradient(to top,transparent 0,transparent 49px,#f1f3f5 50px);border-radius:7px 7px 0 0;}
+.month-value{height:22px;width:100%;display:flex;align-items:flex-end;justify-content:center;white-space:nowrap;color:#3f5f47;font-size:.68rem;font-weight:700;line-height:1;margin-bottom:4px;}
+.month-bar-area{height:179px;width:100%;display:flex;align-items:flex-end;justify-content:center;background:repeating-linear-gradient(to top,transparent 0,transparent 44px,#f1f3f5 45px);border-radius:7px 7px 0 0;}
 .month-bar{width:62%;min-height:0;background:linear-gradient(180deg,#5d8b67,#2e6a3c);border-radius:7px 7px 2px 2px;transition:height .35s ease;}
 .month-name{font-size:.76rem;color:#667085;margin-top:8px;}
 .month-tooltip{position:absolute;bottom:235px;left:50%;transform:translateX(-50%);z-index:3;display:none;white-space:nowrap;background:#243142;color:#fff;border-radius:7px;padding:7px 9px;font-size:.72rem;box-shadow:0 5px 15px rgba(0,0,0,.16);}
