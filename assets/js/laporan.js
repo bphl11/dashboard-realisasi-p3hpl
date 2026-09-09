@@ -2612,7 +2612,7 @@ function downloadExcelLaporan() {
             const cellPagu =
 
                 worksheet[
-                    "M" + row
+                    "J" + row
                 ];
 
 
@@ -2632,7 +2632,7 @@ function downloadExcelLaporan() {
             const cellRealisasi =
 
                 worksheet[
-                    "J" + row
+                    "K" + row
                 ];
 
 
@@ -2652,7 +2652,7 @@ function downloadExcelLaporan() {
             const cellSisa =
 
                 worksheet[
-                    "K" + row
+                    "L" + row
                 ];
 
 
@@ -2678,7 +2678,7 @@ function downloadExcelLaporan() {
             const cellPersen =
 
                 worksheet[
-                    "L" + row
+                    "M" + row
                 ];
 
 
