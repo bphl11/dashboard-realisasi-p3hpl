@@ -199,6 +199,7 @@ function parseDataAplikasi(data) {
             kegiatan: kegiatan || "-",
             kodeOutput: kodeOutput || "-",
             output: output || "-",
+            kodeSubOutput: kodeSubOutput || "-",
             subOutput: subOutput || kodeSubOutput || "-",
             kodeKomponen: kodeKomponen || "-",
             komponen: komponen || "-",
