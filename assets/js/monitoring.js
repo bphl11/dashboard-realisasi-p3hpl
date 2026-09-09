@@ -856,7 +856,7 @@ function renderMonitoring(data) {
         tbody.innerHTML = `
             <tr>
                 <td
-                    colspan="13"
+                    colspan="12"
                     class="text-center text-muted py-4"
                 >
                     Tidak ada data yang sesuai dengan filter.
@@ -906,15 +906,7 @@ function renderMonitoring(data) {
                 </td>
 
                 <td>
-                    ${escapeHtml(item.kegiatan)}
-                </td>
-
-                <td>
                     ${escapeHtml(item.komponen)}
-                </td>
-
-                <td>
-                    ${escapeHtml(item.output)}
                 </td>
 
                 <td>
@@ -927,6 +919,10 @@ function renderMonitoring(data) {
 
                 <td>
                     ${escapeHtml(item.itemAkun)}
+                </td>
+
+                <td>
+                    ${escapeHtml(item.detilAkun)}
                 </td>
 
                 <td>
@@ -1094,7 +1090,7 @@ function tampilkanErrorMonitoring(
         <tr>
 
             <td
-                colspan="13"
+                colspan="12"
                 class="text-center text-danger py-4"
             >
 
