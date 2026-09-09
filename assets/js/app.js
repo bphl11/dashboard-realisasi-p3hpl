@@ -349,7 +349,10 @@ function tampilkanSubKomponenDashboard(items) {
 
             return componentHeader + rows;
         }).join("")
-        : '<tr><td colspan="6" class="text-center text-muted py-4">Data sub komponen belum tersedia.</td></tfunction tampilkanDiagramAkunBelanjaDashboard(items) {
+        : '<tr><td colspan="6" class="text-center text-muted py-4">Data sub komponen belum tersedia.</td></tr>';
+}
+
+function tampilkanDiagramAkunBelanjaDashboard(items) {
     const container = document.getElementById("diagramAkunBelanjaDashboard");
     if (!container) return;
 
