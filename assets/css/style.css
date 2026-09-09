@@ -458,3 +458,150 @@ padding:20px;
     .akun-chart-count{display:inline-block;margin-top:8px;}
     .akun-bar-row{grid-template-columns:110px 1fr;}
 }
+
+
+/* ==========================================================
+   UI REFRESH 2026 - VISUAL ONLY
+   Dashboard: Header, KPI, Grafik, Komponen, Sub Komponen, Akun
+   Tidak mengubah data atau Calculation Engine
+   ========================================================== */
+:root{
+    --ui-brand:#2f6b35;
+    --ui-brand-dark:#245429;
+    --ui-page:#f3f6f4;
+    --ui-ink:#263342;
+    --ui-muted:#718096;
+    --ui-line:#e4e9ee;
+    --ui-blue:#3f6ed6;
+    --ui-green:#39814b;
+    --ui-red:#b64d47;
+    --ui-gold:#b18422;
+}
+html{scroll-behavior:smooth}
+body{background:var(--ui-page);color:var(--ui-ink);font-size:14px}
+body:before{
+    content:"";
+    position:fixed;
+    inset:0 0 auto;
+    height:4px;
+    background:linear-gradient(90deg,#244e2a,#4d8254 55%,#a47a3b);
+    z-index:2000;
+}
+.sidebar{
+    background:linear-gradient(180deg,#2f642f 0%,#285829 100%);
+    box-shadow:8px 0 26px rgba(23,45,27,.10);
+}
+.sidebar li{border-radius:11px;transition:.18s ease}
+.sidebar li:hover{background:rgba(255,255,255,.09)}
+.sidebar li.active{box-shadow:0 5px 14px rgba(0,0,0,.08)}
+.content{padding:28px 30px}
+.dashboard-page{max-width:1840px}
+.dashboard-header{margin-bottom:18px}
+.dashboard-header h2{
+    font-size:1.85rem;
+    letter-spacing:-.45px;
+    color:#202b38;
+    font-weight:800;
+}
+.dashboard-header p{font-size:.88rem;color:#7a8491}
+.dashboard-badge{
+    border-radius:999px;
+    padding:9px 13px;
+    font-size:.76rem;
+    font-weight:750;
+    box-shadow:none;
+}
+.summary-card{
+    padding:15px 16px;
+    border-radius:14px;
+    box-shadow:0 4px 12px rgba(28,44,55,.045);
+    position:relative;
+    overflow:hidden;
+}
+.summary-card:after{
+    content:"";
+    position:absolute;
+    left:0;right:0;bottom:0;
+    height:3px;
+    background:#dce9de;
+}
+.summary-blue:after{background:#8ba6ea}
+.summary-green:after{background:#83b48f}
+.summary-red:after{background:#d99a96}
+.summary-gold:after{background:#d3b46a}
+.summary-icon{width:42px;height:42px;flex-basis:42px;border-radius:12px;font-size:1.05rem}
+.summary-label{font-size:.72rem}
+.summary-value{font-size:1.16rem;letter-spacing:-.2px}
+.dashboard-section{
+    border-radius:16px;
+    padding:17px;
+    margin-top:16px;
+    box-shadow:0 6px 18px rgba(28,44,55,.038);
+}
+.section-title{margin-bottom:13px}
+.section-title h4{font-size:1rem;font-weight:800}
+.section-title p{font-size:.75rem;line-height:1.4}
+.section-count{font-size:.71rem;padding:5px 9px}
+.monthly-card{min-height:235px;padding:3px 2px 0}
+.monthly-chart{height:215px;gap:9px}
+.month-value{font-size:.64rem}
+.month-bar-area{height:158px}
+.month-bar{width:54%}
+.month-name{font-size:.7rem}
+.component-card{border-radius:13px;padding:14px}
+.component-card-title{margin-bottom:11px}
+.component-card-title h5{font-size:.83rem;font-weight:780}
+.component-icon{width:31px;height:31px;flex-basis:31px}
+.component-metrics{gap:6px;padding-top:10px}
+.metric-item{font-size:.72rem}
+.metric-item strong{font-size:.74rem}
+.progress-label{font-size:.7rem;margin-top:10px;margin-bottom:5px}
+.component-progress{height:6px}
+.dashboard-table{font-size:.75rem}
+.dashboard-table thead th{padding:9px;font-weight:800}
+.dashboard-table td{padding:8px 9px}
+.dashboard-table .component-group-row td{
+    background:#edf5ee!important;
+    color:#285f36!important;
+    padding:9px 11px!important;
+}
+.component-group-label{font-size:.61rem}
+.subcomponent-indent{width:35px;padding-left:13px!important}
+.dashboard-table .subcomponent-cell{font-weight:650}
+.percent-pill{font-size:.68rem;padding:3px 6px}
+.akun-chart-card{
+    border-color:#e3e9e5;
+    border-radius:13px;
+    padding:14px;
+    margin-bottom:12px;
+    background:#fbfdfb;
+}
+.akun-chart-header{padding-bottom:10px;margin-bottom:11px}
+.akun-chart-kicker{font-size:.62rem}
+.akun-chart-header h5{font-size:.88rem}
+.akun-chart-count{font-size:.66rem;padding:5px 8px}
+.akun-chart-grid{gap:10px}
+.akun-mini-chart{border-radius:10px;padding:10px}
+.akun-mini-chart-title{margin-bottom:9px}
+.akun-mini-chart-title strong{font-size:.77rem}
+.akun-mini-chart-title span{font-size:.63rem}
+.akun-bars{gap:6px}
+.akun-bar-row{grid-template-columns:minmax(80px,39%) 1fr;gap:7px}
+.akun-bar-label{font-size:.63rem}
+.akun-bar-track{min-height:20px}
+.akun-bar{height:20px;padding:0 6px}
+.akun-bar span{font-size:.59rem}
+.akun-bar-outside{font-size:.59rem}
+@media(max-width:1199px){.akun-chart-grid{grid-template-columns:1fr}}
+@media(max-width:991px){
+    .content{padding:18px}
+    .dashboard-header{display:block}
+    .dashboard-badge{display:inline-flex;margin-top:10px}
+    .dashboard-section{padding:14px}
+}
+@media(max-width:575px){
+    .content{padding:13px}
+    .dashboard-header h2{font-size:1.5rem}
+    .section-title{display:block}
+    .section-count{display:inline-block;margin-top:8px}
+}
