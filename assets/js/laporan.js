@@ -1767,7 +1767,7 @@ function renderTabelLaporan(
             <tr>
 
                 <td
-                    colspan="11"
+                    colspan="12"
                     class="text-center text-muted py-4"
                 >
 
@@ -1821,37 +1821,25 @@ function renderTabelLaporan(
 
 
             // ================================================
-            // NAMA ITEM
+            // IDENTITAS AKUN
             // ================================================
 
-            let namaItem =
+            const namaItemAkun =
 
                 item.itemAkun ||
                 "-";
 
 
-            if (
-                item.rincianItem &&
-                item.rincianItem !==
-                "-"
-            ) {
+            const namaDetilAkun =
 
-                namaItem =
+                item.detilAkun ||
+                "-";
 
-                    (
-                        item.itemAkun ||
-                        ""
-                    )
 
-                    +
+            const namaRincianItem =
 
-                    " - "
-
-                    +
-
-                    item.rincianItem;
-
-            }
+                item.rincianItem ||
+                "-";
 
 
             // ================================================
@@ -1863,12 +1851,6 @@ function renderTabelLaporan(
                 <td>
                     ${escapeHtml(
                         item.kode
-                    )}
-                </td>
-
-                <td>
-                    ${escapeHtml(
-                        item.kegiatan
                     )}
                 </td>
 
@@ -1892,7 +1874,19 @@ function renderTabelLaporan(
 
                 <td>
                     ${escapeHtml(
-                        namaItem
+                        namaItemAkun
+                    )}
+                </td>
+
+                <td>
+                    ${escapeHtml(
+                        namaDetilAkun
+                    )}
+                </td>
+
+                <td>
+                    ${escapeHtml(
+                        namaRincianItem
                     )}
                 </td>
 
@@ -2069,7 +2063,7 @@ function tampilkanErrorLaporan(
             <tr>
 
                 <td
-                    colspan="11"
+                    colspan="12"
                     class="text-center text-danger py-4"
                 >
 
@@ -2389,15 +2383,17 @@ function downloadExcelLaporan() {
 
         "Kode",
 
-        "Kegiatan",
-
         "Komponen",
 
         "Sub Komponen",
 
         "Akun Belanja",
 
-        "Item",
+        "Item Akun",
+
+        "Detil Akun",
+
+        "Rincian Item",
 
         "Status",
 
@@ -2423,38 +2419,7 @@ function downloadExcelLaporan() {
             index
         ) {
 
-            let namaItem =
-
-                item.itemAkun ||
-                "-";
-
-
-            // =================================================
-            // TAMBAHKAN RINCIAN ITEM
-            // =================================================
-
-            if (
-                item.rincianItem &&
-                item.rincianItem !==
-                "-"
-            ) {
-
-                namaItem =
-
-                    (
-                        item.itemAkun ||
-                        ""
-                    )
-
-                    +
-
-                    " - "
-
-                    +
-
-                    item.rincianItem;
-
-            }
+            // Item Akun, Detil Akun, dan Rincian Item diekspor sebagai kolom terpisah.
 
 
             dataExcel.push([
@@ -2462,9 +2427,6 @@ function downloadExcelLaporan() {
                 index + 1,
 
                 item.kode ||
-                "-",
-
-                item.kegiatan ||
                 "-",
 
                 item.komponen ||
@@ -2476,7 +2438,14 @@ function downloadExcelLaporan() {
                 item.akun ||
                 "-",
 
-                namaItem,
+                item.itemAkun ||
+                "-",
+
+                item.detilAkun ||
+                "-",
+
+                item.rincianItem ||
+                "-",
 
                 item.statusPagu ||
                 "-",
