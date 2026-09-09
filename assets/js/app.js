@@ -163,6 +163,7 @@ function tampilkanGrafikBulananDashboard(items) {
             const height = value > 0 ? Math.max((value / maksimum) * 100, 2) : 0;
             return '<div class="month-column">' +
                 '<div class="month-tooltip">' + escapeHtmlDashboard(nama) + '<br><strong>' + formatRupiahDashboard(value) + '</strong></div>' +
+                '<div class="month-value">' + formatSingkatRupiahDashboard(value) + '</div>' +
                 '<div class="month-bar-area"><div class="month-bar" style="height:' + height + '%"></div></div>' +
                 '<div class="month-name">' + escapeHtmlDashboard(nama.substring(0, 3)) + '</div>' +
             '</div>';
@@ -379,6 +380,24 @@ function tampilkanErrorDashboard(error) {
 
 function formatRupiahDashboard(value) {
     return "Rp" + Math.round(Number(value) || 0).toLocaleString("id-ID");
+}
+
+function formatSingkatRupiahDashboard(value) {
+    const number = Math.round(Number(value) || 0);
+
+    if (number >= 1000000000) {
+        return "Rp" + (number / 1000000000).toLocaleString("id-ID", { maximumFractionDigits: 1 }) + " M";
+    }
+
+    if (number >= 1000000) {
+        return "Rp" + (number / 1000000).toLocaleString("id-ID", { maximumFractionDigits: 1 }) + " Jt";
+    }
+
+    if (number >= 1000) {
+        return "Rp" + (number / 1000).toLocaleString("id-ID", { maximumFractionDigits: 1 }) + " Rb";
+    }
+
+    return "Rp" + number.toLocaleString("id-ID");
 }
 
 function formatPersenDashboard(value) {
