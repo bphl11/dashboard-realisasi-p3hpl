@@ -2521,6 +2521,10 @@ function downloadExcelLaporan() {
         },
 
         {
+            wch: 45
+        },
+
+        {
             wch: 12
         },
 
@@ -2608,7 +2612,7 @@ function downloadExcelLaporan() {
             const cellPagu =
 
                 worksheet[
-                    "I" + row
+                    "M" + row
                 ];
 
 
