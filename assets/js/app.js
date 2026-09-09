@@ -52,7 +52,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         tampilkanGrafikBulananDashboard(normalData);
         tampilkanKomponenDashboard(normalData);
         tampilkanSubKomponenDashboard(normalData);
-        tampilkanMonitoringDashboard(normalData);
+        tampilkanDiagramAkunBelanjaDashboard(normalData);
 
     } catch (error) {
         console.error("ERROR DASHBOARD:", error);
@@ -349,27 +349,81 @@ function tampilkanSubKomponenDashboard(items) {
 
             return componentHeader + rows;
         }).join("")
-        : '<tr><td colspan="6" class="text-center text-muted py-4">Data sub komponen belum tersedia.</td></tr>';
-}
-
-function tampilkanMonitoringDashboard(items) {
-    const container = document.getElementById("monitoringDashboard");
+        : '<tr><td colspan="6" class="text-center text-muted py-4">Data sub komponen belum tersedia.</td></tfunction tampilkanDiagramAkunBelanjaDashboard(items) {
+    const container = document.getElementById("diagramAkunBelanjaDashboard");
     if (!container) return;
 
-    const groups = buatKelompokDashboard(items, ["komponen", "subKomponen"])
-        .sort(function (a, b) { return b.total.realisasi - a.total.realisasi; })
-        .slice(0, 10);
+    const groups = buatKelompokDashboard(items, ["akun", "itemAkun"])
+        .sort(function (a, b) {
+            return bandingkanTeksDashboard(a.values[0], b.values[0]) ||
+                bandingkanTeksDashboard(a.values[1], b.values[1]);
+        });
 
-    container.innerHTML = '<div class="table-responsive dashboard-table-wrap"><table class="table dashboard-table align-middle mb-0">' +
-        '<thead><tr><th>Komponen</th><th>Sub Komponen</th><th class="text-end">Pagu</th><th class="text-end">Realisasi</th><th class="text-end">%</th></tr></thead>' +
-        '<tbody>' +
-        (groups.length ? groups.map(function (group) {
-            const total = group.total;
-            return '<tr><td>' + escapeHtmlDashboard(group.values[0]) + '</td><td>' + escapeHtmlDashboard(group.values[1]) + '</td><td class="text-end">' + formatRupiahDashboard(total.pagu) + '</td><td class="text-end text-success fw-semibold">' + formatRupiahDashboard(total.realisasi) + '</td><td class="text-end">' + formatPersenDashboard(total.persen) + '</td></tr>';
-        }).join("") : '<tr><td colspan="5" class="text-center text-muted py-4">Tidak ada data Normal.</td></tr>') +
-        '</tbody></table></div>';
+    if (!groups.length) {
+        container.innerHTML = '<div class="empty-dashboard">Tidak ada data akun belanja dengan status Normal.</div>';
+        return;
+    }
+
+    const akunMap = new Map();
+
+    groups.forEach(function (group) {
+        const akun = group.values[0];
+        if (!akunMap.has(akun)) akunMap.set(akun, []);
+        akunMap.get(akun).push(group);
+    });
+
+    container.innerHTML = Array.from(akunMap.entries()).map(function (entry) {
+        const akun = entry[0];
+        const itemGroups = entry[1];
+        const labels = itemGroups.map(function (group) {
+            return group.values[1] && group.values[1] !== "Tidak Teridentifikasi"
+                ? group.values[1]
+                : "Tanpa Item Akun";
+        });
+
+        return '<article class="akun-chart-card">' +
+            '<div class="akun-chart-header">' +
+                '<div><span class="akun-chart-kicker">Akun Belanja</span><h5><i class="bi bi-wallet2"></i> ' +
+                escapeHtmlDashboard(akun) +
+                '</h5></div>' +
+                '<span class="akun-chart-count">' + itemGroups.length + ' Item Akun</span>' +
+            '</div>' +
+            '<div class="akun-chart-grid">' +
+                buatDiagramAkunDashboard("Pagu", "Pagu seluruh " + akun, labels, itemGroups.map(function (g) { return g.total.pagu; }), "chart-pagu") +
+                buatDiagramAkunDashboard("Realisasi", "Realisasi seluruh " + akun, labels, itemGroups.map(function (g) { return g.total.realisasi; }), "chart-realisasi") +
+                buatDiagramAkunDashboard("Sisa", "Sisa anggaran seluruh " + akun, labels, itemGroups.map(function (g) { return g.total.sisa; }), "chart-sisa") +
+            '</div>' +
+        '</article>';
+    }).join("");
 }
 
+function buatDiagramAkunDashboard(title, subtitle, labels, values, className) {
+    const maksimum = Math.max.apply(null, values.concat([1]));
+
+    const rows = labels.map(function (label, index) {
+        const value = Number(values[index]) || 0;
+        const width = value > 0 ? Math.max((value / maksimum) * 100, 1.5) : 0;
+
+        return '<div class="akun-bar-row">' +
+            '<div class="akun-bar-label" title="' + escapeHtmlDashboard(label) + '">' +
+                escapeHtmlDashboard(label) +
+            '</div>' +
+            '<div class="akun-bar-track">' +
+                '<div class="akun-bar ' + className + '" style="width:' + width + '%">' +
+                    (width >= 12 ? '<span>' + formatSingkatRupiahDashboard(value) + '</span>' : '') +
+                '</div>' +
+                (width < 12 ? '<span class="akun-bar-outside">' + formatSingkatRupiahDashboard(value) + '</span>' : '') +
+            '</div>' +
+        '</div>';
+    }).join("");
+
+    return '<section class="akun-mini-chart">' +
+        '<div class="akun-mini-chart-title"><strong>' + escapeHtmlDashboard(title) + '</strong><span>' +
+            escapeHtmlDashboard(subtitle) +
+        '</span></div>' +
+        '<div class="akun-bars">' + rows + '</div>' +
+    '</section>';
+}
 function tampilkanErrorDashboard(error) {
     const message = escapeHtmlDashboard(error && error.message ? error.message : "Terjadi kesalahan.");
     ["grafikBulanan","dashboardKomponen","monitoringDashboard"].forEach(function (id) {
