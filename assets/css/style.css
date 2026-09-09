@@ -343,3 +343,118 @@ padding:20px;
         font-size:.8rem;
     }
 }
+
+
+/* ==========================================================
+   DIAGRAM REALISASI PER AKUN BELANJA & ITEM AKUN
+   ========================================================== */
+.akun-chart-card{
+    border:1px solid #e6eaee;
+    border-radius:14px;
+    padding:16px;
+    margin-bottom:16px;
+    background:#fbfcfb;
+}
+.akun-chart-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:14px;
+    padding-bottom:13px;
+    margin-bottom:14px;
+    border-bottom:1px solid #e7ece8;
+}
+.akun-chart-kicker{
+    display:block;
+    color:#74808d;
+    font-size:.72rem;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+    margin-bottom:3px;
+}
+.akun-chart-header h5{
+    margin:0;
+    color:#2d3a48;
+    font-size:1rem;
+    font-weight:800;
+}
+.akun-chart-header h5 i{color:#3d7a4d;margin-right:6px;}
+.akun-chart-count{
+    white-space:nowrap;
+    background:#edf6ee;
+    color:#356c42;
+    padding:5px 9px;
+    border-radius:999px;
+    font-size:.72rem;
+    font-weight:700;
+}
+.akun-chart-grid{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:14px;
+}
+.akun-mini-chart{
+    min-width:0;
+    border:1px solid #e8ecef;
+    border-radius:11px;
+    background:#fff;
+    padding:13px;
+}
+.akun-mini-chart-title{
+    display:flex;
+    flex-direction:column;
+    gap:3px;
+    margin-bottom:13px;
+}
+.akun-mini-chart-title strong{color:#344150;font-size:.88rem;}
+.akun-mini-chart-title span{color:#7a8491;font-size:.72rem;line-height:1.35;}
+.akun-bars{display:flex;flex-direction:column;gap:10px;}
+.akun-bar-row{display:grid;grid-template-columns:minmax(95px,42%) 1fr;gap:8px;align-items:center;}
+.akun-bar-label{
+    color:#596575;
+    font-size:.72rem;
+    line-height:1.3;
+    overflow:hidden;
+    display:-webkit-box;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+}
+.akun-bar-track{
+    min-width:0;
+    min-height:24px;
+    position:relative;
+    display:flex;
+    align-items:center;
+    background:#f0f3f4;
+    border-radius:5px;
+    overflow:visible;
+}
+.akun-bar{
+    height:24px;
+    min-width:0;
+    border-radius:5px;
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    padding:0 7px;
+    transition:width .35s ease;
+}
+.akun-bar span{font-size:.66rem;font-weight:800;color:#fff;white-space:nowrap;}
+.chart-pagu{background:linear-gradient(90deg,#5276c5,#7995d4);}
+.chart-realisasi{background:linear-gradient(90deg,#3f7a51,#74a47f);}
+.chart-sisa{background:linear-gradient(90deg,#b24e48,#d17a72);}
+.akun-bar-outside{
+    position:absolute;
+    left:calc(100% + 6px);
+    color:#5e6874;
+    font-size:.66rem;
+    font-weight:750;
+    white-space:nowrap;
+}
+@media(max-width:1199px){.akun-chart-grid{grid-template-columns:1fr;}}
+@media(max-width:575px){
+    .akun-chart-header{display:block;}
+    .akun-chart-count{display:inline-block;margin-top:8px;}
+    .akun-bar-row{grid-template-columns:110px 1fr;}
+}
