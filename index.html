@@ -52,7 +52,7 @@
         <section class="dashboard-section"><div class="section-title"><div><h4><i class="bi bi-calendar-month"></i> Grafik Realisasi Bulanan</h4><p>Realisasi anggaran tanpa blokir Januari sampai Desember</p></div></div><div class="monthly-card" id="grafikBulanan"></div></section>
         <section class="dashboard-section"><div class="section-title"><div><h4><i class="bi bi-grid-3x3-gap"></i> Ringkasan Per Komponen</h4><p>Pagu awal tanpa blokir, realisasi, sisa anggaran dan persentase setiap komponen</p></div><span class="section-count" id="jumlahKomponen">0 Komponen</span></div><div class="component-grid row g-3" id="dashboardKomponen"></div></section>
         <section class="dashboard-section"><div class="section-title"><div><h4><i class="bi bi-diagram-3"></i> Ringkasan Per Sub Komponen</h4><p>Rincian penyerapan anggaran tanpa blokir berdasarkan sub komponen</p></div><span class="section-count" id="jumlahSubKomponen">0 Sub Komponen</span></div><div class="table-responsive dashboard-table-wrap"><table class="table dashboard-table align-middle mb-0"><thead><tr><th>Komponen</th><th>Sub Komponen</th><th class="text-end">Pagu</th><th class="text-end">Realisasi</th><th class="text-end">Sisa</th><th class="text-end">%</th></tr></thead><tbody id="dashboardSubKomponen"></tbody></table></div></section>
-        <section class="dashboard-section"><div class="section-title"><div><h4><i class="bi bi-bar-chart-line"></i> Realisasi Per Akun Belanja dan Item Akun</h4><p>Perbandingan Pagu, Realisasi, dan Sisa anggaran untuk setiap Akun Belanja berdasarkan Item Akun, tanpa blokir.</p></div></div><div id="diagramAkunBelanjaDashboard"></div></section>
+        <section class="dashboard-section"><div class="section-title"><div><h4><i class="bi bi-bar-chart-line"></i> Realisasi Per Akun Belanja</h4><p>Perbandingan Pagu, Realisasi, dan Sisa anggaran untuk setiap Akun Belanja, tanpa menampilkan Item Akun.</p></div></div><div id="diagramAkunBelanjaDashboard"></div></section>
     </main>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -64,5 +64,6 @@
 <script src="assets/js/audit-ui.js"></script>
 <script src="assets/js/parser.js"></script>
 <script src="assets/js/app.js"></script>
+<script src="assets/js/akun-dashboard.js"></script>
 </body>
 </html>
