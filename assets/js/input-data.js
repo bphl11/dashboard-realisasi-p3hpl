@@ -157,6 +157,42 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
   };
 
+  async function bacaInputRealisasiTerbaru(){
+    const separator=INPUT_REALISASI_ENDPOINT.includes("?")?"&":"?";
+    const url=INPUT_REALISASI_ENDPOINT+separator+"action=list&_="+Date.now();
+    const response=await fetch(url,{cache:"no-store"});
+    if(!response.ok) throw new Error("Gagal memverifikasi INPUT_REALISASI. HTTP "+response.status);
+    const text=await response.text();
+    let payload;
+    try{ payload=JSON.parse(text); }
+    catch(error){ throw new Error("Respons verifikasi INPUT_REALISASI bukan JSON yang valid."); }
+    if(!payload||payload.success!==true) throw new Error(payload?.message||"Verifikasi INPUT_REALISASI gagal.");
+    return Array.isArray(payload.data)?payload.data:[];
+  }
+
+  async function verifikasiTransaksiTersimpan(payload){
+    const targetIndex=Number(payload.index_record);
+    const targetNominal=Number(payload.nominal_realisasi);
+    const targetBulan=clean(payload.bulan);
+
+    for(let attempt=1;attempt<=5;attempt++){
+      try{
+        const rowsInput=await bacaInputRealisasiTerbaru();
+        const found=rowsInput.find(row=>
+          Number(row?.index_record)===targetIndex &&
+          clean(row?.bulan)===targetBulan &&
+          Number(row?.nominal_realisasi)===targetNominal
+        );
+        if(found) return found;
+      }catch(error){
+        if(attempt===5) throw error;
+        console.warn("Verifikasi transaksi percobaan "+attempt+" gagal:",error);
+      }
+      await new Promise(resolve=>setTimeout(resolve,800));
+    }
+    return null;
+  }
+
   realisasiForm.addEventListener("submit", async event=>{
     event.preventDefault();
 
@@ -197,34 +233,31 @@ document.addEventListener("DOMContentLoaded", async function () {
     realisasiFormMessage.textContent="Mengirim transaksi ke INPUT_REALISASI...";
 
     try{
-      const response=await fetch(INPUT_REALISASI_ENDPOINT,{
+      // Apps Script saat ini tidak memberikan header CORS untuk membaca respons
+      // POST dari GitHub Pages. Gunakan simple POST no-cors agar request tetap
+      // terkirim. Responsnya opaque, jadi keberhasilan tidak pernah diasumsikan.
+      await fetch(INPUT_REALISASI_ENDPOINT,{
         method:"POST",
-        headers:{
-          "Content-Type":"text/plain;charset=utf-8"
-        },
+        mode:"no-cors",
+        headers:{"Content-Type":"text/plain;charset=utf-8"},
         body:JSON.stringify(payload)
       });
 
-      const responseText=await response.text();
-      let result;
-      try{
-        result=JSON.parse(responseText);
-      }catch(parseError){
-        throw new Error("Respons endpoint tidak dapat dibaca. Pastikan deployment Apps Script menggunakan URL /exec dan akses 'Siapa saja'.");
+      realisasiFormMessage.textContent="Transaksi terkirim. Memverifikasi data pada INPUT_REALISASI...";
+      const saved=await verifikasiTransaksiTersimpan(payload);
+
+      if(!saved){
+        throw new Error("Transaksi belum dapat diverifikasi pada INPUT_REALISASI. Data tidak dinyatakan berhasil tersimpan.");
       }
 
-      if(!response.ok||!result.success){
-        throw new Error(result?.message||"Penyimpanan realisasi gagal.");
-      }
-
-      inputIdPreview.value=result?.data?.id_input||"Berhasil disimpan";
+      inputIdPreview.value=saved?.id_input||"Berhasil disimpan";
       inputNominal.value="";
       inputKeterangan.value="";
       inputBulan.value="";
       realisasiFormMessage.className="small mt-3 text-success";
-      realisasiFormMessage.innerHTML='<i class="bi bi-check-circle-fill me-1"></i>Realisasi berhasil disimpan ke INPUT_REALISASI.';
+      realisasiFormMessage.innerHTML='<i class="bi bi-check-circle-fill me-1"></i>Realisasi berhasil disimpan dan sudah diverifikasi pada INPUT_REALISASI.';
 
-      // Data INPUT_REALISASI berubah; paksa request berikutnya mengambil data terbaru.
+      // Data INPUT_REALISASI berubah; request berikutnya harus mengambil data terbaru.
       if(typeof invalidateApiCache === "function"){
         invalidateApiCache();
       }
