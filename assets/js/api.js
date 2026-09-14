@@ -7,12 +7,8 @@
 // ============================================================
 // CACHE DATA
 //
-// Data anggaran relatif besar dan dipakai berulang oleh beberapa
-// halaman. Cache sementara menghindari request Google Sheet dan
-// Apps Script setiap kali halaman dibuka/pindah menu.
-//
-// TTL 2 menit: cukup cepat untuk perubahan data, tetapi mengurangi
-// request berulang yang menjadi sumber lambat/loading ulang.
+// Cache sementara menghindari request Google Sheet dan Apps Script
+// berulang. TTL 2 menit untuk menjaga data tetap relatif segar.
 // ============================================================
 
 const API_CACHE_KEY = "p3hpl_data_cache_v1";
@@ -20,9 +16,10 @@ const API_CACHE_TTL = 2 * 60 * 1000;
 
 let apiMemoryCache = null;
 
-function bacaCacheApi() {
+function bacaCacheApi(allowStale = false) {
     if (apiMemoryCache && Array.isArray(apiMemoryCache.data)) {
-        return apiMemoryCache.data;
+        const expired = Date.now() - Number(apiMemoryCache.timestamp || 0) > API_CACHE_TTL;
+        if (!expired || allowStale) return apiMemoryCache.data;
     }
 
     try {
@@ -32,7 +29,8 @@ function bacaCacheApi() {
         const cached = JSON.parse(raw);
         if (!cached || !Array.isArray(cached.data)) return null;
 
-        if (Date.now() - Number(cached.timestamp || 0) > API_CACHE_TTL) {
+        const expired = Date.now() - Number(cached.timestamp || 0) > API_CACHE_TTL;
+        if (expired && !allowStale) {
             sessionStorage.removeItem(API_CACHE_KEY);
             return null;
         }
@@ -56,12 +54,8 @@ function simpanCacheApi(data) {
     apiMemoryCache = cached;
 
     try {
-        sessionStorage.setItem(
-            API_CACHE_KEY,
-            JSON.stringify(cached)
-        );
+        sessionStorage.setItem(API_CACHE_KEY, JSON.stringify(cached));
     } catch (error) {
-        // Jika storage penuh/tidak tersedia, memory cache tetap dipakai.
         console.warn("Cache API tidak dapat disimpan:", error);
     }
 }
@@ -93,35 +87,24 @@ async function fetchInputRealisasi() {
         return [];
     }
 
-    const separator =
-        CONFIG.INPUT_REALISASI_URL.includes("?")
-            ? "&"
-            : "?";
-
-    const url =
-        CONFIG.INPUT_REALISASI_URL +
-        separator +
-        "action=list";
+    const separator = CONFIG.INPUT_REALISASI_URL.includes("?") ? "&" : "?";
+    const url = CONFIG.INPUT_REALISASI_URL + separator + "action=list";
 
     const response = await fetch(url);
 
     if (!response.ok) {
         throw new Error(
-            "Gagal mengambil INPUT_REALISASI. HTTP " +
-            response.status
+            "Gagal mengambil INPUT_REALISASI. HTTP " + response.status
         );
     }
 
     const text = await response.text();
 
     let payload;
-
     try {
         payload = JSON.parse(text);
     } catch (error) {
-        throw new Error(
-            "Respons INPUT_REALISASI bukan JSON yang valid."
-        );
+        throw new Error("Respons INPUT_REALISASI bukan JSON yang valid.");
     }
 
     if (!payload || payload.success !== true) {
@@ -131,9 +114,7 @@ async function fetchInputRealisasi() {
         );
     }
 
-    return Array.isArray(payload.data)
-        ? payload.data
-        : [];
+    return Array.isArray(payload.data) ? payload.data : [];
 }
 
 
@@ -142,7 +123,6 @@ async function fetchInputRealisasi() {
 // ============================================================
 
 async function fetchSheetData(forceRefresh = false) {
-    // Gunakan cache selama TTL masih berlaku.
     if (!forceRefresh) {
         const cached = bacaCacheApi();
         if (cached) {
@@ -151,7 +131,6 @@ async function fetchSheetData(forceRefresh = false) {
         }
     }
 
-    // Jika beberapa pemanggilan terjadi bersamaan, tunggu request yang sama.
     if (apiLoadingPromise) {
         return await apiLoadingPromise;
     }
@@ -169,53 +148,69 @@ async function fetchSheetData(forceRefresh = false) {
                 );
             }
 
-            const [response, inputRealisasi] = await Promise.all([
+            // Google Sheet adalah sumber utama Dashboard.
+            // INPUT_REALISASI adalah data tambahan; kegagalannya tidak boleh
+            // membuat seluruh Dashboard gagal tampil.
+            const [sheetResult, inputResult] = await Promise.allSettled([
                 fetch(CONFIG.SHEET_URL),
                 fetchInputRealisasi()
             ]);
 
+            if (sheetResult.status !== "fulfilled") {
+                throw sheetResult.reason;
+            }
+
+            const response = sheetResult.value;
             if (!response.ok) {
                 throw new Error(
-                    "Gagal mengambil Google Sheet. HTTP " +
-                    response.status
+                    "Gagal mengambil Google Sheet. HTTP " + response.status
                 );
             }
 
             const csv = await response.text();
-
             if (!csv) {
-                throw new Error(
-                    "Google Sheet mengembalikan data kosong."
-                );
+                throw new Error("Google Sheet mengembalikan data kosong.");
             }
 
             const data = csvToArray(csv);
+
+            let inputRealisasi = [];
+            if (inputResult.status === "fulfilled") {
+                inputRealisasi = inputResult.value;
+            } else {
+                console.warn(
+                    "INPUT_REALISASI tidak tersedia. Dashboard tetap menggunakan DATA_APLIKASI.",
+                    inputResult.reason
+                );
+            }
 
             // Transaksi tambahan disimpan sebagai metadata pada array raw.
             // Bentuk utama tetap Array agar seluruh halaman lama tidak perlu
             // diubah. parser.js akan menggabungkannya berdasarkan INDEX_RECORD.
             data.__inputRealisasi = inputRealisasi;
 
-            console.log(
-                "JUMLAH BARIS GOOGLE SHEET:",
-                data.length
-            );
-
+            console.log("JUMLAH BARIS GOOGLE SHEET:", data.length);
             console.log(
                 "JUMLAH TRANSAKSI INPUT_REALISASI:",
                 inputRealisasi.length
             );
+
+            if (inputResult.status !== "fulfilled") {
+                console.warn(
+                    "PERINGATAN: INPUT_REALISASI gagal dimuat. Periksa deployment Apps Script jika transaksi tambahan diperlukan."
+                );
+            }
 
             simpanCacheApi(data);
             return data;
         } catch (error) {
             console.error("ERROR FETCH GOOGLE SHEET:", error);
 
-            // Bila refresh gagal tetapi cache lama masih ada, gunakan cache
-            // lama agar aplikasi tetap dapat dibuka tanpa reload manual.
-            const staleCache = bacaCacheApi();
+            // True stale fallback: cache lama tetap dapat dipakai saat sumber
+            // utama sedang gagal, meskipun TTL-nya sudah lewat.
+            const staleCache = bacaCacheApi(true);
             if (staleCache) {
-                console.warn("Request gagal. Menggunakan cache yang tersedia.");
+                console.warn("Request gagal. Menggunakan stale cache yang tersedia.");
                 return staleCache;
             }
 
@@ -232,9 +227,7 @@ async function fetchSheetData(forceRefresh = false) {
 // ============================================================
 // INVALIDASI CACHE
 //
-// Dipanggil oleh modul lain setelah berhasil mengubah INPUT_REALISASI.
-// Tidak mengubah data atau perhitungan; hanya memaksa pembacaan terbaru
-// pada request berikutnya.
+// Dipanggil setelah berhasil mengubah INPUT_REALISASI.
 // ============================================================
 
 function invalidateApiCache() {
@@ -283,11 +276,7 @@ function csvToArray(csv) {
         const char = csv[i];
         const nextChar = csv[i + 1];
 
-        // ====================================================
-        // TANDA KUTIP
-        // ====================================================
         if (char === '"') {
-            // Quote ganda di dalam quoted field
             if (insideQuotes && nextChar === '"') {
                 field += '"';
                 i++;
@@ -297,23 +286,16 @@ function csvToArray(csv) {
             continue;
         }
 
-        // ====================================================
-        // PEMISAH KOLOM
-        // ====================================================
         if (char === "," && !insideQuotes) {
             row.push(field);
             field = "";
             continue;
         }
 
-        // ====================================================
-        // BARIS BARU
-        // ====================================================
         if (
             (char === "\n" || char === "\r") &&
             !insideQuotes
         ) {
-            // CRLF
             if (char === "\r" && nextChar === "\n") {
                 i++;
             }
@@ -321,28 +303,18 @@ function csvToArray(csv) {
             row.push(field);
             field = "";
 
-            // Jangan masukkan baris kosong total
             const adaIsi = row.some(function (value) {
                 return String(value).trim() !== "";
             });
 
-            if (adaIsi) {
-                rows.push(row);
-            }
-
+            if (adaIsi) rows.push(row);
             row = [];
             continue;
         }
 
-        // ====================================================
-        // KARAKTER NORMAL
-        // ====================================================
         field += char;
     }
 
-    // ========================================================
-    // BARIS TERAKHIR
-    // ========================================================
     if (field !== "" || row.length > 0) {
         row.push(field);
 
@@ -350,9 +322,7 @@ function csvToArray(csv) {
             return String(value).trim() !== "";
         });
 
-        if (adaIsi) {
-            rows.push(row);
-        }
+        if (adaIsi) rows.push(row);
     }
 
     return rows;
