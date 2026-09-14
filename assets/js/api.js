@@ -1,17 +1,18 @@
 // ============================================================
 // API.JS
-// Mengambil data Google Sheet
-// Dipakai oleh Dashboard dan Monitoring
+// Mengambil data Google Sheet untuk Dashboard dan Monitoring
 // ============================================================
 
 // ============================================================
 // CACHE DATA
 //
-// Cache sementara menghindari request Google Sheet dan Apps Script
-// berulang. TTL 2 menit untuk menjaga data tetap relatif segar.
+// Dashboard hanya membaca DATA_APLIKASI.
+// INPUT_REALISASI tidak dipanggil pada saat load Dashboard/Monitoring.
+// Cache diberi versi baru agar cache lama yang masih menyimpan metadata
+// INPUT_REALISASI tidak ikut digunakan.
 // ============================================================
 
-const API_CACHE_KEY = "p3hpl_data_cache_v1";
+const API_CACHE_KEY = "p3hpl_data_cache_v2";
 const API_CACHE_TTL = 2 * 60 * 1000;
 
 let apiMemoryCache = null;
@@ -76,57 +77,18 @@ let apiLoadingPromise = null;
 
 
 // ============================================================
-// AMBIL TRANSAKSI INPUT_REALISASI
-// ============================================================
-
-async function fetchInputRealisasi() {
-    if (
-        typeof CONFIG === "undefined" ||
-        !CONFIG.INPUT_REALISASI_URL
-    ) {
-        return [];
-    }
-
-    const separator = CONFIG.INPUT_REALISASI_URL.includes("?") ? "&" : "?";
-    const url = CONFIG.INPUT_REALISASI_URL + separator + "action=list";
-
-    const response = await fetch(url);
-
-    if (!response.ok) {
-        throw new Error(
-            "Gagal mengambil INPUT_REALISASI. HTTP " + response.status
-        );
-    }
-
-    const text = await response.text();
-
-    let payload;
-    try {
-        payload = JSON.parse(text);
-    } catch (error) {
-        throw new Error("Respons INPUT_REALISASI bukan JSON yang valid.");
-    }
-
-    if (!payload || payload.success !== true) {
-        throw new Error(
-            payload?.message ||
-            "Endpoint INPUT_REALISASI mengembalikan respons gagal."
-        );
-    }
-
-    return Array.isArray(payload.data) ? payload.data : [];
-}
-
-
-// ============================================================
 // AMBIL DATA GOOGLE SHEET
+//
+// DATA_APLIKASI adalah satu-satunya sumber data Dashboard/Monitoring.
+// INPUT_REALISASI tetap digunakan oleh halaman Input Data melalui
+// input-data.js, tetapi TIDAK diambil di sini.
 // ============================================================
 
 async function fetchSheetData(forceRefresh = false) {
     if (!forceRefresh) {
         const cached = bacaCacheApi();
         if (cached) {
-            console.log("=== MENGGUNAKAN CACHE DATA GOOGLE SHEET ===");
+            console.log("=== MENGGUNAKAN CACHE DATA_APLIKASI ===");
             return cached;
         }
     }
@@ -137,7 +99,7 @@ async function fetchSheetData(forceRefresh = false) {
 
     apiLoadingPromise = (async function () {
         try {
-            console.log("=== MENGAMBIL DATA GOOGLE SHEET ===");
+            console.log("=== MENGAMBIL DATA_APLIKASI GOOGLE SHEET ===");
 
             if (
                 typeof CONFIG === "undefined" ||
@@ -148,63 +110,27 @@ async function fetchSheetData(forceRefresh = false) {
                 );
             }
 
-            // Google Sheet adalah sumber utama Dashboard.
-            // INPUT_REALISASI adalah data tambahan; kegagalannya tidak boleh
-            // membuat seluruh Dashboard gagal tampil.
-            const [sheetResult, inputResult] = await Promise.allSettled([
-                fetch(CONFIG.SHEET_URL),
-                fetchInputRealisasi()
-            ]);
+            const response = await fetch(CONFIG.SHEET_URL);
 
-            if (sheetResult.status !== "fulfilled") {
-                throw sheetResult.reason;
-            }
-
-            const response = sheetResult.value;
             if (!response.ok) {
                 throw new Error(
-                    "Gagal mengambil Google Sheet. HTTP " + response.status
+                    "Gagal mengambil DATA_APLIKASI. HTTP " + response.status
                 );
             }
 
             const csv = await response.text();
             if (!csv) {
-                throw new Error("Google Sheet mengembalikan data kosong.");
+                throw new Error("DATA_APLIKASI mengembalikan data kosong.");
             }
 
             const data = csvToArray(csv);
 
-            let inputRealisasi = [];
-            if (inputResult.status === "fulfilled") {
-                inputRealisasi = inputResult.value;
-            } else {
-                console.warn(
-                    "INPUT_REALISASI tidak tersedia. Dashboard tetap menggunakan DATA_APLIKASI.",
-                    inputResult.reason
-                );
-            }
-
-            // Transaksi tambahan disimpan sebagai metadata pada array raw.
-            // Bentuk utama tetap Array agar seluruh halaman lama tidak perlu
-            // diubah. parser.js akan menggabungkannya berdasarkan INDEX_RECORD.
-            data.__inputRealisasi = inputRealisasi;
-
-            console.log("JUMLAH BARIS GOOGLE SHEET:", data.length);
-            console.log(
-                "JUMLAH TRANSAKSI INPUT_REALISASI:",
-                inputRealisasi.length
-            );
-
-            if (inputResult.status !== "fulfilled") {
-                console.warn(
-                    "PERINGATAN: INPUT_REALISASI gagal dimuat. Periksa deployment Apps Script jika transaksi tambahan diperlukan."
-                );
-            }
+            console.log("JUMLAH BARIS DATA_APLIKASI:", data.length);
 
             simpanCacheApi(data);
             return data;
         } catch (error) {
-            console.error("ERROR FETCH GOOGLE SHEET:", error);
+            console.error("ERROR FETCH DATA_APLIKASI:", error);
 
             // True stale fallback: cache lama tetap dapat dipakai saat sumber
             // utama sedang gagal, meskipun TTL-nya sudah lewat.
@@ -227,7 +153,8 @@ async function fetchSheetData(forceRefresh = false) {
 // ============================================================
 // INVALIDASI CACHE
 //
-// Dipanggil setelah berhasil mengubah INPUT_REALISASI.
+// Tetap tersedia agar halaman Input Data dapat meminta Dashboard
+// memuat ulang DATA_APLIKASI pada sesi berikutnya bila diperlukan.
 // ============================================================
 
 function invalidateApiCache() {
