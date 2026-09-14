@@ -18,8 +18,8 @@ document.addEventListener("DOMContentLoaded", async function () {
   const btnSimpanRealisasi = document.getElementById("btnSimpanRealisasi");
   const inputIdPreview = document.getElementById("inputIdPreview");
 
-  // Endpoint Google Apps Script untuk penyimpanan INPUT_REALISASI.
-  const INPUT_REALISASI_ENDPOINT = "https://script.google.com/macros/s/AKfycbzdDEvYU0r_9qKeQQZSdcPRtgz01kFsHdMm6PM5nj8K21c28oV4k53co6cCJC8risZScQ/exec";
+  // Gunakan satu sumber konfigurasi untuk endpoint INPUT_REALISASI.
+  const INPUT_REALISASI_ENDPOINT = CONFIG.INPUT_REALISASI_URL;
 
   let rows = [];
 
@@ -223,6 +223,11 @@ document.addEventListener("DOMContentLoaded", async function () {
       inputBulan.value="";
       realisasiFormMessage.className="small mt-3 text-success";
       realisasiFormMessage.innerHTML='<i class="bi bi-check-circle-fill me-1"></i>Realisasi berhasil disimpan ke INPUT_REALISASI.';
+
+      // Data INPUT_REALISASI berubah; paksa request berikutnya mengambil data terbaru.
+      if(typeof invalidateApiCache === "function"){
+        invalidateApiCache();
+      }
     }catch(error){
       console.error("Gagal menyimpan INPUT_REALISASI:",error);
       realisasiFormMessage.className="small mt-3 text-danger";
