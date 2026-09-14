@@ -80,8 +80,7 @@ let apiLoadingPromise = null;
 // AMBIL DATA GOOGLE SHEET
 //
 // DATA_APLIKASI adalah satu-satunya sumber data Dashboard/Monitoring.
-// INPUT_REALISASI tetap digunakan oleh halaman Input Data melalui
-// input-data.js, tetapi TIDAK diambil di sini.
+// INPUT_REALISASI tidak digunakan oleh Dashboard/Monitoring.
 // ============================================================
 
 async function fetchSheetData(forceRefresh = false) {
@@ -152,9 +151,6 @@ async function fetchSheetData(forceRefresh = false) {
 
 // ============================================================
 // INVALIDASI CACHE
-//
-// Tetap tersedia agar halaman Input Data dapat meminta Dashboard
-// memuat ulang DATA_APLIKASI pada sesi berikutnya bila diperlukan.
 // ============================================================
 
 function invalidateApiCache() {
@@ -254,3 +250,22 @@ function csvToArray(csv) {
 
     return rows;
 }
+
+
+// ============================================================
+// MENU INPUT DATA DINONAKTIFKAN
+//
+// DATA REALISASI sekarang dikelola langsung di DATA_APLIKASI.
+// Halaman/menu Input Data tidak lagi menjadi bagian dari aplikasi.
+// ============================================================
+
+document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll('.sidebar li[onclick*="input-data.html"]').forEach(function (item) {
+        item.remove();
+    });
+
+    document.querySelectorAll('.sidebar a[href="input-data.html"]').forEach(function (link) {
+        const item = link.closest("li");
+        if (item) item.remove();
+    });
+});
