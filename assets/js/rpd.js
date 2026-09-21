@@ -149,7 +149,7 @@ function rpdRenderDetilTable() {
     }
 
     tbody.innerHTML = rows.map(row => {
-        const saved = byId.get(String(row.id_rpd)) || RPD_EMPTY;
+        const saved = byId.get(String(row.id_rpd)) || rpdFindSavedForMaster(row) || RPD_EMPTY;
         const total = [saved.tw1, saved.tw2, saved.tw3, saved.tw4].reduce((a,b) => a + rpdNumber(b), 0);
         // RPD adalah rencana mandiri. Sisa RPD hanya berasal dari Pagu Detil RPD
         // dikurangi Total RPD, tanpa memakai Realisasi/Sisa dari DATA_APLIKASI.
@@ -179,11 +179,37 @@ function rpdRenderDetilTable() {
     });
 }
 
+function rpdFindSavedForMaster(masterRow) {
+    const exact = rpdExisting.find(item => String(item.id_rpd || "").trim() === String(masterRow.id_rpd || "").trim());
+    if (exact) return exact;
+
+    // Kompatibilitas dengan record lama yang belum memiliki ID_RPD.
+    // Cocokkan metadata yang tersedia secara berurutan; jangan mencocokkan
+    // hanya berdasarkan akun karena satu akun dapat memiliki banyak detil.
+    const candidates = rpdExisting.filter(item =>
+        String(item.tahun ?? "") === String(masterRow.tahun ?? "") &&
+        String(item.akun ?? item.AKUN ?? "").trim() === String(masterRow.akun ?? "").trim() &&
+        (
+            String(item.kode_sub_komponen ?? "").trim() === String(masterRow.kodeSubKomponen ?? "").trim() ||
+            !String(item.kode_sub_komponen ?? "").trim()
+        ) &&
+        (
+            String(item.sub_komponen ?? "").trim() === String(masterRow.subKomponen ?? "").trim() ||
+            !String(item.sub_komponen ?? "").trim()
+        ) &&
+        (
+            String(item.detil_akun ?? "").trim() === String(masterRow.detilAkun ?? "").trim() ||
+            !String(item.detil_akun ?? "").trim()
+        )
+    );
+    return candidates.length === 1 ? candidates[0] : null;
+}
+
 function rpdOpenEditor(id) {
     const row = rpdMasterRows.find(r => String(r.id_rpd) === String(id));
     if (!row) return;
 
-    const saved = rpdExisting.find(r => String(r.id_rpd) === String(id)) || RPD_EMPTY;
+    const saved = rpdFindSavedForMaster(row) || RPD_EMPTY;
     rpdCurrentSelection = row;
 
     document.getElementById("rpdEditId").value = row.id_rpd;
@@ -227,6 +253,9 @@ function rpdUpdateEditorTotal() {
 async function rpdSave() {
     if (!rpdCurrentSelection || !rpdUser) return;
 
+    // Pastikan semua identitas master dikirim ulang setiap kali menyimpan.
+    // Ini penting untuk memperbaiki record lama yang hanya menyimpan akun/TW
+    // tetapi kehilangan ID_RPD atau metadata baris.
     const payload = {
         id_rpd: rpdCurrentSelection.id_rpd,
         tahun: rpdCurrentSelection.tahun,
