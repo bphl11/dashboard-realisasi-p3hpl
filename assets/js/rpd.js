@@ -80,11 +80,12 @@ function rpdGetFilteredRows() {
     );
 }
 
-function rpdRefreshFilters() {
+function rpdRefreshFilters(options = {}) {
     const subSelect = document.getElementById("rpdSubKomponen");
     const akunSelect = document.getElementById("rpdAkun");
     const subValue = subSelect?.value || "";
-    const akunValue = akunSelect?.value || "";
+    const keepAkun = options.keepAkun === true;
+    const akunValue = keepAkun ? (akunSelect?.value || "") : "";
 
     const subs = rpdUniqueSorted(rpdMasterRows, "subKomponen");
     rpdPopulateSelect("rpdSubKomponen", subs, "Pilih Sub Komponen");
@@ -103,12 +104,12 @@ function rpdRefreshFilters() {
 
     const filteredBySub = rpdMasterRows.filter(r => r.subKomponen === subValue);
     const akuns = rpdUniqueSorted(filteredBySub, "akun");
-    rpdPopulateSelect("rpdAkun", akuns, "Pilih Akun Belanja");
+    rpdPopulateSelect("rpdAkun", akuns, "Semua Akun Belanja");
 
-    if (akunSelect && akuns.includes(akunValue)) {
-        akunSelect.value = akunValue;
-    } else if (akunSelect) {
-        akunSelect.value = "";
+    // Secara default tampilkan SEMUA akun/detil pada Sub Komponen.
+    // Dropdown Akun hanya menjadi filter tambahan.
+    if (akunSelect) {
+        akunSelect.value = keepAkun && akuns.includes(akunValue) ? akunValue : "";
     }
 }
 
@@ -283,7 +284,7 @@ async function rpdInitData() {
 
         // Gabungkan data RPD tersimpan yang ID-nya memakai rowIndex lama.
         // Untuk data baru, ID dibuat deterministik dari row DATA_APLIKASI.
-        rpdRefreshFilters();
+        rpdRefreshFilters({ keepAkun: false });
         rpdRenderDetilTable();
 
         document.getElementById("rpdTotalDetil").textContent =
