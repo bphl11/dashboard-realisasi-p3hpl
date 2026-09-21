@@ -132,7 +132,9 @@ function rpdRenderDetilTable() {
         const status = total > rpdNumber(row.pagu) ? "Melebihi Pagu" : (total === rpdNumber(row.pagu) ? "Sesuai Pagu" : "Belum Lengkap");
 
         return '<tr>' +
-            '<td><strong>' + rpdEsc(row.akun) + '</strong><div class="small text-muted">' + rpdEsc(row.detilAkun) + '</div></td>' +
+            '<td><strong>' + rpdEsc(row.itemAkun ? row.itemAkun + " — " : "") + rpdEsc(row.akun) + '</strong>' +
+            '<div class="small text-muted">' + (row.detilAkun ? 'Detil: ' + rpdEsc(row.detilAkun) : 'Detil: -') + '</div>' +
+            '<div class="small">' + (row.rincianItem ? 'Rincian: ' + rpdEsc(row.rincianItem) : '') + '</div></td>' +
             '<td class="text-end">' + rpdFormatRupiah(row.pagu) + '</td>' +
             '<td class="text-end">' + rpdFormatRupiah(saved.tw1) + '</td>' +
             '<td class="text-end">' + rpdFormatRupiah(saved.tw2) + '</td>' +
@@ -153,7 +155,7 @@ function rpdOpenEditor(id) {
     rpdCurrentSelection = row;
 
     document.getElementById("rpdEditId").value = row.id_rpd;
-    document.getElementById("rpdEditLabel").textContent = row.detilAkun || "-";
+    document.getElementById("rpdEditLabel").textContent = row.rincianItem || row.detilAkun || "-";
     document.getElementById("rpdEditSub").textContent = row.subKomponen || "-";
     document.getElementById("rpdEditAkun").textContent = row.akun || "-";
     document.getElementById("rpdEditPagu").textContent = rpdFormatRupiah(row.pagu);
@@ -193,6 +195,7 @@ async function rpdSave() {
         akun: rpdCurrentSelection.akun,
         item_akun: rpdCurrentSelection.itemAkun,
         detil_akun: rpdCurrentSelection.detilAkun,
+        rincian_item: rpdCurrentSelection.rincianItem,
         pagu_detil: rpdCurrentSelection.pagu,
         tw1: rpdNumber(document.getElementById("rpdTw1").value),
         tw2: rpdNumber(document.getElementById("rpdTw2").value),
@@ -235,11 +238,24 @@ async function rpdSave() {
 function rpdBuildMasterRows(rawData) {
     if (!Array.isArray(rawData) || !rawData.length) return [];
 
-    const norm = value => String(value ?? "").trim().toLowerCase().replace(/[._-]/g, " ").replace(/\s+/g, " ");
-    const headers = rawData.find(row => Array.isArray(row) && row.some(v => {
-        const k = norm(v);
-        return k === "pagu";
-    }));
+    // DATA_APLIKASI adalah sumber master RPD.
+    // Struktur aktualnya:
+    // Sub Komponen -> Item Akun (kode) -> Akun Belanja -> Detil Akun -> Rincian Item.
+    //
+    // PENTING:
+    // - Jangan melakukan fill-down pada Akun/Detil/Rincian. Setiap baris DATA_APLIKASI
+    //   adalah satu baris anggaran atomik dan sudah memiliki nilai hierarkinya.
+    // - Detil Akun boleh kosong (mis. Belanja Bahan), tetapi Rincian Item tetap
+    //   menjadi uraian/leaf yang harus muncul dan dapat diinput RPD.
+    // - Baris berstatus Diblokir tidak menjadi master RPD.
+    // - ID mempertahankan nomor baris sumber agar RPD tersimpan lama tetap terhubung.
+    const norm = value => String(value ?? "")
+        .trim()
+        .toLowerCase()
+        .replace(/[._-]/g, " ")
+        .replace(/\\s+/g, " ");
+
+    const headers = rawData.find(row => Array.isArray(row) && row.some(v => norm(v) === "pagu"));
     if (!headers) return [];
 
     const map = {};
@@ -255,26 +271,27 @@ function rpdBuildMasterRows(rawData) {
         }
         return -1;
     };
+
     const get = (row, aliases) => {
         const i = idx(aliases);
         return i >= 0 ? String(row[i] ?? "").trim() : "";
     };
+
     const money = value => {
         if (value === null || value === undefined || value === "") return 0;
         let s = String(value).replace(/Rp/gi, "").trim();
         s = s.replace(/[^0-9,.-]/g, "");
-        if (s.includes(".") && s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
-        else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
-        else s = s.replace(/,/g, "");
+        if (s.includes(".") && s.includes(",")) {
+            s = s.replace(/\\./g, "").replace(",", ".");
+        } else if (/^\\d{1,3}(\\.\\d{3})+$/.test(s)) {
+            s = s.replace(/\\./g, "");
+        } else {
+            s = s.replace(/,/g, "");
+        }
         return Number(s) || 0;
     };
 
     const headerIndex = rawData.indexOf(headers);
-    let currentSub = "";
-    let currentKodeSub = "";
-    let currentAkun = "";
-    let currentItem = "";
-    let currentDetil = "";
     const out = [];
 
     for (let i = headerIndex + 1; i < rawData.length; i++) {
@@ -288,46 +305,34 @@ function rpdBuildMasterRows(rawData) {
         const detil = get(row, ["Detil Akun", "Detail Akun", "Detil"]);
         const rincian = get(row, ["Rincian Item", "Rincian"]);
         const status = get(row, ["Status Pagu", "Status"]).toLowerCase();
-
-        if (sub) currentSub = sub;
-        if (kodeSub) currentKodeSub = kodeSub;
-        if (akun) currentAkun = akun;
-        if (item) currentItem = item;
-        if (detil) currentDetil = detil;
-
         const pagu = money(get(row, ["Pagu"]));
-        if (!currentSub || !currentAkun || !currentDetil || pagu <= 0) continue;
-        if (status.includes("blok")) continue;
 
-        // Hindari baris summary akun/item yang bukan detil transaksi.
-        // Jika Rincian Item tersedia, baris tersebut adalah detail atomik.
-        // Jika tidak ada rincian, Detil Akun + Pagu tetap dianggap valid.
-        const identity = [currentSub, currentAkun, currentItem, currentDetil, rincian].join(" ").trim();
-        if (!identity) continue;
+        if (status.includes("blok")) continue;
+        if (!sub || !akun || pagu <= 0) continue;
+
+        // Rincian Item adalah leaf/uraian anggaran pada DATA_APLIKASI.
+        // Jika Rincian kosong, Detil Akun tetap dipakai sebagai fallback.
+        const leaf = rincian || detil || "";
+        if (!leaf) continue;
 
         out.push({
             rowIndex: i,
             sourceFormat: "RPD_RAW",
             id_rpd: "RPD-" + i,
             tahun: get(row, ["Tahun", "Tahun Anggaran"]) || new Date().getFullYear(),
-            kodeSubKomponen: currentKodeSub || currentSub,
-            subKomponen: currentSub,
-            akun: currentAkun,
-            itemAkun: currentItem || "",
-            detilAkun: currentDetil,
+            kodeSubKomponen: kodeSub || sub,
+            subKomponen: sub,
+            akun: akun,
+            itemAkun: item || "",
+            detilAkun: detil || "",
             rincianItem: rincian || "",
             pagu: pagu
         });
     }
 
-    // Hilangkan duplikasi identik akibat baris tampilan/summary yang berulang.
-    const seen = new Set();
-    return out.filter(row => {
-        const key = [row.subKomponen, row.akun, row.itemAkun, row.detilAkun, row.rincianItem, row.pagu].join("|");
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-    });
+    // Tidak melakukan deduplikasi. Dua baris sumber yang kebetulan identik
+    // tetap merupakan dua baris DATA_APLIKASI dan harus tetap dapat di-RPD-kan.
+    return out;
 }
 
 async function rpdInitData() {
@@ -348,9 +353,9 @@ async function rpdInitData() {
         // dan seluruh Detil Akun yang ada di DATA_APLIKASI ikut muncul.
         const rawData = await getSheetData();
 
-        // Bangun master RPD langsung dari DATA_APLIKASI dengan fill-down
-        // hierarki. Ini penting untuk sheet yang hanya menulis Sub Komponen/
-        // Akun/Detil sekali lalu membiarkan baris berikutnya kosong.
+        // Bangun master RPD langsung dari DATA_APLIKASI.
+        // Setiap baris sumber dipertahankan sebagai satu baris anggaran atomik,
+        // tanpa fill-down yang dapat memindahkan Detil Akun dari baris sebelumnya.
         let builtMaster = rpdBuildMasterRows(rawData);
 
         // Fallback ke parser utama jika format sheet sudah flat.
