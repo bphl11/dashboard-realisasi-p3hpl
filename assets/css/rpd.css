@@ -1,0 +1,16 @@
+/* RPD module */
+.rpd-header{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
+.rpd-user-box{background:#fff;border:1px solid #e3e8e4;border-radius:10px;padding:10px 12px;min-width:220px}
+.rpd-user-box small{display:block;color:#6b7280}
+.rpd-login-card{max-width:620px;margin:50px auto;border:1px solid #e2e8e3;border-radius:18px;box-shadow:0 8px 25px rgba(16,24,40,.06)}
+.rpd-login-icon{font-size:3rem;color:#2e6a3c;margin-bottom:12px}
+.rpd-stat{padding:16px;border:1px solid #e5e9ee;border-radius:12px;box-shadow:0 4px 12px rgba(16,24,40,.04)}
+.rpd-stat small{color:#6b7280;display:block;margin-bottom:5px}
+.rpd-stat strong{font-size:1.35rem;color:#2e6a3c}
+.rpd-note span{color:#495566;font-size:.9rem}
+.rpd-card{border:1px solid #e5e9ee;border-radius:15px;box-shadow:0 5px 16px rgba(16,24,40,.045)}
+.rpd-table{font-size:.82rem}
+.rpd-table th{white-space:nowrap;background:#f5f7f9}
+.rpd-total-box{background:#f4f8f4;border:1px solid #dbe9dd;border-radius:10px;padding:12px;display:flex;gap:30px;flex-wrap:wrap}
+.rpd-total-box strong{color:#2e6a3c}
+@media(max-width:700px){.rpd-header{display:block}.rpd-user-box{margin-top:12px}.rpd-table{min-width:900px}}
