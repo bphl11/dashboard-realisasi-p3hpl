@@ -295,12 +295,30 @@ async function rpdSave() {
 
         if (!result.ok) throw new Error(result.message || "Data RPD gagal disimpan.");
 
+        // Jangan menunggu bootstrap ulang untuk menampilkan hasil simpan.
+        // Gabungkan payload yang BARU saja berhasil disimpan ke state lokal.
+        // Ini juga membuat tampilan tetap benar walaupun respons API lama
+        // belum mengembalikan seluruh daftar RPD.
+        const localSaved = rpdNormalizeSavedRow({
+            ...payload,
+            id_rpd: payload.id_rpd,
+            ID_RPD: payload.id_rpd,
+            tw1: payload.tw1,
+            tw2: payload.tw2,
+            tw3: payload.tw3,
+            tw4: payload.tw4,
+            catatan: payload.catatan
+        });
+        const savedById = new Map(rpdExisting.map(item => [String(item.id_rpd), item]));
+        savedById.set(String(localSaved.id_rpd), localSaved);
+
+        // Jika API mengembalikan data terbaru, gunakan data tersebut juga.
         const savedRows = rpdNormalizeExistingRows(result.data ?? result.rpd ?? result);
-        if (savedRows.length) {
-            const savedById = new Map(rpdExisting.map(item => [String(item.id_rpd), item]));
-            savedRows.forEach(item => savedById.set(String(item.id_rpd), item));
-            rpdExisting = [...savedById.values()];
-        }
+        savedRows.forEach(item => {
+            if (item.id_rpd) savedById.set(String(item.id_rpd), item);
+        });
+        rpdExisting = [...savedById.values()];
+
         bootstrap.Modal.getInstance(document.getElementById("rpdEditorModal"))?.hide();
         rpdRenderDetilTable();
         rpdSetStatus("RPD berhasil disimpan.", "success");
