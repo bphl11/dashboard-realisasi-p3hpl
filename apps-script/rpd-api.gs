@@ -15,7 +15,7 @@
 // masukkan Client ID ke RPD_CONFIG.GOOGLE_CLIENT_ID.
 // ============================================================
 
-const RPD_SHEET_ID = ""; // isi Spreadsheet ID RPD
+const RPD_SHEET_ID = "1HA8oG7ItA9r5Yf9NRQXNvzJp9qaVRZeAbcDK3gxQR88"; // isi Spreadsheet ID RPD
 const RPD_CLIENT_ID = ""; // harus sama dengan GOOGLE_CLIENT_ID di frontend
 
 // URL CSV DATA_APLIKASI yang saat ini dipakai Dashboard.
