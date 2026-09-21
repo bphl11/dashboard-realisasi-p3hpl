@@ -65,6 +65,29 @@ function rpdUniqueSorted(rows, key) {
         .sort((a, b) => a.localeCompare(b, "id"));
 }
 
+function rpdNormalizeSavedRow(row) {
+    const source = row && typeof row === "object" ? row : {};
+    return {
+        ...source,
+        id_rpd: String(source.id_rpd ?? source.ID_RPD ?? "").trim(),
+        tw1: rpdNumber(source.tw1 ?? source.TW1 ?? 0),
+        tw2: rpdNumber(source.tw2 ?? source.TW2 ?? 0),
+        tw3: rpdNumber(source.tw3 ?? source.TW3 ?? 0),
+        tw4: rpdNumber(source.tw4 ?? source.TW4 ?? 0),
+        catatan: String(source.catatan ?? source.CATATAN ?? "").trim()
+    };
+}
+
+function rpdNormalizeExistingRows(value) {
+    if (Array.isArray(value)) return value.map(rpdNormalizeSavedRow);
+    if (value && typeof value === "object") {
+        if (Array.isArray(value.rpd)) return value.rpd.map(rpdNormalizeSavedRow);
+        if (Array.isArray(value.data)) return value.data.map(rpdNormalizeSavedRow);
+        if (value.id_rpd || value.ID_RPD) return [rpdNormalizeSavedRow(value)];
+    }
+    return [];
+}
+
 function rpdGetFilteredRows() {
     const sub = document.getElementById("rpdSubKomponen")?.value || "";
     const akun = document.getElementById("rpdAkun")?.value || "";
@@ -128,9 +151,9 @@ function rpdRenderDetilTable() {
     tbody.innerHTML = rows.map(row => {
         const saved = byId.get(String(row.id_rpd)) || RPD_EMPTY;
         const total = [saved.tw1, saved.tw2, saved.tw3, saved.tw4].reduce((a,b) => a + rpdNumber(b), 0);
-        // "Sisa" pada tabel RPD mengikuti Sisa Anggaran dari DATA_APLIKASI.
-        // Total RPD tetap ditampilkan terpisah dan tidak mengganti nilai Sisa Anggaran.
-        const sisaAnggaran = rpdNumber(row.sisaAnggaran ?? row.sisa ?? Math.max(rpdNumber(row.pagu) - rpdNumber(row.realisasi), 0));
+        // RPD adalah rencana mandiri. Sisa RPD hanya berasal dari Pagu Detil RPD
+        // dikurangi Total RPD, tanpa memakai Realisasi/Sisa dari DATA_APLIKASI.
+        const sisaRpd = Math.max(rpdNumber(row.pagu) - total, 0);
 
         return '<tr>' +
             '<td><strong>' + rpdEsc(row.itemAkun ? row.itemAkun + " — " : "") + rpdEsc(row.akun) + '</strong>' +
@@ -142,7 +165,7 @@ function rpdRenderDetilTable() {
             '<td class="text-end">' + rpdFormatRupiah(saved.tw3) + '</td>' +
             '<td class="text-end">' + rpdFormatRupiah(saved.tw4) + '</td>' +
             '<td class="text-end fw-bold">' + rpdFormatRupiah(total) + '</td>' +
-            '<td class="text-end">' + rpdFormatRupiah(sisaAnggaran) + '</td>' +
+            '<td class="text-end">' + rpdFormatRupiah(sisaRpd) + '</td>' +
             '<td><button type="button" class="btn btn-sm btn-success rpd-edit-btn" data-rpd-id="' + rpdEsc(row.id_rpd) + '"><i class="bi bi-pencil-square"></i> Input/Edit</button></td>' +
             '</tr>';
     }).join("");
@@ -173,8 +196,6 @@ function rpdOpenEditor(id) {
     const rincianEl = document.getElementById("rpdEditRincian");
     if (rincianEl) rincianEl.textContent = row.rincianItem ? "Rincian: " + row.rincianItem : "";
     document.getElementById("rpdEditPagu").textContent = rpdFormatRupiah(row.pagu);
-    const sourceSisaEl = document.getElementById("rpdEditSourceSisa");
-    if (sourceSisaEl) sourceSisaEl.textContent = rpdFormatRupiah(row.sisaAnggaran ?? row.sisa ?? Math.max(rpdNumber(row.pagu) - rpdNumber(row.realisasi), 0));
     document.getElementById("rpdTw1").value = rpdNumber(saved.tw1) || "";
     document.getElementById("rpdTw2").value = rpdNumber(saved.tw2) || "";
     document.getElementById("rpdTw3").value = rpdNumber(saved.tw3) || "";
@@ -245,7 +266,12 @@ async function rpdSave() {
 
         if (!result.ok) throw new Error(result.message || "Data RPD gagal disimpan.");
 
-        rpdExisting = result.data || rpdExisting;
+        const savedRows = rpdNormalizeExistingRows(result.data ?? result.rpd ?? result);
+        if (savedRows.length) {
+            const savedById = new Map(rpdExisting.map(item => [String(item.id_rpd), item]));
+            savedRows.forEach(item => savedById.set(String(item.id_rpd), item));
+            rpdExisting = [...savedById.values()];
+        }
         bootstrap.Modal.getInstance(document.getElementById("rpdEditorModal"))?.hide();
         rpdRenderDetilTable();
         rpdSetStatus("RPD berhasil disimpan.", "success");
@@ -336,9 +362,7 @@ function rpdBuildMasterRows(rawData) {
         const rowRincian = get(row, ["Rincian Item", "Rincian"]);
         const status = get(row, ["Status Pagu", "Status"]).toLowerCase();
         const pagu = money(get(row, ["Pagu"]));
-        const realisasi = money(get(row, ["Realisasi", "Jumlah Realisasi"]));
-        const sisaRaw = get(row, ["Sisa", "Sisa Anggaran"]);
-        const sisaAnggaran = sisaRaw && sisaRaw !== "-" ? money(sisaRaw) : Math.max(pagu - realisasi, 0);
+
 
         // Parent baru memutus konteks Detil sebelumnya.
         if (rowSub) {
@@ -394,9 +418,7 @@ function rpdBuildMasterRows(rawData) {
             itemAkun: item || "",
             detilAkun: detil || "",
             rincianItem: rincian || "",
-            pagu: pagu,
-            realisasi: realisasi,
-            sisaAnggaran: sisaAnggaran
+            pagu: pagu
         });
     }
 
@@ -450,9 +472,7 @@ async function rpdInitData() {
                     akun: row.akun,
                     itemAkun: row.itemAkun || "",
                     detilAkun: row.detilAkun,
-                    pagu: Number(row.pagu) || 0,
-                    realisasi: Number(row.realisasi) || 0,
-                    sisaAnggaran: Number(row.sisa) || Math.max((Number(row.pagu) || 0) - (Number(row.realisasi) || 0), 0)
+                    pagu: Number(row.pagu) || 0
                 }));
         }
 
@@ -468,7 +488,7 @@ async function rpdInitData() {
             console.warn("Bootstrap RPD lama gagal, master DATA_APLIKASI tetap digunakan:", apiError);
         }
 
-        rpdExisting = Array.isArray(result.rpd) ? result.rpd : [];
+        rpdExisting = rpdNormalizeExistingRows(result.rpd ?? result.data ?? result);
 
         // Gabungkan data RPD tersimpan yang ID-nya memakai rowIndex lama.
         // Untuk data baru, ID dibuat deterministik dari row DATA_APLIKASI.
