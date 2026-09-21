@@ -186,14 +186,17 @@ function rpdUpdateEditorTotal() {
     const values = ["rpdTw1","rpdTw2","rpdTw3","rpdTw4"].map(id => rpdNumber(document.getElementById(id)?.value));
     const total = values.reduce((a,b) => a+b, 0);
     const pagu = rpdNumber(rpdCurrentSelection?.pagu);
-    const valid = total <= pagu;
+    const hasNegative = values.some(value => value < 0);
+    const valid = !hasNegative && total <= pagu;
 
     document.getElementById("rpdEditTotal").textContent = rpdFormatRupiah(total);
     document.getElementById("rpdEditSisa").textContent = rpdFormatRupiah(Math.max(pagu-total, 0));
 
     const state = document.getElementById("rpdEditValidation");
     state.className = "small mt-2 " + (valid ? "text-success" : "text-danger");
-    state.textContent = valid ? "Valid: total RPD tidak melebihi pagu." : "Tidak valid: total RPD melebihi pagu.";
+    state.textContent = hasNegative
+        ? "Tidak valid: nilai RPD tidak boleh negatif."
+        : (valid ? "Valid: total RPD tidak melebihi pagu." : "Tidak valid: total RPD melebihi pagu.");
     document.getElementById("rpdSaveButton").disabled = !valid;
 }
 
@@ -218,6 +221,10 @@ async function rpdSave() {
     };
 
     const total = payload.tw1 + payload.tw2 + payload.tw3 + payload.tw4;
+    if ([payload.tw1, payload.tw2, payload.tw3, payload.tw4].some(value => value < 0)) {
+        rpdSetStatus("Nilai TW I-IV tidak boleh negatif.", "danger");
+        return;
+    }
     if (total > payload.pagu_detil) {
         rpdSetStatus("Total RPD melebihi pagu detil.", "danger");
         return;
