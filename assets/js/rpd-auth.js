@@ -52,11 +52,13 @@ function rpdShowApp(user) {
     rpdRenderUser(user);
     document.getElementById("rpdLoginPanel")?.classList.add("d-none");
     document.getElementById("rpdAppPanel")?.classList.remove("d-none");
+    document.getElementById("rpdUserBox")?.classList.remove("d-none");
 }
 
 function rpdShowLogin() {
     document.getElementById("rpdLoginPanel")?.classList.remove("d-none");
     document.getElementById("rpdAppPanel")?.classList.add("d-none");
+    document.getElementById("rpdUserBox")?.classList.add("d-none");
 }
 
 async function rpdHandleCredentialResponse(response) {
