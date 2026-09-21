@@ -128,8 +128,9 @@ function rpdRenderDetilTable() {
     tbody.innerHTML = rows.map(row => {
         const saved = byId.get(String(row.id_rpd)) || RPD_EMPTY;
         const total = [saved.tw1, saved.tw2, saved.tw3, saved.tw4].reduce((a,b) => a + rpdNumber(b), 0);
-        const sisa = Math.max(rpdNumber(row.pagu) - total, 0);
-        const status = total > rpdNumber(row.pagu) ? "Melebihi Pagu" : (total === rpdNumber(row.pagu) ? "Sesuai Pagu" : "Belum Lengkap");
+        // "Sisa" pada tabel RPD mengikuti Sisa Anggaran dari DATA_APLIKASI.
+        // Total RPD tetap ditampilkan terpisah dan tidak mengganti nilai Sisa Anggaran.
+        const sisaAnggaran = rpdNumber(row.sisaAnggaran ?? row.sisa ?? Math.max(rpdNumber(row.pagu) - rpdNumber(row.realisasi), 0));
 
         return '<tr>' +
             '<td><strong>' + rpdEsc(row.itemAkun ? row.itemAkun + " — " : "") + rpdEsc(row.akun) + '</strong>' +
@@ -141,7 +142,7 @@ function rpdRenderDetilTable() {
             '<td class="text-end">' + rpdFormatRupiah(saved.tw3) + '</td>' +
             '<td class="text-end">' + rpdFormatRupiah(saved.tw4) + '</td>' +
             '<td class="text-end fw-bold">' + rpdFormatRupiah(total) + '</td>' +
-            '<td class="text-end">' + rpdFormatRupiah(sisa) + '</td>' +
+            '<td class="text-end">' + rpdFormatRupiah(sisaAnggaran) + '</td>' +
             '<td><button type="button" class="btn btn-sm btn-success rpd-edit-btn" data-rpd-id="' + rpdEsc(row.id_rpd) + '"><i class="bi bi-pencil-square"></i> Input/Edit</button></td>' +
             '</tr>';
     }).join("");
@@ -172,6 +173,8 @@ function rpdOpenEditor(id) {
     const rincianEl = document.getElementById("rpdEditRincian");
     if (rincianEl) rincianEl.textContent = row.rincianItem ? "Rincian: " + row.rincianItem : "";
     document.getElementById("rpdEditPagu").textContent = rpdFormatRupiah(row.pagu);
+    const sourceSisaEl = document.getElementById("rpdEditSourceSisa");
+    if (sourceSisaEl) sourceSisaEl.textContent = rpdFormatRupiah(row.sisaAnggaran ?? row.sisa ?? Math.max(rpdNumber(row.pagu) - rpdNumber(row.realisasi), 0));
     document.getElementById("rpdTw1").value = rpdNumber(saved.tw1) || "";
     document.getElementById("rpdTw2").value = rpdNumber(saved.tw2) || "";
     document.getElementById("rpdTw3").value = rpdNumber(saved.tw3) || "";
@@ -247,8 +250,7 @@ async function rpdSave() {
         rpdRenderDetilTable();
         rpdSetStatus("RPD berhasil disimpan.", "success");
     } catch (error) {
-        console.error(error);
-        rpdSetStatus(error.message || "RPD gagal disimpan.", "danger");
+        console.error(error);        rpdSetStatus(error.message || "RPD gagal disimpan.", "danger");
     } finally {
         button.disabled = false;
         button.innerHTML = '<i class="bi bi-save"></i> Simpan RPD';
@@ -334,6 +336,9 @@ function rpdBuildMasterRows(rawData) {
         const rowRincian = get(row, ["Rincian Item", "Rincian"]);
         const status = get(row, ["Status Pagu", "Status"]).toLowerCase();
         const pagu = money(get(row, ["Pagu"]));
+        const realisasi = money(get(row, ["Realisasi", "Jumlah Realisasi"]));
+        const sisaRaw = get(row, ["Sisa", "Sisa Anggaran"]);
+        const sisaAnggaran = sisaRaw && sisaRaw !== "-" ? money(sisaRaw) : Math.max(pagu - realisasi, 0);
 
         // Parent baru memutus konteks Detil sebelumnya.
         if (rowSub) {
@@ -389,7 +394,9 @@ function rpdBuildMasterRows(rawData) {
             itemAkun: item || "",
             detilAkun: detil || "",
             rincianItem: rincian || "",
-            pagu: pagu
+            pagu: pagu,
+            realisasi: realisasi,
+            sisaAnggaran: sisaAnggaran
         });
     }
 
@@ -443,7 +450,9 @@ async function rpdInitData() {
                     akun: row.akun,
                     itemAkun: row.itemAkun || "",
                     detilAkun: row.detilAkun,
-                    pagu: Number(row.pagu) || 0
+                    pagu: Number(row.pagu) || 0,
+                    realisasi: Number(row.realisasi) || 0,
+                    sisaAnggaran: Number(row.sisa) || Math.max((Number(row.pagu) || 0) - (Number(row.realisasi) || 0), 0)
                 }));
         }
 
@@ -497,7 +506,6 @@ document.addEventListener("DOMContentLoaded", function () {
         if (akun) akun.value = "";
         rpdRefreshFilters();
         rpdRenderDetilTable();
-    });
-    document.getElementById("rpdAkun")?.addEventListener("change", rpdRenderDetilTable);
+    });    document.getElementById("rpdAkun")?.addEventListener("change", rpdRenderDetilTable);
     document.getElementById("rpdSaveButton")?.addEventListener("click", rpdSave);
 });
