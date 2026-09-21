@@ -34,7 +34,7 @@
 <header class="rpd-header">
   <div>
     <h2>Rencana Penarikan Dana (RPD)</h2>
-    <p>Input RPD per triwulan berdasarkan Detil Akun</p>
+    <p>Input RPD per triwulan berdasarkan Detil Akun. RPD merupakan rencana dan tidak menggunakan data realisasi.</p>
   </div>
   <div id="rpdUserBox" class="rpd-user-box d-none">
     <div><i class="bi bi-person-circle"></i> <strong id="rpdUserName">Operator</strong></div>
@@ -78,7 +78,7 @@
       </div>
       <div class="table-responsive">
         <table class="table table-bordered table-hover align-middle rpd-table">
-          <thead><tr><th>Detil Akun</th><th class="text-end">Pagu</th><th class="text-end">TW I</th><th class="text-end">TW II</th><th class="text-end">TW III</th><th class="text-end">TW IV</th><th class="text-end">Total RPD</th><th class="text-end">Sisa Anggaran</th><th>Aksi</th></tr></thead>
+          <thead><tr><th>Detil Akun</th><th class="text-end">Pagu</th><th class="text-end">TW I</th><th class="text-end">TW II</th><th class="text-end">TW III</th><th class="text-end">TW IV</th><th class="text-end">Total RPD</th><th class="text-end">Sisa RPD</th><th>Aksi</th></tr></thead>
           <tbody id="rpdTableBody"><tr><td colspan="9" class="text-center text-muted py-4">Pilih Sub Komponen untuk menampilkan detil.</td></tr></tbody>
         </table>
       </div>
@@ -97,7 +97,7 @@
     <div class="mb-2"><small class="text-muted">Sub Komponen</small><div id="rpdEditSub" class="fw-semibold"></div></div>
     <div class="mb-2"><small class="text-muted">Akun Belanja</small><div id="rpdEditAkun" class="fw-semibold"></div></div>
     <div class="mb-2"><small class="text-muted">Item Akun</small><div id="rpdEditItem" class="fw-semibold"></div></div>
-    <div class="mb-3"><small class="text-muted">Detil / Rincian Anggaran</small><div id="rpdEditLabel" class="fw-semibold"></div><div id="rpdEditRincian" class="small text-muted mt-1"></div><div class="mt-2">Pagu: <strong id="rpdEditPagu">Rp0</strong></div><div class="mt-1">Sisa Anggaran: <strong id="rpdEditSourceSisa">Rp0</strong></div></div>
+    <div class="mb-3"><small class="text-muted">Detil / Rincian Anggaran</small><div id="rpdEditLabel" class="fw-semibold"></div><div id="rpdEditRincian" class="small text-muted mt-1"></div><div class="mt-2">Pagu: <strong id="rpdEditPagu">Rp0</strong></div></div>
     <div class="row g-3">
       <div class="col-md-6"><label class="form-label">TW I</label><input type="number" min="0" step="1" id="rpdTw1" class="form-control"></div>
       <div class="col-md-6"><label class="form-label">TW II</label><input type="number" min="0" step="1" id="rpdTw2" class="form-control"></div>
