@@ -243,13 +243,61 @@ async function rpdInitData() {
     rpdSetLoading(true);
 
     try {
-        const result = await rpdApiRequest("bootstrap", { id_token: rpdUser.id_token });
-        rpdMasterRows = Array.isArray(result.master) ? result.master : [];
+        // MASTER RPD harus mengikuti DATA_APLIKASI, bukan daftar akun
+        // yang dibentuk terbatas oleh API RPD. Dengan demikian seluruh
+        // Akun Belanja (barang, jasa, perjalanan, modal, honor, dll.)
+        // dan seluruh Detil Akun yang ada di DATA_APLIKASI ikut muncul.
+        const rawData = await getSheetData();
+        const parsed = typeof parseDataAplikasi === "function"
+            ? (parseDataAplikasi(rawData) || [])
+            : [];
+
+        rpdMasterRows = parsed
+            .filter(row => row && row.statusPagu !== "Diblokir")
+            .filter(row => row.subKomponen && row.subKomponen !== "-")
+            .filter(row => row.akun && row.akun !== "-")
+            .filter(row => row.detilAkun && row.detilAkun !== "-")
+            .map(row => ({
+                ...row,
+                id_rpd: "RPD-" + String(row.rowIndex),
+                tahun: row.tahun || new Date().getFullYear(),
+                kodeSubKomponen: row.kodeSubKomponen || row.subKomponen,
+                subKomponen: row.subKomponen,
+                akun: row.akun,
+                itemAkun: row.itemAkun || "",
+                detilAkun: row.detilAkun,
+                pagu: Number(row.pagu) || 0
+            }));
+
+        // API tetap dipakai hanya untuk mengambil RPD yang sudah tersimpan.
+        // Jika API master lama masih hanya berisi akun perjalanan, ia tidak
+        // lagi membatasi pilihan master pada halaman RPD.
+        let result = { rpd: [] };
+        try {
+            result = await rpdApiRequest("bootstrap", { id_token: rpdUser.id_token });
+        } catch (apiError) {
+            console.warn("Bootstrap RPD lama gagal, master DATA_APLIKASI tetap digunakan:", apiError);
+        }
+
         rpdExisting = Array.isArray(result.rpd) ? result.rpd : [];
+
+        // Gabungkan data RPD tersimpan yang ID-nya memakai rowIndex lama.
+        // Untuk data baru, ID dibuat deterministik dari row DATA_APLIKASI.
         rpdRefreshFilters();
         rpdRenderDetilTable();
-        document.getElementById("rpdTotalDetil").textContent = rpdMasterRows.length.toLocaleString("id-ID");
-        document.getElementById("rpdTotalTerisi").textContent = rpdExisting.length.toLocaleString("id-ID");
+
+        document.getElementById("rpdTotalDetil").textContent =
+            rpdMasterRows.length.toLocaleString("id-ID");
+
+        const uniqueExisting = new Set(rpdExisting.map(r => String(r.id_rpd || "")));
+        document.getElementById("rpdTotalTerisi").textContent =
+            rpdMasterRows.filter(r => uniqueExisting.has(String(r.id_rpd))).length.toLocaleString("id-ID");
+
+        if (!rpdMasterRows.length) {
+            rpdSetStatus("DATA_APLIKASI tidak menghasilkan Detil Akun yang dapat digunakan untuk RPD. Periksa kolom Sub Komponen, Akun Belanja, dan Detil Akun.", "warning");
+        } else {
+            rpdHideStatus();
+        }
     } catch (error) {
         console.error(error);
         rpdSetStatus(error.message || "Data RPD gagal dimuat.", "danger");
