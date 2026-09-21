@@ -142,9 +142,17 @@ function rpdRenderDetilTable() {
             '<td class="text-end">' + rpdFormatRupiah(saved.tw4) + '</td>' +
             '<td class="text-end fw-bold">' + rpdFormatRupiah(total) + '</td>' +
             '<td class="text-end">' + rpdFormatRupiah(sisa) + '</td>' +
-            '<td><button class="btn btn-sm btn-success" onclick="rpdOpenEditor(' + JSON.stringify(row.id_rpd) + ')"><i class="bi bi-pencil-square"></i> Input/Edit</button></td>' +
+            '<td><button type="button" class="btn btn-sm btn-success rpd-edit-btn" data-rpd-id="' + rpdEsc(row.id_rpd) + '"><i class="bi bi-pencil-square"></i> Input/Edit</button></td>' +
             '</tr>';
     }).join("");
+
+    // Event handler dipasang setelah render agar tidak bergantung pada
+    // inline onclick/JSON string di HTML.
+    tbody.querySelectorAll(".rpd-edit-btn").forEach(button => {
+        button.addEventListener("click", function () {
+            rpdOpenEditor(this.dataset.rpdId);
+        });
+    });
 }
 
 function rpdOpenEditor(id) {
@@ -158,6 +166,11 @@ function rpdOpenEditor(id) {
     document.getElementById("rpdEditLabel").textContent = row.rincianItem || row.detilAkun || "-";
     document.getElementById("rpdEditSub").textContent = row.subKomponen || "-";
     document.getElementById("rpdEditAkun").textContent = row.akun || "-";
+    const itemEl = document.getElementById("rpdEditItem");
+    if (itemEl) itemEl.textContent = row.itemAkun || "-";
+    document.getElementById("rpdEditLabel").textContent = row.detilAkun || "-";
+    const rincianEl = document.getElementById("rpdEditRincian");
+    if (rincianEl) rincianEl.textContent = row.rincianItem ? "Rincian: " + row.rincianItem : "";
     document.getElementById("rpdEditPagu").textContent = rpdFormatRupiah(row.pagu);
     document.getElementById("rpdTw1").value = rpdNumber(saved.tw1) || "";
     document.getElementById("rpdTw2").value = rpdNumber(saved.tw2) || "";
