@@ -16,13 +16,13 @@
 // ============================================================
 
 const RPD_SHEET_ID = "1HA8oG7ItA9r5Yf9NRQXNvzJp9qaVRZeAbcDK3gxQR88"; // isi Spreadsheet ID RPD
-const RPD_CLIENT_ID = ""; // harus sama dengan GOOGLE_CLIENT_ID di frontend
+const RPD_CLIENT_ID = "443412026871-pqoa9tskrfkaffp5u2ohjhtq1l0ds2r1.apps.googleusercontent.com"; // sama dengan frontend
 
 // URL CSV DATA_APLIKASI yang saat ini dipakai Dashboard.
 const SOURCE_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vShdaPwws12pkv75bkQJL9AYjuC_4xjvANknmsoT6HVmgKeQ2DJsLLm5QzbvlKQJeQvqNGzYALsOk5n/pub?gid=1473286966&single=true&output=csv";
 
 const RPD_SHEETS = {
-  RPD: "RPD",
+  RPD: "RPD P3HPL",
   USERS: "USERS",
   LOG: "RPD_LOG"
 };
