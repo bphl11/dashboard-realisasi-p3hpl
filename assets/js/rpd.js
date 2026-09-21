@@ -232,6 +232,104 @@ async function rpdSave() {
     }
 }
 
+function rpdBuildMasterRows(rawData) {
+    if (!Array.isArray(rawData) || !rawData.length) return [];
+
+    const norm = value => String(value ?? "").trim().toLowerCase().replace(/[._-]/g, " ").replace(/\s+/g, " ");
+    const headers = rawData.find(row => Array.isArray(row) && row.some(v => {
+        const k = norm(v);
+        return k === "pagu";
+    }));
+    if (!headers) return [];
+
+    const map = {};
+    headers.forEach((v, i) => {
+        const k = norm(v);
+        if (k) map[k] = i;
+    });
+
+    const idx = aliases => {
+        for (const a of aliases) {
+            const k = norm(a);
+            if (Object.prototype.hasOwnProperty.call(map, k)) return map[k];
+        }
+        return -1;
+    };
+    const get = (row, aliases) => {
+        const i = idx(aliases);
+        return i >= 0 ? String(row[i] ?? "").trim() : "";
+    };
+    const money = value => {
+        if (value === null || value === undefined || value === "") return 0;
+        let s = String(value).replace(/Rp/gi, "").trim();
+        s = s.replace(/[^0-9,.-]/g, "");
+        if (s.includes(".") && s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+        else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
+        else s = s.replace(/,/g, "");
+        return Number(s) || 0;
+    };
+
+    const headerIndex = rawData.indexOf(headers);
+    let currentSub = "";
+    let currentKodeSub = "";
+    let currentAkun = "";
+    let currentItem = "";
+    let currentDetil = "";
+    const out = [];
+
+    for (let i = headerIndex + 1; i < rawData.length; i++) {
+        const row = Array.isArray(rawData[i]) ? rawData[i] : [];
+        if (!row.length || !row.some(v => String(v ?? "").trim() !== "")) continue;
+
+        const sub = get(row, ["Sub Komponen", "Subkomponen", "Nama Sub Komponen"]);
+        const kodeSub = get(row, ["Kode Sub Komponen", "KodeSubKomponen"]);
+        const akun = get(row, ["Akun Belanja", "Akun"]);
+        const item = get(row, ["Item Akun", "Item"]);
+        const detil = get(row, ["Detil Akun", "Detail Akun", "Detil"]);
+        const rincian = get(row, ["Rincian Item", "Rincian"]);
+        const status = get(row, ["Status Pagu", "Status"]).toLowerCase();
+
+        if (sub) currentSub = sub;
+        if (kodeSub) currentKodeSub = kodeSub;
+        if (akun) currentAkun = akun;
+        if (item) currentItem = item;
+        if (detil) currentDetil = detil;
+
+        const pagu = money(get(row, ["Pagu"]));
+        if (!currentSub || !currentAkun || !currentDetil || pagu <= 0) continue;
+        if (status.includes("blok")) continue;
+
+        // Hindari baris summary akun/item yang bukan detil transaksi.
+        // Jika Rincian Item tersedia, baris tersebut adalah detail atomik.
+        // Jika tidak ada rincian, Detil Akun + Pagu tetap dianggap valid.
+        const identity = [currentSub, currentAkun, currentItem, currentDetil, rincian].join(" ").trim();
+        if (!identity) continue;
+
+        out.push({
+            rowIndex: i,
+            sourceFormat: "RPD_RAW",
+            id_rpd: "RPD-" + i,
+            tahun: get(row, ["Tahun", "Tahun Anggaran"]) || new Date().getFullYear(),
+            kodeSubKomponen: currentKodeSub || currentSub,
+            subKomponen: currentSub,
+            akun: currentAkun,
+            itemAkun: currentItem || "",
+            detilAkun: currentDetil,
+            rincianItem: rincian || "",
+            pagu: pagu
+        });
+    }
+
+    // Hilangkan duplikasi identik akibat baris tampilan/summary yang berulang.
+    const seen = new Set();
+    return out.filter(row => {
+        const key = [row.subKomponen, row.akun, row.itemAkun, row.detilAkun, row.rincianItem, row.pagu].join("|");
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
 async function rpdInitData() {
     rpdUser = rpdGetStoredUser();
     if (!rpdUser) return;
@@ -249,26 +347,37 @@ async function rpdInitData() {
         // Akun Belanja (barang, jasa, perjalanan, modal, honor, dll.)
         // dan seluruh Detil Akun yang ada di DATA_APLIKASI ikut muncul.
         const rawData = await getSheetData();
-        const parsed = typeof parseDataAplikasi === "function"
-            ? (parseDataAplikasi(rawData) || [])
-            : [];
 
-        rpdMasterRows = parsed
-            .filter(row => row && row.statusPagu !== "Diblokir")
-            .filter(row => row.subKomponen && row.subKomponen !== "-")
-            .filter(row => row.akun && row.akun !== "-")
-            .filter(row => row.detilAkun && row.detilAkun !== "-")
-            .map(row => ({
-                ...row,
-                id_rpd: "RPD-" + String(row.rowIndex),
-                tahun: row.tahun || new Date().getFullYear(),
-                kodeSubKomponen: row.kodeSubKomponen || row.subKomponen,
-                subKomponen: row.subKomponen,
-                akun: row.akun,
-                itemAkun: row.itemAkun || "",
-                detilAkun: row.detilAkun,
-                pagu: Number(row.pagu) || 0
-            }));
+        // Bangun master RPD langsung dari DATA_APLIKASI dengan fill-down
+        // hierarki. Ini penting untuk sheet yang hanya menulis Sub Komponen/
+        // Akun/Detil sekali lalu membiarkan baris berikutnya kosong.
+        let builtMaster = rpdBuildMasterRows(rawData);
+
+        // Fallback ke parser utama jika format sheet sudah flat.
+        if (!builtMaster.length) {
+            const parsed = typeof parseDataAplikasi === "function"
+                ? (parseDataAplikasi(rawData) || [])
+                : [];
+
+            builtMaster = parsed
+                .filter(row => row && row.statusPagu !== "Diblokir")
+                .filter(row => row.subKomponen && row.subKomponen !== "-")
+                .filter(row => row.akun && row.akun !== "-")
+                .filter(row => row.detilAkun && row.detilAkun !== "-")
+                .map(row => ({
+                    ...row,
+                    id_rpd: "RPD-" + String(row.rowIndex),
+                    tahun: row.tahun || new Date().getFullYear(),
+                    kodeSubKomponen: row.kodeSubKomponen || row.subKomponen,
+                    subKomponen: row.subKomponen,
+                    akun: row.akun,
+                    itemAkun: row.itemAkun || "",
+                    detilAkun: row.detilAkun,
+                    pagu: Number(row.pagu) || 0
+                }));
+        }
+
+        rpdMasterRows = builtMaster;
 
         // API tetap dipakai hanya untuk mengambil RPD yang sudah tersimpan.
         // Jika API master lama masih hanya berisi akun perjalanan, ia tidak
