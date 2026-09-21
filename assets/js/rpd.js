@@ -317,6 +317,20 @@ async function rpdSave() {
         savedRows.forEach(item => {
             if (item.id_rpd) savedById.set(String(item.id_rpd), item);
         });
+
+        // Setelah save, baca ulang dari API. Ini memastikan tampilan tidak
+        // hanya bergantung pada state browser dan sekaligus memverifikasi
+        // bahwa record benar-benar sudah tersimpan di Spreadsheet RPD.
+        try {
+            const fresh = await rpdApiRequest("bootstrap", { id_token: rpdUser.id_token });
+            const freshRows = rpdNormalizeExistingRows(fresh.rpd ?? fresh.data ?? fresh);
+            freshRows.forEach(item => {
+                if (item.id_rpd) savedById.set(String(item.id_rpd), item);
+            });
+        } catch (reloadError) {
+            console.warn("Reload RPD setelah save gagal:", reloadError);
+        }
+
         rpdExisting = [...savedById.values()];
 
         bootstrap.Modal.getInstance(document.getElementById("rpdEditorModal"))?.hide();
