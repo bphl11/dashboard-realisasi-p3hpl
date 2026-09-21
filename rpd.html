@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RPD Triwulanan - P3HPHL</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/rpd.css">
+</head>
+<body>
+<div class="wrapper">
+<aside class="sidebar">
+  <div class="logo app-brand">
+    <div class="brand-mark"><img src="img/logo-kemenhut.png" alt="Logo Kementerian Kehutanan" class="logo-sidebar"></div>
+    <div class="brand-text">
+      <div class="brand-ministry">KEMENTERIAN KEHUTANAN</div>
+      <div class="brand-title">DASHBOARD REALISASI</div>
+      <div class="brand-subtitle">BPHL XI Banjarbaru</div>
+    </div>
+  </div>
+  <ul>
+    <li><a href="index.html"><i class="bi bi-house"></i> Dashboard</a></li>
+    <li class="active"><a href="rpd.html"><i class="bi bi-calendar3"></i> RPD</a></li>
+    <li><a href="monitoring.html"><i class="bi bi-table"></i> Monitoring</a></li>
+    <li><a href="grafik.html"><i class="bi bi-bar-chart"></i> Grafik</a></li>
+    <li><a href="laporan.html"><i class="bi bi-file-earmark-text"></i> Laporan</a></li>
+    <li><a href="audit.html"><i class="bi bi-shield-check"></i> Audit Parser</a></li>
+  </ul>
+</aside>
+
+<main class="content">
+<header class="rpd-header">
+  <div>
+    <h2>Rencana Penarikan Dana (RPD)</h2>
+    <p>Input RPD per triwulan berdasarkan Detil Akun</p>
+  </div>
+  <div id="rpdUserBox" class="rpd-user-box d-none">
+    <div><i class="bi bi-person-circle"></i> <strong id="rpdUserName">Operator</strong></div>
+    <small id="rpdUserEmail"></small>
+    <button id="rpdLogoutButton" class="btn btn-sm btn-outline-danger mt-1">Keluar</button>
+  </div>
+</header>
+
+<section id="rpdLoginPanel" class="card rpd-login-card">
+  <div class="card-body text-center">
+    <i class="bi bi-shield-lock rpd-login-icon"></i>
+    <h4>Login Modul RPD</h4>
+    <p class="text-muted">Hanya email Google yang terdaftar pada daftar Operator RPD yang dapat mengakses modul ini.</p>
+    <div id="googleSignInButton" class="d-flex justify-content-center"></div>
+    <div id="rpdLoginLoading" class="text-muted small d-none mt-3">Memeriksa akun...</div>
+    <div id="rpdAuthMessage" class="alert alert-danger d-none mt-3 text-start"></div>
+  </div>
+</section>
+
+<section id="rpdAppPanel" class="d-none">
+  <div id="rpdStatus" class="alert alert-info d-none"></div>
+  <div id="rpdLoading" class="alert alert-light d-none">Memuat data RPD...</div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-3"><div class="card rpd-stat"><small>Total Detil</small><strong id="rpdTotalDetil">0</strong></div></div>
+    <div class="col-md-3"><div class="card rpd-stat"><small>Sudah Diisi</small><strong id="rpdTotalTerisi">0</strong></div></div>
+    <div class="col-md-6"><div class="card rpd-stat rpd-note"><small>Validasi</small><span>Total TW I + II + III + IV tidak boleh melebihi Pagu Detil.</span></div></div>
+  </div>
+
+  <div class="card rpd-card">
+    <div class="card-body">
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Sub Komponen</label>
+          <select id="rpdSubKomponen" class="form-select"><option value="">Pilih Sub Komponen</option></select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Akun Belanja</label>
+          <select id="rpdAkun" class="form-select"><option value="">Pilih Akun Belanja</option></select>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-bordered table-hover align-middle rpd-table">
+          <thead><tr><th>Detil Akun</th><th class="text-end">Pagu</th><th class="text-end">TW I</th><th class="text-end">TW II</th><th class="text-end">TW III</th><th class="text-end">TW IV</th><th class="text-end">Total RPD</th><th class="text-end">Sisa</th><th>Aksi</th></tr></thead>
+          <tbody id="rpdTableBody"><tr><td colspan="9" class="text-center text-muted py-4">Pilih Sub Komponen untuk menampilkan detil.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+</div>
+
+<div class="modal fade" id="rpdEditorModal" tabindex="-1" aria-hidden="true">
+<div class="modal-dialog modal-lg modal-dialog-centered">
+<div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title"><i class="bi bi-calendar3"></i> Input / Edit RPD</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+    <input type="hidden" id="rpdEditId">
+    <div class="mb-2"><small class="text-muted">Sub Komponen</small><div id="rpdEditSub" class="fw-semibold"></div></div>
+    <div class="mb-2"><small class="text-muted">Akun Belanja</small><div id="rpdEditAkun" class="fw-semibold"></div></div>
+    <div class="mb-3"><small class="text-muted">Detil Akun</small><div id="rpdEditLabel" class="fw-semibold"></div><div>Pagu: <strong id="rpdEditPagu">Rp0</strong></div></div>
+    <div class="row g-3">
+      <div class="col-md-6"><label class="form-label">TW I</label><input type="number" min="0" step="1" id="rpdTw1" class="form-control"></div>
+      <div class="col-md-6"><label class="form-label">TW II</label><input type="number" min="0" step="1" id="rpdTw2" class="form-control"></div>
+      <div class="col-md-6"><label class="form-label">TW III</label><input type="number" min="0" step="1" id="rpdTw3" class="form-control"></div>
+      <div class="col-md-6"><label class="form-label">TW IV</label><input type="number" min="0" step="1" id="rpdTw4" class="form-control"></div>
+    </div>
+    <div class="rpd-total-box mt-3"><div>Total RPD <strong id="rpdEditTotal">Rp0</strong></div><div>Sisa <strong id="rpdEditSisa">Rp0</strong></div><div id="rpdEditValidation" class="small mt-2 text-success"></div></div>
+    <div class="mt-3"><label class="form-label">Catatan</label><textarea id="rpdCatatan" class="form-control" rows="2"></textarea></div>
+  </div>
+  <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button type="button" id="rpdSaveButton" class="btn btn-success"><i class="bi bi-save"></i> Simpan RPD</button></div>
+</div>
+</div>
+</div>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="assets/js/rpd-config.js"></script>
+<script src="assets/js/rpd-api.js"></script>
+<script src="assets/js/rpd-auth.js"></script>
+<script src="assets/js/rpd.js"></script>
+</body>
+</html>
