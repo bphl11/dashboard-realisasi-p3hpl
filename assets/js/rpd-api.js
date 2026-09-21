@@ -19,7 +19,9 @@ async function rpdApiRequest(action, payload = {}) {
         headers: {
             "Content-Type": "text/plain;charset=utf-8"
         },
-        body
+        body,
+        redirect: "follow",
+        credentials: "omit"
     });
 
     if (!response.ok) {
