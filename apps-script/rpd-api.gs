@@ -215,8 +215,18 @@ function readRpd_(sheet) {
   if (values.length < 2) return [];
 
   const index = headerIndex_(values[0]);
-  return values.slice(1).filter(row => row[index.ID_RPD]).map(row => ({
-    id_rpd: String(row[index.ID_RPD]),
+  return values.slice(1).filter(row => row.some(cell => String(cell ?? "").trim() !== "")).map(row => {
+    const existingId = String(row[index.ID_RPD] || "").trim();
+    const tahun = String(row[index.TAHUN] || "");
+    const kodeSub = String(row[index.KODE_SUB_KOMPONEN] || "");
+    const sub = String(row[index.SUB_KOMPONEN] || "");
+    const akun = String(row[index.AKUN] || "");
+    const item = String(row[index.ITEM_AKUN] || "");
+    const detil = String(row[index.DETIL_AKUN] || "");
+    const generatedId = existingId || makeRpdId_(tahun, kodeSub, sub, akun, item, detil);
+
+    return {
+    id_rpd: generatedId,
     tahun: String(row[index.TAHUN] || ""),
     kode_sub_komponen: String(row[index.KODE_SUB_KOMPONEN] || ""),
     sub_komponen: String(row[index.SUB_KOMPONEN] || ""),
@@ -232,7 +242,8 @@ function readRpd_(sheet) {
     catatan: String(row[index.CATATAN] || ""),
     updated_at: row[index.UPDATED_AT] || "",
     updated_by: String(row[index.UPDATED_BY] || "")
-  }));
+    };
+  });
 }
 
 function saveRpd_(idToken, row) {
@@ -282,7 +293,9 @@ function saveRpd_(idToken, row) {
     updated_by: user.email
   };
 
-  const output = [];
+  // Buat array DENSE sesuai urutan header agar ID_RPD selalu ditulis
+  // pada kolom A dan tidak bergeser ketika appendRow().
+  const output = new Array(sheet.getLastColumn()).fill("");
   output[index.ID_RPD] = record.id_rpd;
   output[index.TAHUN] = record.tahun;
   output[index.KODE_SUB_KOMPONEN] = record.kode_sub_komponen;
