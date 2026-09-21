@@ -18,6 +18,9 @@
 const RPD_SHEET_ID = ""; // isi Spreadsheet ID RPD
 const RPD_CLIENT_ID = ""; // harus sama dengan GOOGLE_CLIENT_ID di frontend
 
+// URL CSV DATA_APLIKASI yang saat ini dipakai Dashboard.
+const SOURCE_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vShdaPwws12pkv75bkQJL9AYjuC_4xjvANknmsoT6HVmgKeQ2DJsLLm5QzbvlKQJeQvqNGzYALsOk5n/pub?gid=1473286966&single=true&output=csv";
+
 const RPD_SHEETS = {
   RPD: "RPD",
   USERS: "USERS",
@@ -153,16 +156,18 @@ function bootstrap_(idToken) {
 }
 
 function buildMasterFromDataAplikasi_() {
-  // DATA_APLIKASI berada pada spreadsheet yang sama untuk versi awal.
-  // Jika DATA_APLIKASI berada pada spreadsheet berbeda, ubah
-  // SOURCE_SPREADSHEET_ID dan SOURCE_SHEET_NAME sesuai kebutuhan.
-  const SOURCE_SPREADSHEET_ID = getSpreadsheet_().getId();
-  const SOURCE_SHEET_NAME = "DATA_APLIKASI";
+  if (!SOURCE_CSV_URL) throw new Error("SOURCE_CSV_URL belum diisi.");
 
-  const sheet = SpreadsheetApp.openById(SOURCE_SPREADSHEET_ID).getSheetByName(SOURCE_SHEET_NAME);
-  if (!sheet) throw new Error("Sheet DATA_APLIKASI tidak ditemukan pada spreadsheet RPD. Jika sumber berbeda, ubah buildMasterFromDataAplikasi_().");
+  const response = UrlFetchApp.fetch(SOURCE_CSV_URL, {
+    muteHttpExceptions: true,
+    followRedirects: true
+  });
 
-  const values = sheet.getDataRange().getValues();
+  if (response.getResponseCode() !== 200) {
+    throw new Error("DATA_APLIKASI tidak dapat dibaca dari sumber CSV.");
+  }
+
+  const values = Utilities.parseCsv(response.getContentText());
   if (values.length < 2) return [];
 
   const context = detectHeader_(values);
