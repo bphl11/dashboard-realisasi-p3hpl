@@ -68,26 +68,48 @@ function rpdUniqueSorted(rows, key) {
 function rpdGetFilteredRows() {
     const sub = document.getElementById("rpdSubKomponen")?.value || "";
     const akun = document.getElementById("rpdAkun")?.value || "";
+
+    // Akun dan Detil baru boleh ditampilkan setelah Sub Komponen dipilih.
+    // Ini mencegah halaman langsung menampilkan satu akun saja
+    // (misalnya Belanja Perjalanan Dinas Biasa) sebelum filter dipilih.
+    if (!sub) return [];
+
     return rpdMasterRows.filter(row =>
-        (!sub || row.subKomponen === sub) &&
+        row.subKomponen === sub &&
         (!akun || row.akun === akun)
     );
 }
 
 function rpdRefreshFilters() {
-    const subValue = document.getElementById("rpdSubKomponen")?.value || "";
-    const akunValue = document.getElementById("rpdAkun")?.value || "";
+    const subSelect = document.getElementById("rpdSubKomponen");
+    const akunSelect = document.getElementById("rpdAkun");
+    const subValue = subSelect?.value || "";
+    const akunValue = akunSelect?.value || "";
 
     const subs = rpdUniqueSorted(rpdMasterRows, "subKomponen");
     rpdPopulateSelect("rpdSubKomponen", subs, "Pilih Sub Komponen");
 
-    if (subs.includes(subValue)) document.getElementById("rpdSubKomponen").value = subValue;
+    if (subSelect && subs.includes(subValue)) {
+        subSelect.value = subValue;
+    } else if (subSelect) {
+        subSelect.value = "";
+    }
 
-    const filteredBySub = rpdMasterRows.filter(r => !subValue || r.subKomponen === subValue);
+    // Jangan tampilkan akun sebelum Sub Komponen dipilih.
+    if (!subValue) {
+        rpdPopulateSelect("rpdAkun", [], "Pilih Akun Belanja");
+        return;
+    }
+
+    const filteredBySub = rpdMasterRows.filter(r => r.subKomponen === subValue);
     const akuns = rpdUniqueSorted(filteredBySub, "akun");
     rpdPopulateSelect("rpdAkun", akuns, "Pilih Akun Belanja");
 
-    if (akuns.includes(akunValue)) document.getElementById("rpdAkun").value = akunValue;
+    if (akunSelect && akuns.includes(akunValue)) {
+        akunSelect.value = akunValue;
+    } else if (akunSelect) {
+        akunSelect.value = "";
+    }
 }
 
 function rpdRenderDetilTable() {
@@ -241,6 +263,10 @@ document.addEventListener("DOMContentLoaded", function () {
         document.getElementById(id)?.addEventListener("input", rpdUpdateEditorTotal);
     });
     document.getElementById("rpdSubKomponen")?.addEventListener("change", function () {
+        // Reset Akun setiap kali Sub Komponen berubah agar seluruh
+        // daftar Akun pada Sub Komponen tersebut dimuat ulang.
+        const akun = document.getElementById("rpdAkun");
+        if (akun) akun.value = "";
         rpdRefreshFilters();
         rpdRenderDetilTable();
     });
