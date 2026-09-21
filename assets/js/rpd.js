@@ -238,24 +238,26 @@ async function rpdSave() {
 function rpdBuildMasterRows(rawData) {
     if (!Array.isArray(rawData) || !rawData.length) return [];
 
-    // DATA_APLIKASI adalah sumber master RPD.
-    // Struktur aktualnya:
-    // Sub Komponen -> Item Akun (kode) -> Akun Belanja -> Detil Akun -> Rincian Item.
+    // DATA_APLIKASI dapat berasal dari Google Sheet yang memakai sel
+    // ter-merge/fill-down: Sub Komponen, Item Akun, Akun Belanja, atau
+    // Detil Akun tidak selalu diulang pada setiap baris rincian.
     //
-    // PENTING:
-    // - Jangan melakukan fill-down pada Akun/Detil/Rincian. Setiap baris DATA_APLIKASI
-    //   adalah satu baris anggaran atomik dan sudah memiliki nilai hierarkinya.
-    // - Detil Akun boleh kosong (mis. Belanja Bahan), tetapi Rincian Item tetap
-    //   menjadi uraian/leaf yang harus muncul dan dapat diinput RPD.
-    // - Baris berstatus Diblokir tidak menjadi master RPD.
-    // - ID mempertahankan nomor baris sumber agar RPD tersimpan lama tetap terhubung.
+    // Aturan RPD:
+    // 1. Parent hierarchy boleh di-fill-down sampai ada parent baru.
+    // 2. Detil Akun hanya di-fill-down jika baris tersebut mempunyai Rincian Item.
+    // 3. Rincian Item dan Pagu selalu diambil dari BARIS AKTUAL.
+    // 4. Tidak melakukan deduplikasi: setiap baris anggaran menjadi satu record RPD.
+    // 5. Baris Diblokir tidak menjadi master RPD.
+
     const norm = value => String(value ?? "")
         .trim()
         .toLowerCase()
-        .replace(/[._-]/g, " ")
-        .replace(/\\s+/g, " ");
+        .replace(/\s+/g, " ")
+        .replace(/[._-]/g, " ");
 
-    const headers = rawData.find(row => Array.isArray(row) && row.some(v => norm(v) === "pagu"));
+    const headers = rawData.find(row =>
+        Array.isArray(row) && row.some(v => norm(v) === "pagu")
+    );
     if (!headers) return [];
 
     const map = {};
@@ -282,9 +284,9 @@ function rpdBuildMasterRows(rawData) {
         let s = String(value).replace(/Rp/gi, "").trim();
         s = s.replace(/[^0-9,.-]/g, "");
         if (s.includes(".") && s.includes(",")) {
-            s = s.replace(/\\./g, "").replace(",", ".");
-        } else if (/^\\d{1,3}(\\.\\d{3})+$/.test(s)) {
-            s = s.replace(/\\./g, "");
+            s = s.replace(/\./g, "").replace(",", ".");
+        } else if (/^\d{1,3}(\.\d{3})+$/.test(s)) {
+            s = s.replace(/\./g, "");
         } else {
             s = s.replace(/,/g, "");
         }
@@ -294,24 +296,65 @@ function rpdBuildMasterRows(rawData) {
     const headerIndex = rawData.indexOf(headers);
     const out = [];
 
+    let currentSub = "";
+    let currentKodeSub = "";
+    let currentAkun = "";
+    let currentItem = "";
+    let currentDetil = "";
+
     for (let i = headerIndex + 1; i < rawData.length; i++) {
         const row = Array.isArray(rawData[i]) ? rawData[i] : [];
         if (!row.length || !row.some(v => String(v ?? "").trim() !== "")) continue;
 
-        const sub = get(row, ["Sub Komponen", "Subkomponen", "Nama Sub Komponen"]);
-        const kodeSub = get(row, ["Kode Sub Komponen", "KodeSubKomponen"]);
-        const akun = get(row, ["Akun Belanja", "Akun"]);
-        const item = get(row, ["Item Akun", "Item"]);
-        const detil = get(row, ["Detil Akun", "Detail Akun", "Detil"]);
-        const rincian = get(row, ["Rincian Item", "Rincian"]);
+        const rowSub = get(row, ["Sub Komponen", "Subkomponen", "Nama Sub Komponen"]);
+        const rowKodeSub = get(row, ["Kode Sub Komponen", "KodeSubKomponen"]);
+        const rowAkun = get(row, ["Akun Belanja", "Akun"]);
+        const rowItem = get(row, ["Item Akun", "Item"]);
+        const rowDetil = get(row, ["Detil Akun", "Detail Akun", "Detil"]);
+        const rowRincian = get(row, ["Rincian Item", "Rincian"]);
         const status = get(row, ["Status Pagu", "Status"]).toLowerCase();
         const pagu = money(get(row, ["Pagu"]));
+
+        // Parent baru memutus konteks Detil sebelumnya.
+        if (rowSub) {
+            currentSub = rowSub;
+            currentKodeSub = rowKodeSub || rowSub;
+            currentAkun = "";
+            currentItem = "";
+            currentDetil = "";
+        } else if (rowKodeSub) {
+            currentKodeSub = rowKodeSub;
+        }
+
+        if (rowAkun) {
+            currentAkun = rowAkun;
+            currentItem = "";
+            currentDetil = "";
+        }
+
+        if (rowItem) {
+            currentItem = rowItem;
+            currentDetil = "";
+        }
+
+        // Detil Akun boleh menjadi header yang kemudian diikuti beberapa
+        // Rincian Item. Simpan sebagai konteks untuk baris rincian berikutnya.
+        if (rowDetil) {
+            currentDetil = rowDetil;
+        }
+
+        const sub = currentSub;
+        const kodeSub = currentKodeSub || sub;
+        const akun = currentAkun;
+        const item = currentItem;
+        const detil = rowDetil || currentDetil;
+        const rincian = rowRincian;
 
         if (status.includes("blok")) continue;
         if (!sub || !akun || pagu <= 0) continue;
 
-        // Rincian Item adalah leaf/uraian anggaran pada DATA_APLIKASI.
-        // Jika Rincian kosong, Detil Akun tetap dipakai sebagai fallback.
+        // Rincian Item adalah leaf. Untuk akun yang tidak memiliki Rincian,
+        // Detil Akun tetap menjadi leaf.
         const leaf = rincian || detil || "";
         if (!leaf) continue;
 
@@ -320,7 +363,7 @@ function rpdBuildMasterRows(rawData) {
             sourceFormat: "RPD_RAW",
             id_rpd: "RPD-" + i,
             tahun: get(row, ["Tahun", "Tahun Anggaran"]) || new Date().getFullYear(),
-            kodeSubKomponen: kodeSub || sub,
+            kodeSubKomponen: kodeSub,
             subKomponen: sub,
             akun: akun,
             itemAkun: item || "",
@@ -330,8 +373,10 @@ function rpdBuildMasterRows(rawData) {
         });
     }
 
-    // Tidak melakukan deduplikasi. Dua baris sumber yang kebetulan identik
-    // tetap merupakan dua baris DATA_APLIKASI dan harus tetap dapat di-RPD-kan.
+    console.log("RPD MASTER ROWS:", out.length);
+    console.log("RPD SUB KOMPONEN:", new Set(out.map(r => r.subKomponen)).size);
+    console.log("RPD AKUN BELANJA:", new Set(out.map(r => r.akun)).size);
+
     return out;
 }
 
