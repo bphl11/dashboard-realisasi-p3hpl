@@ -331,6 +331,8 @@ function rpdGetPrintRows() {
             return {
                 ...(master || {}),
                 ...saved,
+                kodeKomponen: saved.kode_komponen || saved.kodeKomponen || master?.kodeKomponen || "",
+                komponen: saved.komponen || master?.komponen || "",
                 subKomponen: saved.sub_komponen || saved.subKomponen || master?.subKomponen || "",
                 kodeSubKomponen: saved.kode_sub_komponen || saved.kodeSubKomponen || master?.kodeSubKomponen || "",
                 akun: saved.akun || master?.akun || "",
@@ -385,6 +387,22 @@ function rpdPrintAll() {
     )];
     const yearLabel = yearSet.length === 1 ? yearSet[0] : yearSet.join(", ");
 
+    const componentSet = [...new Set(
+        rows.map(row => {
+            const code = String(row.kodeKomponen || "").trim();
+            const name = String(row.komponen || "").trim();
+            return code && name ? code + " - " + name : (name || code);
+        }).filter(Boolean)
+    )];
+
+    const subComponentSet = [...new Set(
+        rows.map(row => {
+            const code = String(row.kodeSubKomponen || "").trim();
+            const name = String(row.subKomponen || "").trim();
+            return code && name ? code + " - " + name : (name || code);
+        }).filter(Boolean)
+    )];
+
     let grandTotal = 0;
     let number = 0;
     const detailRows = [];
@@ -405,7 +423,14 @@ function rpdPrintAll() {
                 detailRows.push(
                     '<tr>' +
                     '<td class="no">' + number + '</td>' +
-                    '<td>' + rpdEsc(sub) + '</td>' +
+                    '<td>' + rpdEsc(
+                        (() => {
+                            const first = rows.find(row => (row.subKomponen || "Sub Komponen Tidak Diketahui") === sub);
+                            if (!first) return sub;
+                            const code = String(first.kodeSubKomponen || "").trim();
+                            return code ? code + " - " + sub : sub;
+                        })()
+                    ) + '</td>' +
                     '<td>' + rpdEsc(month.label) + '</td>' +
                     '<td class="week">Minggu ' + (index + 1) + '</td>' +
                     '<td class="num"><strong>' + rpdFormatRupiah(value) + '</strong></td>' +
@@ -453,6 +478,7 @@ function rpdPrintAll() {
         'table{width:100%;border-collapse:collapse}' +
         'th,td{border:1px solid #888;padding:6px;vertical-align:middle}' +
         'th{background:#e9ecef;text-align:center;font-weight:700}' +
+        '.hierarchy{border:1px solid #888;padding:8px 10px;margin:0 0 10px;background:#f7f9f7;line-height:1.6}' +
         '.num{text-align:right;white-space:nowrap}' +
         '.no{width:38px;text-align:center}' +
         '.week{width:90px;text-align:center;white-space:nowrap}' +
@@ -472,6 +498,10 @@ function rpdPrintAll() {
         '<div class="card"><span>Jumlah Sub Komponen</span><strong>' + grouped.size.toLocaleString("id-ID") + '</strong></div>' +
         '<div class="card"><span>Jumlah Baris Mingguan</span><strong>' + number.toLocaleString("id-ID") + '</strong></div>' +
         '<div class="card"><span>Total RPD</span><strong>' + rpdFormatRupiah(grandTotal) + '</strong></div>' +
+        '</div>' +
+        '<div class="hierarchy">' +
+        '<div><strong>Komponen:</strong> ' + rpdEsc(componentSet.join(" | ") || "-") + '</div>' +
+        '<div><strong>Sub Komponen:</strong> ' + rpdEsc(subComponentSet.join(" | ") || "-") + '</div>' +
         '</div>' +
         '<table>' +
         '<thead><tr><th>No</th><th>Sub Komponen</th><th>Bulan</th><th>Minggu</th><th>Nilai RPD</th></tr></thead>' +
@@ -545,6 +575,8 @@ function rpdBuildMasterRows(rawData) {
     const headerIndex = rawData.indexOf(headers);
     const out = [];
 
+    let currentKodeKomponen = "";
+    let currentKomponen = "";
     let currentSub = "";
     let currentKodeSub = "";
     let currentAkun = "";
@@ -555,6 +587,8 @@ function rpdBuildMasterRows(rawData) {
         const row = Array.isArray(rawData[i]) ? rawData[i] : [];
         if (!row.length || !row.some(v => String(v ?? "").trim() !== "")) continue;
 
+        const rowKodeKomponen = get(row, ["Kode Komponen", "KodeKomponen"]);
+        const rowKomponen = get(row, ["Komponen", "Nama Komponen"]);
         const rowSub = get(row, ["Sub Komponen", "Subkomponen", "Nama Sub Komponen"]);
         const rowKodeSub = get(row, ["Kode Sub Komponen", "KodeSubKomponen"]);
         const rowAkun = get(row, ["Akun Belanja", "Akun"]);
@@ -564,6 +598,10 @@ function rpdBuildMasterRows(rawData) {
         const status = get(row, ["Status Pagu", "Status"]).toLowerCase();
         const pagu = money(get(row, ["Pagu"]));
 
+
+        // Komponen mengikuti struktur parent DATA_APLIKASI.
+        if (rowKodeKomponen) currentKodeKomponen = rowKodeKomponen;
+        if (rowKomponen) currentKomponen = rowKomponen;
 
         // Parent baru memutus konteks Detil sebelumnya.
         if (rowSub) {
@@ -613,6 +651,8 @@ function rpdBuildMasterRows(rawData) {
             sourceFormat: "RPD_RAW",
             id_rpd: rpdStableId({ tahun: get(row, ["Tahun", "Tahun Anggaran"]) || new Date().getFullYear(), kodeSubKomponen: kodeSub, subKomponen: sub, akun: akun, itemAkun: item || "", detilAkun: detil || "", rincianItem: rincian || "", pagu: pagu }),
             tahun: get(row, ["Tahun", "Tahun Anggaran"]) || new Date().getFullYear(),
+            kodeKomponen: currentKodeKomponen,
+            komponen: currentKomponen,
             kodeSubKomponen: kodeSub,
             subKomponen: sub,
             akun: akun,
