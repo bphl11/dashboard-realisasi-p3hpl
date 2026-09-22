@@ -13,6 +13,31 @@ const RPD_EMPTY = {
 };
 
 const RPD_LOCAL_CACHE_KEY = "p3hpl_rpd_saved_v4";
+const RPD_MASTER_CACHE_KEY = "p3hpl_rpd_master_v2";
+const RPD_MASTER_CACHE_TTL = 5 * 60 * 1000;
+
+function rpdLoadMasterCache() {
+    try {
+        const raw = localStorage.getItem(RPD_MASTER_CACHE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || !Array.isArray(parsed.rows) || !parsed.savedAt) return null;
+        if (Date.now() - Number(parsed.savedAt) > RPD_MASTER_CACHE_TTL) return null;
+        return parsed.rows;
+    } catch (e) {
+        return null;
+    }
+}
+
+function rpdSaveMasterCache(rows) {
+    try {
+        localStorage.setItem(RPD_MASTER_CACHE_KEY, JSON.stringify({
+            savedAt: Date.now(),
+            rows: rows || []
+        }));
+    } catch (e) {}
+}
+
 
 function rpdLoadLocalCache() {
     try {
@@ -513,16 +538,18 @@ async function rpdInitData() {
     rpdSetLoading(true);
 
     try {
-        // MASTER RPD harus mengikuti DATA_APLIKASI, bukan daftar akun
-        // yang dibentuk terbatas oleh API RPD. Dengan demikian seluruh
-        // Akun Belanja (barang, jasa, perjalanan, modal, honor, dll.)
-        // dan seluruh Detil Akun yang ada di DATA_APLIKASI ikut muncul.
-        const rawData = await getSheetData();
+        // MASTER RPD mengikuti DATA_APLIKASI, tetapi gunakan cache master
+        // terlebih dahulu agar halaman langsung tampil. DATA_APLIKASI tetap
+        // diperbarui di background untuk menjaga data tetap mutakhir.
+        let builtMaster = rpdLoadMasterCache();
+        let rawData = null;
 
-        // Bangun master RPD langsung dari DATA_APLIKASI.
-        // Setiap baris sumber dipertahankan sebagai satu baris anggaran atomik,
-        // tanpa fill-down yang dapat memindahkan Detil Akun dari baris sebelumnya.
-        let builtMaster = rpdBuildMasterRows(rawData);
+        if (Array.isArray(builtMaster) && builtMaster.length) {
+            rpdMasterRows = builtMaster;
+        } else {
+            rawData = await getSheetData();
+            builtMaster = rpdBuildMasterRows(rawData);
+        }
 
         // Fallback ke parser utama jika format sheet sudah flat.
         if (!builtMaster.length) {
@@ -549,11 +576,28 @@ async function rpdInitData() {
         }
 
         rpdMasterRows = builtMaster;
+        rpdSaveMasterCache(rpdMasterRows);
 
         // Tampilkan cache RPD lebih dulu agar halaman tidak menunggu API.
         rpdExisting = rpdLoadLocalCache();
         rpdRefreshFilters({ keepAkun: false });
         rpdRenderDetilTable();
+
+        // Jika master berasal dari cache, refresh DATA_APLIKASI di background.
+        // Kegagalan refresh tidak mengganggu tampilan yang sudah tersedia.
+        if (rawData === null) {
+            getSheetData().then(freshRaw => {
+                const freshMaster = rpdBuildMasterRows(freshRaw);
+                if (freshMaster.length) {
+                    rpdMasterRows = freshMaster;
+                    rpdSaveMasterCache(freshMaster);
+                    rpdRefreshFilters({ keepAkun: true });
+                    rpdRenderDetilTable();
+                    document.getElementById("rpdTotalDetil").textContent =
+                        rpdMasterRows.length.toLocaleString("id-ID");
+                }
+            }).catch(error => console.warn("Refresh master RPD background gagal:", error));
+        }
 
         // Ambil RPD tersimpan dari API secara background. API tidak lagi
         // membangun MASTER dari DATA_APLIKASI sehingga jauh lebih ringan.
