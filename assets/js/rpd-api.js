@@ -18,41 +18,32 @@ async function rpdApiRequest(action, payload = {}) {
             try { rpdInitGoogleLogin(); } catch (e) { console.warn(e); }
         }
     };
+
     if (!RPD_CONFIG.RPD_API_URL) {
         throw new Error("RPD_API_URL belum dikonfigurasi.");
     }
 
-    // Login Google: gunakan GET agar tidak terkena redirect POST -> GET
-    // pada ContentService Google Apps Script.
-    // Token hanya dipakai untuk proses autentikasi dan segera divalidasi
-    // oleh Apps Script.
-    if (action === "auth") {
-        const params = new URLSearchParams({
-            action: "auth",
-            id_token: String(payload.id_token || "")
-        });
-
-        const response = await fetch(
-            RPD_CONFIG.RPD_API_URL + "?" + params.toString(),
-            {
-                method: "GET",
-                redirect: "follow",
-                credentials: "omit",
-                cache: "no-store"
-            }
-        );
-
-        if (!response.ok) {
-            throw new Error("API RPD mengembalikan HTTP " + response.status);
-        }
-
+    const parseResponse = async (response) => {
         const text = await response.text();
-        let result;
+        let result = null;
 
         try {
             result = JSON.parse(text);
         } catch (e) {
+            if (!response.ok) {
+                throw new Error(
+                    "API RPD mengembalikan HTTP " + response.status +
+                    ". Respons bukan JSON."
+                );
+            }
             throw new Error("Respons API RPD bukan JSON yang valid.");
+        }
+
+        if (!response.ok) {
+            const message = result?.message || (
+                "API RPD mengembalikan HTTP " + response.status
+            );
+            throw new Error(message);
         }
 
         if (result?.ok === false) {
@@ -64,42 +55,58 @@ async function rpdApiRequest(action, payload = {}) {
         }
 
         return result;
+    };
+
+    // ========================================================
+    // AUTH
+    // ========================================================
+    // Jangan gunakan GET + id_token di query string.
+    //
+    // Google Apps Script ContentService mengirim response melalui
+    // redirect ke script.googleusercontent.com. Untuk request dari
+    // GitHub Pages, gunakan POST sederhana (text/plain) + redirect
+    // follow agar tidak memicu CORS preflight dan agar token tidak
+    // ditaruh di URL.
+    if (action === "auth") {
+        const body = JSON.stringify({
+            action: "auth",
+            id_token: String(payload.id_token || "")
+        });
+
+        const response = await fetch(RPD_CONFIG.RPD_API_URL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "text/plain;charset=utf-8"
+            },
+            body,
+            redirect: "follow",
+            credentials: "omit",
+            cache: "no-store"
+        });
+
+        return await parseResponse(response);
     }
 
+    // ========================================================
+    // BOOTSTRAP / LIST / SAVE
+    // ========================================================
+    // Tetap gunakan POST sederhana. Jangan menggunakan
+    // application/json karena dapat memicu OPTIONS preflight.
     const body = JSON.stringify({
         action,
         ...payload
     });
 
-    // POST tetap dipakai untuk bootstrap/list/save karena payload save
-    // dapat besar. Redirect POST ContentService tidak digunakan untuk login.
     const response = await fetch(RPD_CONFIG.RPD_API_URL, {
         method: "POST",
+        headers: {
+            "Content-Type": "text/plain;charset=utf-8"
+        },
         body,
         redirect: "follow",
-        credentials: "omit"
+        credentials: "omit",
+        cache: "no-store"
     });
 
-    if (!response.ok) {
-        throw new Error("API RPD mengembalikan HTTP " + response.status);
-    }
-
-    const text = await response.text();
-    let result;
-
-    try {
-        result = JSON.parse(text);
-    } catch (e) {
-        throw new Error("Respons API RPD bukan JSON yang valid.");
-    }
-
-    if (result?.ok === false) {
-        const message = result.message || "Permintaan RPD ditolak.";
-        if (/token.*(valid|kadaluarsa|kedaluwarsa)|kedaluwarsa.*token|sesi.*(berakhir|kadaluarsa|kedaluwarsa)/i.test(message)) {
-            handleAuthExpired();
-        }
-        throw new Error(message);
-    }
-
-    return result;
+    return await parseResponse(response);
 }
