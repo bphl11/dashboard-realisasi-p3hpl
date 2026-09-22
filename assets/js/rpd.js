@@ -35,7 +35,7 @@ function rpdQuarterTotals(saved) {
 }
 
 const RPD_LOCAL_CACHE_KEY = "p3hpl_rpd_saved_v4";
-const RPD_MASTER_CACHE_KEY = "p3hpl_rpd_master_v2";
+const RPD_MASTER_CACHE_KEY = "p3hpl_rpd_master_v3_realisasi";
 const RPD_MASTER_CACHE_TTL = 5 * 60 * 1000;
 
 function rpdLoadMasterCache() {
