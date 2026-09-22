@@ -34,7 +34,7 @@
 <header class="rpd-header">
   <div>
     <h2>Rencana Penarikan Dana (RPD)</h2>
-    <p>Input RPD per triwulan berdasarkan Detil Akun. RPD merupakan rencana dan tidak menggunakan data realisasi.</p>
+    <p>Input RPD 48 minggu berdasarkan Detil Akun. Realisasi dibaca dari DATA_APLIKASI hanya sebagai pengurang dana yang tersedia. Data RPD disimpan terpisah dan tidak menulis ke DATA_APLIKASI.</p>
   </div>
   <div class="rpd-actions">
     <button id="rpdPrintButton" type="button" class="btn btn-outline-success">
@@ -66,7 +66,7 @@
   <div class="row g-3 mb-3">
     <div class="col-md-3"><div class="card rpd-stat"><small>Total Detil</small><strong id="rpdTotalDetil">0</strong></div></div>
     <div class="col-md-3"><div class="card rpd-stat"><small>Sudah Diisi</small><strong id="rpdTotalTerisi">0</strong></div></div>
-    <div class="col-md-6"><div class="card rpd-stat rpd-note"><small>Validasi</small><span>Total TW I + II + III + IV tidak boleh melebihi Pagu Detil.</span></div></div>
+    <div class="col-md-6"><div class="card rpd-stat rpd-note"><small>Validasi</small><span>Total RPD 48 minggu tidak boleh melebihi Pagu setelah dikurangi Realisasi.</span></div></div>
   </div>
 
   <div class="card rpd-card">
@@ -83,8 +83,8 @@
       </div>
       <div class="table-responsive">
         <table class="table table-bordered table-hover align-middle rpd-table">
-          <thead><tr><th>Detil Akun</th><th class="text-end">Pagu</th><th class="text-end">TW I</th><th class="text-end">TW II</th><th class="text-end">TW III</th><th class="text-end">TW IV</th><th class="text-end">Total RPD</th><th class="text-end">Sisa RPD</th><th>Aksi</th></tr></thead>
-          <tbody id="rpdTableBody"><tr><td colspan="9" class="text-center text-muted py-4">Pilih Sub Komponen untuk menampilkan detil.</td></tr></tbody>
+          <thead><tr><th>Detil Akun</th><th class="text-end">Pagu</th><th class="text-end">Realisasi</th><th class="text-end">Dana Tersedia</th><th class="text-end">TW I</th><th class="text-end">TW II</th><th class="text-end">TW III</th><th class="text-end">TW IV</th><th class="text-end">Total RPD</th><th class="text-end">Sisa RPD</th><th>Aksi</th></tr></thead>
+          <tbody id="rpdTableBody"><tr><td colspan="10" class="text-center text-muted py-4">Pilih Sub Komponen untuk menampilkan detil.</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -102,9 +102,9 @@
     <div class="mb-2"><small class="text-muted">Sub Komponen</small><div id="rpdEditSub" class="fw-semibold"></div></div>
     <div class="mb-2"><small class="text-muted">Akun Belanja</small><div id="rpdEditAkun" class="fw-semibold"></div></div>
     <div class="mb-2"><small class="text-muted">Item Akun</small><div id="rpdEditItem" class="fw-semibold"></div></div>
-    <div class="mb-3"><small class="text-muted">Detil / Rincian Anggaran</small><div id="rpdEditLabel" class="fw-semibold"></div><div id="rpdEditRincian" class="small text-muted mt-1"></div><div class="mt-2">Pagu: <strong id="rpdEditPagu">Rp0</strong></div></div>
+    <div class="mb-3"><small class="text-muted">Detil / Rincian Anggaran</small><div id="rpdEditLabel" class="fw-semibold"></div><div id="rpdEditRincian" class="small text-muted mt-1"></div><div class="mt-2">Pagu: <strong id="rpdEditPagu">Rp0</strong></div><div>Realisasi: <strong id="rpdEditRealisasi">Rp0</strong></div><div>Dana tersedia untuk RPD: <strong id="rpdEditDanaTersedia">Rp0</strong></div></div>
     <div class="rpd-weekly-editor">
-      <div class="small text-muted mb-2">Isi rencana penarikan berdasarkan bulan dan Minggu 1–4. Total seluruh 48 minggu tidak boleh melebihi Pagu Detil.</div>
+      <div class="small text-muted mb-2">Isi rencana penarikan berdasarkan bulan dan Minggu 1–4. Total seluruh 48 minggu tidak boleh melebihi dana tersedia setelah dikurangi Realisasi.</div>
       <div class="rpd-quarter-block">
       <div class="rpd-quarter-title">TW I</div>
       <div class="rpd-month-block">
@@ -186,7 +186,7 @@
       <div class="rpd-quarter-summary">Total TW IV: <strong id="rpdTw4Summary">Rp0</strong></div>
     </div>
     </div>
-    <div class="rpd-total-box mt-3"><div>Total RPD <strong id="rpdEditTotal">Rp0</strong></div><div>Sisa <strong id="rpdEditSisa">Rp0</strong></div><div id="rpdEditValidation" class="small mt-2 text-success"></div></div>
+    <div class="rpd-total-box mt-3"><div>Total RPD <strong id="rpdEditTotal">Rp0</strong></div><div>Sisa RPD <strong id="rpdEditSisa">Rp0</strong></div><div id="rpdEditValidation" class="small mt-2 text-success"></div></div>
     <div class="mt-3"><label class="form-label">Catatan</label><textarea id="rpdCatatan" class="form-control" rows="2"></textarea></div>
   </div>
   <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button type="button" id="rpdSaveButton" class="btn btn-success"><i class="bi bi-save"></i> Simpan RPD</button></div>
@@ -202,6 +202,6 @@
 <script src="assets/js/rpd-config.js"></script>
 <script src="assets/js/rpd-api.js"></script>
 <script src="assets/js/rpd-auth.js"></script>
-<script src="assets/js/rpd.js?v=20260922-07"></script>
+<script src="assets/js/rpd.js?v=20260922-09"></script>
 </body>
 </html>
