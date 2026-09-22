@@ -75,10 +75,46 @@ function rpdSaveLocalCache(rows) {
 
 function rpdMergeSavedRows(rows) {
     const byId = new Map(rpdExisting.map(item => [String(item.id_rpd || ""), item]));
+
     (rows || []).forEach(item => {
         const normalized = rpdNormalizeSavedRow(item);
-        if (normalized.id_rpd) byId.set(String(normalized.id_rpd), normalized);
+        if (!normalized.id_rpd) return;
+
+        const key = String(normalized.id_rpd);
+        const existing = byId.get(key);
+
+        // Kompatibilitas dengan API lama:
+        // API lama hanya mengembalikan TW1-TW4 sehingga tidak boleh
+        // menimpa posisi minggu 1-4 yang baru saja diinput pengguna.
+        const incomingHasWeekly = RPD_WEEK_FIELDS.some(field => {
+            return item?.[field] !== undefined ||
+                   item?.[field.toUpperCase()] !== undefined;
+        });
+        const existingHasWeekly = existing &&
+            RPD_WEEK_FIELDS.some(field => rpdNumber(existing?.[field]) !== 0);
+
+        if (existing && existingHasWeekly && !incomingHasWeekly) {
+            const preserved = {
+                ...normalized,
+                ...Object.fromEntries(
+                    RPD_WEEK_FIELDS.map(field => [field, rpdNumber(existing[field])])
+                ),
+                tw1: rpdNumber(existing.tw1),
+                tw2: rpdNumber(existing.tw2),
+                tw3: rpdNumber(existing.tw3),
+                tw4: rpdNumber(existing.tw4),
+                total_rpd: rpdQuarterTotals(existing).tw1 +
+                           rpdQuarterTotals(existing).tw2 +
+                           rpdQuarterTotals(existing).tw3 +
+                           rpdQuarterTotals(existing).tw4,
+                catatan: existing.catatan || normalized.catatan || ""
+            };
+            byId.set(key, preserved);
+        } else {
+            byId.set(key, normalized);
+        }
     });
+
     rpdExisting = [...byId.values()];
     rpdSaveLocalCache(rpdExisting);
 }
@@ -156,11 +192,9 @@ function rpdNormalizeSavedRow(row) {
         catatan:String(source.catatan ?? source.CATATAN ?? "").trim()
     };
     RPD_WEEK_FIELDS.forEach(key => { normalized[key]=rpdNumber(source[key] ?? source[key.toUpperCase()] ?? 0); });
-    if (!RPD_WEEK_FIELDS.some(key => normalized[key] !== 0)) {
-        [normalized.tw1,normalized.tw2,normalized.tw3,normalized.tw4].forEach((value,i) => {
-            if (value > 0) normalized[["jan","apr","jul","okt"][i]+"_m1"]=value;
-        });
-    }
+    // API lama hanya menyimpan total triwulan. Jangan memindahkannya
+    // secara otomatis ke Minggu 1 karena lokasi minggu sebenarnya tidak
+    // diketahui. Posisi mingguan hanya berasal dari field 48-minggu.
     const q=rpdQuarterTotals(normalized);
     normalized.tw1=q.tw1; normalized.tw2=q.tw2; normalized.tw3=q.tw3; normalized.tw4=q.tw4;
     normalized.total_rpd=q.tw1+q.tw2+q.tw3+q.tw4;
