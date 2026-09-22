@@ -1,6 +1,6 @@
 // ============================================================
 // RPD MODULE
-// VERSION: 20260922-10-print-current-master-only
+// VERSION: 20260922-11-print-matrix
 // VERSION: 20260922-07-legacy-week-migration
 // Input RPD per triwulan pada level Detil Akun.
 // ============================================================
@@ -479,105 +479,179 @@ function rpdPrintAll() {
         return;
     }
 
-    // Agregasi hanya pada level SUB KOMPONEN -> BULAN -> MINGGU.
-    // Semua detil akun dijumlahkan sehingga laporan jauh lebih ringkas.
+    // Format cetak matriks:
+    // No | Komponen | Sub Komponen | Bulan (M1-M4 + Jumlah) | Total Triwulan.
+    // Hanya bulan yang benar-benar mempunyai nilai RPD yang ditampilkan,
+    // sehingga hasil tetap terbaca pada kertas A4 landscape.
     const grouped = new Map();
 
     rows.forEach(row => {
-        const sub = row.subKomponen || "Sub Komponen Tidak Diketahui";
+        const componentCode = String(row.kodeKomponen || "").trim();
+        const componentName = String(row.komponen || "").trim();
+        const subCode = String(row.kodeSubKomponen || "").trim();
+        const subName = String(row.subKomponen || "Sub Komponen Tidak Diketahui").trim();
 
-        if (!grouped.has(sub)) {
-            grouped.set(sub, {
-                jan: [0,0,0,0], feb: [0,0,0,0], mar: [0,0,0,0],
-                apr: [0,0,0,0], mei: [0,0,0,0], jun: [0,0,0,0],
-                jul: [0,0,0,0], agu: [0,0,0,0], sep: [0,0,0,0],
-                okt: [0,0,0,0], nov: [0,0,0,0], des: [0,0,0,0]
+        const key = [componentCode, componentName, subCode, subName].join("|");
+        if (!grouped.has(key)) {
+            grouped.set(key, {
+                componentCode,
+                componentName,
+                subCode,
+                subName,
+                months: Object.fromEntries(
+                    RPD_MONTHS.map(month => [month.key, [0,0,0,0]])
+                )
             });
         }
 
-        const bucket = grouped.get(sub);
-
+        const bucket = grouped.get(key);
         RPD_MONTHS.forEach(month => {
             for (let week = 1; week <= 4; week++) {
-                bucket[month.key][week - 1] +=
+                bucket.months[month.key][week - 1] +=
                     rpdNumber(row[month.key + "_m" + week]);
             }
         });
     });
 
+    const activeMonths = RPD_MONTHS.filter(month =>
+        [...grouped.values()].some(bucket =>
+            bucket.months[month.key].some(value => value > 0)
+        )
+    );
+
+    if (!activeMonths.length) {
+        rpdSetStatus("Belum ada nilai RPD mingguan yang lebih besar dari Rp0 untuk dicetak.", "warning");
+        return;
+    }
+
+    const activeQuarterNumbers = [...new Set(activeMonths.map(month => month.tw))];
     const yearSet = [...new Set(
         rows.map(row => String(row.tahun || "").trim()).filter(Boolean)
     )];
     const yearLabel = yearSet.length === 1 ? yearSet[0] : yearSet.join(", ");
 
-    const componentSet = [...new Set(
-        rows.map(row => {
-            const code = String(row.kodeKomponen || "").trim();
-            const name = String(row.komponen || "").trim();
-            return code && name ? code + " - " + name : (name || code);
-        }).filter(Boolean)
-    )];
+    const formatPrintNumber = value => {
+        const n = Math.round(Number(value) || 0);
+        return n > 0 ? n.toLocaleString("id-ID") : "-";
+    };
 
-    const subComponentSet = [...new Set(
-        rows.map(row => {
-            const code = String(row.kodeSubKomponen || "").trim();
-            const name = String(row.subKomponen || "").trim();
-            return code && name ? code + " - " + name : (name || code);
-        }).filter(Boolean)
-    )];
+    const quarterTotal = (bucket, quarter) =>
+        RPD_MONTHS
+            .filter(month => month.tw === quarter)
+            .reduce((sum, month) =>
+                sum + bucket.months[month.key].reduce((a, b) => a + b, 0), 0
+            );
 
-    let grandTotal = 0;
-    let number = 0;
-    const detailRows = [];
+    const grandTotal = [...grouped.values()].reduce(
+        (sum, bucket) =>
+            sum + activeMonths.reduce(
+                (s, month) => s + bucket.months[month.key].reduce((a,b) => a+b, 0),
+                0
+            ),
+        0
+    );
 
-    grouped.forEach((months, sub) => {
-        let subTotal = 0;
+    const totalWeeklyRows = rows.reduce((count, row) =>
+        count + RPD_WEEK_FIELDS.filter(key => rpdNumber(row[key]) > 0).length, 0
+    );
 
-        RPD_MONTHS.forEach(month => {
-            const weeks = months[month.key];
+    const colCount = 3 + activeMonths.length * 5 + activeQuarterNumbers.length;
+    const headRow1 = [
+        '<th rowspan="2" class="no">No</th>',
+        '<th rowspan="2" class="component">Komponen</th>',
+        '<th rowspan="2" class="subcomponent">Sub Komponen</th>'
+    ];
 
-            weeks.forEach((value, index) => {
-                if (value <= 0) return;
-
-                number++;
-                subTotal += value;
-                grandTotal += value;
-
-                detailRows.push(
-                    '<tr>' +
-                    '<td class="no">' + number + '</td>' +
-                    '<td>' + rpdEsc(
-                        (() => {
-                            const first = rows.find(row => (row.subKomponen || "Sub Komponen Tidak Diketahui") === sub);
-                            if (!first) return sub;
-                            const code = String(first.kodeSubKomponen || "").trim();
-                            return code ? code + " - " + sub : sub;
-                        })()
-                    ) + '</td>' +
-                    '<td>' + rpdEsc(month.label) + '</td>' +
-                    '<td class="week">Minggu ' + (index + 1) + '</td>' +
-                    '<td class="num"><strong>' + rpdFormatRupiah(value) + '</strong></td>' +
-                    '</tr>'
-                );
-            });
-        });
-
-        // Subtotal per Sub Komponen.
-        detailRows.push(
-            '<tr class="subtotal">' +
-            '<td colspan="4"><strong>Jumlah RPD Sub Komponen</strong></td>' +
-            '<td class="num"><strong>' + rpdFormatRupiah(subTotal) + '</strong></td>' +
-            '</tr>'
+    activeMonths.forEach(month => {
+        headRow1.push(
+            '<th colspan="5" class="month-head">' + rpdEsc(month.label) + '</th>'
         );
     });
 
-    if (!detailRows.length) {
-        rpdSetStatus("Belum ada nilai RPD mingguan yang lebih besar dari Rp0 untuk dicetak.", "warning");
-        return;
-    }
+    activeQuarterNumbers.forEach(q => {
+        headRow1.push(
+            '<th rowspan="2" class="quarter-total-head"><span>Total</span><br>Triwulan ' +
+            ["I","II","III","IV"][q - 1] + '</th>'
+        );
+    });
+
+    const headRow2 = [];
+    activeMonths.forEach(() => {
+        headRow2.push(
+            '<th>Minggu 1</th><th>Minggu 2</th><th>Minggu 3</th><th>Minggu 4</th><th>Jumlah</th>'
+        );
+    });
+
+    let number = 0;
+    const bodyRows = [];
+
+    grouped.forEach(bucket => {
+        number++;
+        const cells = [
+            '<td class="no">' + number + '</td>',
+            '<td class="component">' + rpdEsc(
+                bucket.componentCode && bucket.componentName
+                    ? bucket.componentCode + " - " + bucket.componentName
+                    : (bucket.componentName || bucket.componentCode || "-")
+            ) + '</td>',
+            '<td class="subcomponent">' + rpdEsc(
+                bucket.subCode && bucket.subName
+                    ? bucket.subCode + " - " + bucket.subName
+                    : bucket.subName
+            ) + '</td>'
+        ];
+
+        activeMonths.forEach(month => {
+            const weeks = bucket.months[month.key];
+            const monthTotal = weeks.reduce((a,b) => a+b, 0);
+            weeks.forEach(value => {
+                cells.push('<td class="num">' + formatPrintNumber(value) + '</td>');
+            });
+            cells.push('<td class="num total-month">' + formatPrintNumber(monthTotal) + '</td>');
+        });
+
+        activeQuarterNumbers.forEach(q => {
+            cells.push(
+                '<td class="num total-quarter">' +
+                formatPrintNumber(quarterTotal(bucket, q)) +
+                '</td>'
+            );
+        });
+
+        bodyRows.push('<tr>' + cells.join("") + '</tr>');
+    });
+
+    // Baris total seluruh Sub Komponen.
+    const totalCells = [
+        '<td colspan="3" class="grand-label">TOTAL</td>'
+    ];
+
+    activeMonths.forEach(month => {
+        const weeks = [0,0,0,0];
+        [...grouped.values()].forEach(bucket => {
+            bucket.months[month.key].forEach((value, index) => weeks[index] += value);
+        });
+        const monthTotal = weeks.reduce((a,b) => a+b, 0);
+        weeks.forEach(value => {
+            totalCells.push('<td class="num grand-total">' + formatPrintNumber(value) + '</td>');
+        });
+        totalCells.push('<td class="num grand-total">' + formatPrintNumber(monthTotal) + '</td>');
+    });
+
+    activeQuarterNumbers.forEach(q => {
+        totalCells.push(
+            '<td class="num grand-total">' +
+            formatPrintNumber(
+                [...grouped.values()].reduce((sum, bucket) => sum + quarterTotal(bucket, q), 0)
+            ) +
+            '</td>'
+        );
+    });
+
+    bodyRows.push('<tr class="grand-row">' + totalCells.join("") + '</tr>');
 
     const generated = new Date().toLocaleString("id-ID");
-    const printWindow = window.open("", "_blank", "width=1100,height=800");
+    const printWindow = window.open("", "_blank", "width=1500,height=900");
 
     if (!printWindow) {
         rpdSetStatus("Jendela cetak diblokir browser. Izinkan pop-up untuk halaman ini lalu coba lagi.", "warning");
@@ -587,29 +661,31 @@ function rpdPrintAll() {
     printWindow.document.open();
     printWindow.document.write(
         '<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">' +
-        '<title>RPD Ringkas P3HPL</title>' +
+        '<title>RPD Matriks P3HPL</title>' +
         '<style>' +
-        '@page{size:A4 portrait;margin:14mm}' +
+        '@page{size:A4 landscape;margin:8mm}' +
         '*{box-sizing:border-box}' +
-        'body{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:11px;margin:0}' +
-        'h1{font-size:18px;margin:0 0 3px;text-align:center}' +
-        'h2{font-size:13px;margin:0 0 14px;text-align:center;font-weight:normal}' +
-        '.meta{display:flex;justify-content:space-between;border-bottom:1px solid #999;padding-bottom:7px;margin-bottom:12px}' +
-        '.cards{display:flex;gap:8px;margin-bottom:12px}' +
-        '.card{border:1px solid #aaa;padding:7px 9px;flex:1}' +
-        '.card strong{display:block;font-size:13px;margin-top:2px}' +
-        'table{width:100%;border-collapse:collapse}' +
-        'th,td{border:1px solid #888;padding:6px;vertical-align:middle}' +
-        'th{background:#e9ecef;text-align:center;font-weight:700}' +
-        '.hierarchy{border:1px solid #888;padding:8px 10px;margin:0 0 10px;background:#f7f9f7;line-height:1.6}' +
+        'body{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:8.5px;margin:0}' +
+        'h1{font-size:16px;margin:0 0 2px;text-align:center;font-weight:700}' +
+        'h2{font-size:11px;margin:0 0 7px;text-align:center;font-weight:normal}' +
+        '.meta{display:flex;justify-content:space-between;border-bottom:1px solid #777;padding-bottom:5px;margin-bottom:7px;font-size:8px}' +
+        'table{width:100%;border-collapse:collapse;table-layout:fixed}' +
+        'th,td{border:1px solid #777;padding:3px 4px;vertical-align:middle}' +
+        'th{background:#d9dde3;text-align:center;font-weight:700;line-height:1.15}' +
+        'thead th.month-head{font-size:9px}' +
+        'thead th.quarter-total-head{font-size:8px;white-space:nowrap}' +
+        '.no{width:3%;text-align:center}' +
+        '.component{width:13%;white-space:normal;word-break:break-word}' +
+        '.subcomponent{width:16%;white-space:normal;word-break:break-word}' +
         '.num{text-align:right;white-space:nowrap}' +
-        '.no{width:38px;text-align:center}' +
-        '.week{width:90px;text-align:center;white-space:nowrap}' +
-        '.subtotal td{background:#f3f5f3}' +
-        '.footer{margin-top:14px;font-size:9px;color:#555}' +
-        '.sign{margin-top:35px;display:flex;justify-content:flex-end}' +
-        '.sign-box{width:260px;text-align:center}' +
-        '@media print{.subtotal{break-inside:avoid}}' +
+        '.total-month,.total-quarter{font-weight:700}' +
+        '.grand-row td{font-weight:700;background:#e5e7eb}' +
+        '.grand-label{text-align:right}' +
+        '.footer{margin-top:7px;font-size:7.5px;color:#555}' +
+        '.sign{margin-top:18px;display:flex;justify-content:flex-end}' +
+        '.sign-box{width:190px;text-align:center;font-size:8px}' +
+        '.page-break{page-break-after:always}' +
+        '@media print{thead{display:table-header-group}tr{break-inside:avoid}}' +
         '</style></head><body>' +
         '<h1>RENCANA PENARIKAN DANA (RPD)</h1>' +
         '<h2>P3HPL — BPHL XI Banjarbaru</h2>' +
@@ -617,26 +693,21 @@ function rpdPrintAll() {
         '<div><strong>Tahun Anggaran:</strong> ' + rpdEsc(yearLabel || "-") + '</div>' +
         '<div><strong>Dicetak:</strong> ' + rpdEsc(generated) + '</div>' +
         '</div>' +
-        '<div class="cards">' +
-        '<div class="card"><span>Jumlah Sub Komponen</span><strong>' + grouped.size.toLocaleString("id-ID") + '</strong></div>' +
-        '<div class="card"><span>Jumlah Baris Mingguan</span><strong>' + number.toLocaleString("id-ID") + '</strong></div>' +
-        '<div class="card"><span>Total RPD</span><strong>' + rpdFormatRupiah(grandTotal) + '</strong></div>' +
-        '</div>' +
-        '<div class="hierarchy">' +
-        '<div><strong>Komponen:</strong> ' + rpdEsc(componentSet.join(" | ") || "-") + '</div>' +
-        '<div><strong>Sub Komponen:</strong> ' + rpdEsc(subComponentSet.join(" | ") || "-") + '</div>' +
-        '</div>' +
         '<table>' +
-        '<thead><tr><th>No</th><th>Sub Komponen</th><th>Bulan</th><th>Minggu</th><th>Nilai RPD</th></tr></thead>' +
-        '<tbody>' + detailRows.join("") + '</tbody>' +
+        '<thead><tr>' + headRow1.join("") + '</tr><tr>' + headRow2.join("") + '</tr></thead>' +
+        '<tbody>' + bodyRows.join("") + '</tbody>' +
         '</table>' +
-        '<div class="footer">Nilai pada laporan ini merupakan agregasi seluruh Detil Akun/Rincian Item pada masing-masing Sub Komponen, Bulan, dan Minggu. RPD merupakan rencana penarikan dana dan tidak menggunakan data realisasi.</div>' +
-        '<div class="sign"><div class="sign-box">Mengetahui,<br><br><br><br>____________________________<br>Pejabat yang berwenang</div></div>' +
-        '<script>window.onload=function(){setTimeout(function(){window.print();},350);};<\/script>' +
+        '<div class="footer">RPD merupakan rencana penarikan dana. Nilai pada laporan merupakan agregasi seluruh Detil Akun/Rincian Item pada masing-masing Komponen, Sub Komponen, Bulan, dan Minggu.</div>' +
+        '<div class="footer"><strong>Jumlah Sub Komponen:</strong> ' + grouped.size.toLocaleString("id-ID") +
+        ' &nbsp;&nbsp; <strong>Jumlah Baris Mingguan:</strong> ' + totalWeeklyRows.toLocaleString("id-ID") +
+        ' &nbsp;&nbsp; <strong>Total RPD:</strong> ' + formatPrintNumber(grandTotal) + '</div>' +
+        '<div class="sign"><div class="sign-box">Mengetahui,<br><br><br>____________________________<br>Pejabat yang berwenang</div></div>' +
+        '<script>window.onload=function(){setTimeout(function(){window.print();},350);};<\\/script>' +
         '</body></html>'
     );
     printWindow.document.close();
 }
+
 function rpdBuildMasterRows(rawData) {
     if (!Array.isArray(rawData) || !rawData.length) return [];
 
