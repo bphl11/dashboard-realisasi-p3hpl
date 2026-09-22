@@ -1,6 +1,6 @@
 // ============================================================
 // RPD MODULE
-// VERSION: 20260922-09-realisasi-available-budget
+// VERSION: 20260922-10-print-current-master-only
 // VERSION: 20260922-07-legacy-week-migration
 // Input RPD per triwulan pada level Detil Akun.
 // ============================================================
@@ -445,20 +445,26 @@ function rpdGetPrintRows() {
     return rpdExisting
         .map(saved => {
             const master = masterById.get(String(saved.id_rpd || ""));
+            // Cetak hanya record yang masih mempunyai pasangan pada
+            // MASTER RPD terbaru. Record lama yang tersisa di cache lokal
+            // tidak boleh ikut teragregasi ke laporan cetak.
+            if (!master) return null;
+
             return {
-                ...(master || {}),
+                ...master,
                 ...saved,
-                kodeKomponen: saved.kode_komponen || saved.kodeKomponen || master?.kodeKomponen || "",
-                komponen: saved.komponen || master?.komponen || "",
-                subKomponen: saved.sub_komponen || saved.subKomponen || master?.subKomponen || "",
-                kodeSubKomponen: saved.kode_sub_komponen || saved.kodeSubKomponen || master?.kodeSubKomponen || "",
-                akun: saved.akun || master?.akun || "",
-                itemAkun: saved.item_akun || saved.itemAkun || master?.itemAkun || "",
-                detilAkun: saved.detil_akun || saved.detilAkun || master?.detilAkun || "",
-                rincianItem: saved.rincian_item || saved.rincianItem || master?.rincianItem || "",
-                pagu: rpdNumber(saved.pagu_detil ?? saved.pagu ?? master?.pagu ?? 0)
+                kodeKomponen: saved.kode_komponen || saved.kodeKomponen || master.kodeKomponen || "",
+                komponen: saved.komponen || master.komponen || "",
+                subKomponen: saved.sub_komponen || saved.subKomponen || master.subKomponen || "",
+                kodeSubKomponen: saved.kode_sub_komponen || saved.kodeSubKomponen || master.kodeSubKomponen || "",
+                akun: saved.akun || master.akun || "",
+                itemAkun: saved.item_akun || saved.itemAkun || master.itemAkun || "",
+                detilAkun: saved.detil_akun || saved.detilAkun || master.detilAkun || "",
+                rincianItem: saved.rincian_item || saved.rincianItem || master.rincianItem || "",
+                pagu: rpdNumber(saved.pagu_detil ?? saved.pagu ?? master.pagu ?? 0)
             };
         })
+        .filter(Boolean)
         .filter(row => {
             const q = rpdQuarterTotals(row);
             return (q.tw1 + q.tw2 + q.tw3 + q.tw4) > 0;
