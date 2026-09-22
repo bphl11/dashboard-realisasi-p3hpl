@@ -66,6 +66,18 @@ function getSpreadsheet_() {
   return SpreadsheetApp.openById(RPD_SHEET_ID);
 }
 
+function ensureRpdSchema_(sheet) {
+  let headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0]
+    .map(v => String(v ?? "").trim().toUpperCase());
+  if (!headers.includes("RINCIAN_ITEM")) {
+    const pagu = headers.indexOf("PAGU_DETIL");
+    const insertAt = pagu >= 0 ? pagu + 1 : sheet.getLastColumn() + 1;
+    sheet.insertColumnBefore(insertAt);
+    sheet.getRange(1, insertAt).setValue("RINCIAN_ITEM");
+  }
+}
+
+
 function authenticate_(idToken) {
   const user = verifyGoogleToken_(idToken);
   const allowed = findAllowedUser_(user.email);
@@ -143,6 +155,7 @@ function bootstrap_(idToken) {
 
   const rpdSheet = ss.getSheetByName(RPD_SHEETS.RPD);
   if (!rpdSheet) throw new Error("Sheet RPD belum dibuat.");
+  ensureRpdSchema_(rpdSheet);
 
   const master = buildMasterFromDataAplikasi_();
   const rpd = readRpd_(rpdSheet);
@@ -211,6 +224,7 @@ function buildMasterFromDataAplikasi_() {
 }
 
 function readRpd_(sheet) {
+  ensureRpdSchema_(sheet);
   const values = sheet.getDataRange().getValues();
   if (values.length < 2) return [];
 
@@ -259,6 +273,7 @@ function saveRpd_(idToken, row) {
   const ss = getSpreadsheet_();
   const sheet = ss.getSheetByName(RPD_SHEETS.RPD);
   if (!sheet) throw new Error("Sheet RPD belum dibuat.");
+  ensureRpdSchema_(sheet);
 
   const index = headerIndex_(sheet.getRange(1,1,1,sheet.getLastColumn()).getValues()[0]);
   const pagu = parseAmount_(row.pagu_detil);
