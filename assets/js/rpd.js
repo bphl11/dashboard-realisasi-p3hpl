@@ -338,18 +338,46 @@ async function rpdSave() {
     RPD_MONTHS.forEach(month=>{for(let week=1;week<=4;week++)q[month.tw]+=payload[month.key+"_m"+week];});
     payload.tw1=q[1];payload.tw2=q[2];payload.tw3=q[3];payload.tw4=q[4];payload.total_rpd=total;
     const button=document.getElementById("rpdSaveButton");button.disabled=true;button.innerHTML='<span class="spinner-border spinner-border-sm"></span> Menyimpan...';
+    const localSaved=rpdNormalizeSavedRow(payload);
+
+    // Simpan ke cache lokal SEBELUM menghubungi API.
+    // Dengan demikian input 48-minggu tidak hilang hanya karena
+    // Apps Script sedang gagal merespons. Data lokal juga dapat
+    // langsung dipakai untuk preview/cetak.
+    rpdMergeSavedRows([localSaved]);
+    rpdRenderDetilTable();
+    const uniqueExisting=new Set(rpdExisting.map(r=>String(r.id_rpd||"")));
+    document.getElementById("rpdTotalTerisi").textContent=rpdMasterRows
+        .filter(r=>uniqueExisting.has(String(r.id_rpd))).length.toLocaleString("id-ID");
+
     try{
         const result=await rpdApiRequest("save",{id_token:rpdUser.id_token,row:payload});
         if(!result.ok)throw new Error(result.message||"Data RPD gagal disimpan.");
-        const localSaved=rpdNormalizeSavedRow(payload);
-        rpdMergeSavedRows([localSaved,...rpdNormalizeExistingRows(result.data??result.rpd??result)]);
-        bootstrap.Modal.getInstance(document.getElementById("rpdEditorModal"))?.hide();
+
+        // API boleh mengembalikan record tersimpan; jika API lama hanya
+        // mengembalikan TW1-TW4, rpdMergeSavedRows() menjaga posisi
+        // 48-minggu yang sudah tersimpan di cache lokal.
+        rpdMergeSavedRows(rpdNormalizeExistingRows(result.data??result.rpd??result));
         rpdRenderDetilTable();
-        const uniqueExisting=new Set(rpdExisting.map(r=>String(r.id_rpd||"")));
-        document.getElementById("rpdTotalTerisi").textContent=rpdMasterRows.filter(r=>uniqueExisting.has(String(r.id_rpd))).length.toLocaleString("id-ID");
-        rpdSetStatus("RPD berhasil disimpan.","success");
-    }catch(error){console.error(error);rpdSetStatus(error.message||"RPD gagal disimpan.","danger");}
-    finally{button.disabled=false;button.innerHTML='<i class="bi bi-save"></i> Simpan RPD';}
+
+        bootstrap.Modal.getInstance(document.getElementById("rpdEditorModal"))?.hide();
+        rpdSetStatus("RPD berhasil disimpan ke server.","success");
+    }catch(error){
+        console.error(error);
+
+        // Jangan hapus cache lokal. Pengguna tetap dapat melihat dan
+        // mencetak input yang baru saja dibuat. Beri status jelas bahwa
+        // sinkronisasi server belum berhasil.
+        bootstrap.Modal.getInstance(document.getElementById("rpdEditorModal"))?.hide();
+        rpdSetStatus(
+            "RPD tersimpan di browser, tetapi belum tersinkron ke server: " +
+            (error.message || "API RPD gagal dihubungi."),
+            "warning"
+        );
+    }finally{
+        button.disabled=false;
+        button.innerHTML='<i class="bi bi-save"></i> Simpan RPD';
+    }
 }
 
 
