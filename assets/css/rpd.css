@@ -14,3 +14,12 @@
 .rpd-total-box{background:#f4f8f4;border:1px solid #dbe9dd;border-radius:10px;padding:12px;display:flex;gap:30px;flex-wrap:wrap}
 .rpd-total-box strong{color:#2e6a3c}
 @media(max-width:700px){.rpd-header{display:block}.rpd-user-box{margin-top:12px}.rpd-table{min-width:900px}}
+
+/* Editor RPD 48 minggu */
+.rpd-weekly-editor{max-height:52vh;overflow:auto;padding-right:4px}
+.rpd-quarter-block{border:1px solid #e2e8e3;border-radius:12px;padding:12px;margin-bottom:12px;background:#fbfcfb}
+.rpd-quarter-title{font-weight:700;color:#2e6a3c;border-bottom:1px solid #dbe5dc;padding-bottom:6px;margin-bottom:8px}
+.rpd-month-block{background:#fff;border:1px solid #edf0ed;border-radius:9px;padding:10px;margin-bottom:9px}
+.rpd-month-title{font-weight:600;margin-bottom:7px}
+.rpd-quarter-summary{font-size:.9rem;text-align:right;color:#495566;padding-top:5px}
+.rpd-weekly-editor input[type=number]{min-width:0}
