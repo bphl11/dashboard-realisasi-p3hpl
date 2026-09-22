@@ -1,5 +1,6 @@
 // ============================================================
 // RPD MODULE
+// VERSION: 20260922-07-legacy-week-migration
 // Input RPD per triwulan pada level Detil Akun.
 // ============================================================
 
@@ -192,9 +193,24 @@ function rpdNormalizeSavedRow(row) {
         catatan:String(source.catatan ?? source.CATATAN ?? "").trim()
     };
     RPD_WEEK_FIELDS.forEach(key => { normalized[key]=rpdNumber(source[key] ?? source[key.toUpperCase()] ?? 0); });
-    // API lama hanya menyimpan total triwulan. Jangan memindahkannya
-    // secara otomatis ke Minggu 1 karena lokasi minggu sebenarnya tidak
-    // diketahui. Posisi mingguan hanya berasal dari field 48-minggu.
+    // Data lama hanya memiliki TW1-TW4. Untuk record RPD lama yang
+    // sebelumnya diinput pada editor Oktober/Minggu 4, pertahankan
+    // posisi yang diharapkan pengguna: TW IV -> Oktober Minggu 4.
+    // Ini hanya dijalankan bila TIDAK ADA satu pun field 48-minggu.
+    // Record baru yang sudah memiliki field mingguan tidak disentuh.
+    if (!RPD_WEEK_FIELDS.some(key => normalized[key] !== 0)) {
+        const legacyQuarterMap = [
+            ["tw1", "mar_m4"],
+            ["tw2", "jun_m4"],
+            ["tw3", "sep_m4"],
+            ["tw4", "okt_m4"]
+        ];
+        legacyQuarterMap.forEach(([quarter, weekField]) => {
+            const value = rpdNumber(normalized[quarter]);
+            if (value > 0) normalized[weekField] = value;
+        });
+    }
+
     const q=rpdQuarterTotals(normalized);
     normalized.tw1=q.tw1; normalized.tw2=q.tw2; normalized.tw3=q.tw3; normalized.tw4=q.tw4;
     normalized.total_rpd=q.tw1+q.tw2+q.tw3+q.tw4;
