@@ -599,8 +599,19 @@ function detectHeader_(values) {
 function headerIndex_(headers) {
   const map = {};
   headers.forEach((value, i) => {
-    const key = String(value ?? "").trim().toUpperCase().replace(/[._-]/g, " ").replace(/\s+/g, " ");
-    if (key) map[key] = i;
+    const raw = String(value ?? "").trim().toUpperCase();
+    const key = raw.replace(/[._-]/g, " ").replace(/\s+/g, " ");
+    if (!key) return;
+
+    // Simpan nama normalisasi utama.
+    map[key] = i;
+
+    // Penting untuk schema RPD 48 minggu:
+    // header seperti JAN_M1 dinormalisasi menjadi JAN M1,
+    // sedangkan kode internal menggunakan JAN_M1.
+    // Simpan alias underscore agar keduanya menunjuk kolom yang sama.
+    const underscoreKey = key.replace(/ /g, "_");
+    if (underscoreKey) map[underscoreKey] = i;
   });
 
   // Alias yang dipakai internal.
