@@ -98,11 +98,88 @@
     <div class="mb-2"><small class="text-muted">Akun Belanja</small><div id="rpdEditAkun" class="fw-semibold"></div></div>
     <div class="mb-2"><small class="text-muted">Item Akun</small><div id="rpdEditItem" class="fw-semibold"></div></div>
     <div class="mb-3"><small class="text-muted">Detil / Rincian Anggaran</small><div id="rpdEditLabel" class="fw-semibold"></div><div id="rpdEditRincian" class="small text-muted mt-1"></div><div class="mt-2">Pagu: <strong id="rpdEditPagu">Rp0</strong></div></div>
-    <div class="row g-3">
-      <div class="col-md-6"><label class="form-label">TW I</label><input type="number" min="0" step="1" id="rpdTw1" class="form-control"></div>
-      <div class="col-md-6"><label class="form-label">TW II</label><input type="number" min="0" step="1" id="rpdTw2" class="form-control"></div>
-      <div class="col-md-6"><label class="form-label">TW III</label><input type="number" min="0" step="1" id="rpdTw3" class="form-control"></div>
-      <div class="col-md-6"><label class="form-label">TW IV</label><input type="number" min="0" step="1" id="rpdTw4" class="form-control"></div>
+    <div class="rpd-weekly-editor">
+      <div class="small text-muted mb-2">Isi rencana penarikan berdasarkan bulan dan Minggu 1–4. Total seluruh 48 minggu tidak boleh melebihi Pagu Detil.</div>
+      <div class="rpd-quarter-block">
+      <div class="rpd-quarter-title">TW I</div>
+      <div class="rpd-month-block">
+        <div class="rpd-month-title">Januari</div>
+        <div class="row g-2">
+          <div class="col-6 col-md-3"><label class="form-label small">Minggu 1</label><input type="number" min="0" step="1" id="rpd_jan_m1" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 2</label><input type="number" min="0" step="1" id="rpd_jan_m2" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 3</label><input type="number" min="0" step="1" id="rpd_jan_m3" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 4</label><input type="number" min="0" step="1" id="rpd_jan_m4" class="form-control form-control-sm" placeholder="Rp"></div>
+        </div>
+      </div><div class="rpd-month-block">
+        <div class="rpd-month-title">Februari</div>
+        <div class="row g-2">
+          <div class="col-6 col-md-3"><label class="form-label small">Minggu 1</label><input type="number" min="0" step="1" id="rpd_feb_m1" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 2</label><input type="number" min="0" step="1" id="rpd_feb_m2" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 3</label><input type="number" min="0" step="1" id="rpd_feb_m3" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 4</label><input type="number" min="0" step="1" id="rpd_feb_m4" class="form-control form-control-sm" placeholder="Rp"></div>
+        </div>
+      </div><div class="rpd-month-block">
+        <div class="rpd-month-title">Maret</div>
+        <div class="row g-2">
+          <div class="col-6 col-md-3"><label class="form-label small">Minggu 1</label><input type="number" min="0" step="1" id="rpd_mar_m1" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 2</label><input type="number" min="0" step="1" id="rpd_mar_m2" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 3</label><input type="number" min="0" step="1" id="rpd_mar_m3" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 4</label><input type="number" min="0" step="1" id="rpd_mar_m4" class="form-control form-control-sm" placeholder="Rp"></div>
+        </div>
+      </div>
+      <div class="rpd-quarter-summary">Total TW I: <strong id="twiSummary">Rp0</strong></div>
+    </div>
+<div class="rpd-quarter-block">
+      <div class="rpd-quarter-title">TW II</div>
+      <div class="rpd-month-block">
+        <div class="rpd-month-title">April</div>
+        <div class="row g-2">
+          <div class="col-6 col-md-3"><label class="form-label small">Minggu 1</label><input type="number" min="0" step="1" id="rpd_apr_m1" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 2</label><input type="number" min="0" step="1" id="rpd_apr_m2" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 3</label><input type="number" min="0" step="1" id="rpd_apr_m3" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 4</label><input type="number" min="0" step="1" id="rpd_apr_m4" class="form-control form-control-sm" placeholder="Rp"></div>
+        </div>
+      </div><div class="rpd-month-block">
+        <div class="rpd-month-title">Mei</div>
+        <div class="row g-2">
+          <div class="col-6 col-md-3"><label class="form-label small">Minggu 1</label><input type="number" min="0" step="1" id="rpd_mei_m1" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 2</label><input type="number" min="0" step="1" id="rpd_mei_m2" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 3</label><input type="number" min="0" step="1" id="rpd_mei_m3" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 4</label><input type="number" min="0" step="1" id="rpd_mei_m4" class="form-control form-control-sm" placeholder="Rp"></div>
+        </div>
+      </div><div class="rpd-month-block">
+        <div class="rpd-month-title">Juni</div>
+        <div class="row g-2">
+          <div class="col-6 col-md-3"><label class="form-label small">Minggu 1</label><input type="number" min="0" step="1" id="rpd_jun_m1" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 2</label><input type="number" min="0" step="1" id="rpd_jun_m2" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 3</label><input type="number" min="0" step="1" id="rpd_jun_m3" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 4</label><input type="number" min="0" step="1" id="rpd_jun_m4" class="form-control form-control-sm" placeholder="Rp"></div>
+        </div>
+      </div>
+      <div class="rpd-quarter-summary">Total TW II: <strong id="twiiSummary">Rp0</strong></div>
+    </div>
+<div class="rpd-quarter-block">
+      <div class="rpd-quarter-title">TW III</div>
+      <div class="rpd-month-block">
+        <div class="rpd-month-title">Juli</div>
+        <div class="row g-2">
+          <div class="col-6 col-md-3"><label class="form-label small">Minggu 1</label><input type="number" min="0" step="1" id="rpd_jul_m1" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 2</label><input type="number" min="0" step="1" id="rpd_jul_m2" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 3</label><input type="number" min="0" step="1" id="rpd_jul_m3" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 4</label><input type="number" min="0" step="1" id="rpd_jul_m4" class="form-control form-control-sm" placeholder="Rp"></div>
+        </div>
+      </div><div class="rpd-month-block">
+        <div class="rpd-month-title">Agustus</div>
+        <div class="row g-2">
+          <div class="col-6 col-md-3"><label class="form-label small">Minggu 1</label><input type="number" min="0" step="1" id="rpd_agu_m1" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 2</label><input type="number" min="0" step="1" id="rpd_agu_m2" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 3</label><input type="number" min="0" step="1" id="rpd_agu_m3" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 4</label><input type="number" min="0" step="1" id="rpd_agu_m4" class="form-control form-control-sm" placeholder="Rp"></div>
+        </div>
+      </div><div class="rpd-month-block">
+        <div class="rpd-month-title">September</div>
+        <div class="row g-2">
+          <div class="col-6 col-md-3"><label class="form-label small">Minggu 1</label><input type="number" min="0" step="1" id="rpd_sep_m1" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 2</label><input type="number" min="0" step="1" id="rpd_sep_m2" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 3</label><input type="number" min="0" step="1" id="rpd_sep_m3" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 4</label><input type="number" min="0" step="1" id="rpd_sep_m4" class="form-control form-control-sm" placeholder="Rp"></div>
+        </div>
+      </div>
+      <div class="rpd-quarter-summary">Total TW III: <strong id="twiiiSummary">Rp0</strong></div>
+    </div>
+<div class="rpd-quarter-block">
+      <div class="rpd-quarter-title">TW IV</div>
+      <div class="rpd-month-block">
+        <div class="rpd-month-title">Oktober</div>
+        <div class="row g-2">
+          <div class="col-6 col-md-3"><label class="form-label small">Minggu 1</label><input type="number" min="0" step="1" id="rpd_okt_m1" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 2</label><input type="number" min="0" step="1" id="rpd_okt_m2" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 3</label><input type="number" min="0" step="1" id="rpd_okt_m3" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 4</label><input type="number" min="0" step="1" id="rpd_okt_m4" class="form-control form-control-sm" placeholder="Rp"></div>
+        </div>
+      </div><div class="rpd-month-block">
+        <div class="rpd-month-title">November</div>
+        <div class="row g-2">
+          <div class="col-6 col-md-3"><label class="form-label small">Minggu 1</label><input type="number" min="0" step="1" id="rpd_nov_m1" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 2</label><input type="number" min="0" step="1" id="rpd_nov_m2" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 3</label><input type="number" min="0" step="1" id="rpd_nov_m3" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 4</label><input type="number" min="0" step="1" id="rpd_nov_m4" class="form-control form-control-sm" placeholder="Rp"></div>
+        </div>
+      </div><div class="rpd-month-block">
+        <div class="rpd-month-title">Desember</div>
+        <div class="row g-2">
+          <div class="col-6 col-md-3"><label class="form-label small">Minggu 1</label><input type="number" min="0" step="1" id="rpd_des_m1" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 2</label><input type="number" min="0" step="1" id="rpd_des_m2" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 3</label><input type="number" min="0" step="1" id="rpd_des_m3" class="form-control form-control-sm" placeholder="Rp"></div><div class="col-6 col-md-3"><label class="form-label small">Minggu 4</label><input type="number" min="0" step="1" id="rpd_des_m4" class="form-control form-control-sm" placeholder="Rp"></div>
+        </div>
+      </div>
+      <div class="rpd-quarter-summary">Total TW IV: <strong id="twivSummary">Rp0</strong></div>
+    </div>
     </div>
     <div class="rpd-total-box mt-3"><div>Total RPD <strong id="rpdEditTotal">Rp0</strong></div><div>Sisa <strong id="rpdEditSisa">Rp0</strong></div><div id="rpdEditValidation" class="small mt-2 text-success"></div></div>
     <div class="mt-3"><label class="form-label">Catatan</label><textarea id="rpdCatatan" class="form-control" rows="2"></textarea></div>
@@ -120,6 +197,6 @@
 <script src="assets/js/rpd-config.js"></script>
 <script src="assets/js/rpd-api.js"></script>
 <script src="assets/js/rpd-auth.js"></script>
-<script src="assets/js/rpd.js?v=20260922-03"></script>
+<script src="assets/js/rpd.js?v=20260922-04"></script>
 </body>
 </html>
