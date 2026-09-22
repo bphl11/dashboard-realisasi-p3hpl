@@ -42,6 +42,7 @@ function doPost(e) {
 
     if (action === "auth") return jsonOutput(authenticate_(request.id_token));
     if (action === "bootstrap") return jsonOutput(bootstrap_(request.id_token));
+    if (action === "list") return jsonOutput(listRpd_(request.id_token));
     if (action === "save") return jsonOutput(saveRpd_(request.id_token, request.row));
 
     return jsonOutput({ ok: false, message: "Action API tidak dikenal." });
@@ -147,6 +148,20 @@ function findAllowedUser_(email) {
   }
 
   return null;
+}
+
+function listRpd_(idToken) {
+  const user = authenticate_(idToken);
+  const ss = getSpreadsheet_();
+  const sheet = ss.getSheetByName(RPD_SHEETS.RPD);
+  if (!sheet) throw new Error("Sheet RPD belum dibuat.");
+  ensureRpdSchema_(sheet);
+
+  return {
+    ok: true,
+    user: user.user,
+    rpd: readRpd_(sheet)
+  };
 }
 
 function bootstrap_(idToken) {
