@@ -12,6 +12,33 @@ const RPD_EMPTY = {
     tw1: 0, tw2: 0, tw3: 0, tw4: 0, catatan: ""
 };
 
+const RPD_LOCAL_CACHE_KEY = "p3hpl_rpd_saved_v3";
+
+function rpdLoadLocalCache() {
+    try {
+        const raw = sessionStorage.getItem(RPD_LOCAL_CACHE_KEY);
+        return raw ? rpdNormalizeExistingRows(JSON.parse(raw)) : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function rpdSaveLocalCache(rows) {
+    try {
+        sessionStorage.setItem(RPD_LOCAL_CACHE_KEY, JSON.stringify(rows || []));
+    } catch (e) {}
+}
+
+function rpdMergeSavedRows(rows) {
+    const byId = new Map(rpdExisting.map(item => [String(item.id_rpd || ""), item]));
+    (rows || []).forEach(item => {
+        const normalized = rpdNormalizeSavedRow(item);
+        if (normalized.id_rpd) byId.set(String(normalized.id_rpd), normalized);
+    });
+    rpdExisting = [...byId.values()];
+    rpdSaveLocalCache(rpdExisting);
+}
+
 function rpdFormatRupiah(value) {
     return "Rp" + Math.round(Number(value) || 0).toLocaleString("id-ID");
 }
@@ -188,29 +215,26 @@ function rpdRenderDetilTable() {
 }
 
 function rpdFindSavedForMaster(masterRow) {
-    const exact = rpdExisting.find(item => String(item.id_rpd || "").trim() === String(masterRow.id_rpd || "").trim());
+    // ID_RPD stabil sekarang menjadi kunci utama.
+    const exact = rpdExisting.find(item =>
+        String(item.id_rpd || "").trim() === String(masterRow.id_rpd || "").trim()
+    );
     if (exact) return exact;
 
-    // Kompatibilitas dengan record lama yang belum memiliki ID_RPD.
-    // Cocokkan metadata yang tersedia secara berurutan; jangan mencocokkan
-    // hanya berdasarkan akun karena satu akun dapat memiliki banyak detil.
-    const candidates = rpdExisting.filter(item =>
+    // Kompatibilitas hanya untuk record lama: seluruh identitas baris harus cocok.
+    // Jangan pernah mencocokkan hanya berdasarkan Akun/Detil karena satu akun
+    // dapat mempunyai banyak Rincian Item.
+    const same = rpdExisting.filter(item =>
         String(item.tahun ?? "") === String(masterRow.tahun ?? "") &&
+        String(item.kode_sub_komponen ?? "").trim() === String(masterRow.kodeSubKomponen ?? "").trim() &&
+        String(item.sub_komponen ?? "").trim() === String(masterRow.subKomponen ?? "").trim() &&
         String(item.akun ?? item.AKUN ?? "").trim() === String(masterRow.akun ?? "").trim() &&
-        (
-            String(item.kode_sub_komponen ?? "").trim() === String(masterRow.kodeSubKomponen ?? "").trim() ||
-            !String(item.kode_sub_komponen ?? "").trim()
-        ) &&
-        (
-            String(item.sub_komponen ?? "").trim() === String(masterRow.subKomponen ?? "").trim() ||
-            !String(item.sub_komponen ?? "").trim()
-        ) &&
-        (
-            String(item.detil_akun ?? "").trim() === String(masterRow.detilAkun ?? "").trim() ||
-            !String(item.detil_akun ?? "").trim()
-        )
+        String(item.item_akun ?? "").trim() === String(masterRow.itemAkun ?? "").trim() &&
+        String(item.detil_akun ?? "").trim() === String(masterRow.detilAkun ?? "").trim() &&
+        String(item.rincian_item ?? "").trim() === String(masterRow.rincianItem ?? "").trim() &&
+        rpdNumber(item.pagu_detil ?? item.pagu ?? 0) === rpdNumber(masterRow.pagu)
     );
-    return candidates.length === 1 ? candidates[0] : null;
+    return same.length === 1 ? same[0] : null;
 }
 
 function rpdOpenEditor(id) {
@@ -317,29 +341,8 @@ async function rpdSave() {
             tw4: payload.tw4,
             catatan: payload.catatan
         });
-        const savedById = new Map(rpdExisting.map(item => [String(item.id_rpd), item]));
-        savedById.set(String(localSaved.id_rpd), localSaved);
-
-        // Jika API mengembalikan data terbaru, gunakan data tersebut juga.
         const savedRows = rpdNormalizeExistingRows(result.data ?? result.rpd ?? result);
-        savedRows.forEach(item => {
-            if (item.id_rpd) savedById.set(String(item.id_rpd), item);
-        });
-
-        // Setelah save, baca ulang dari API. Ini memastikan tampilan tidak
-        // hanya bergantung pada state browser dan sekaligus memverifikasi
-        // bahwa record benar-benar sudah tersimpan di Spreadsheet RPD.
-        try {
-            const fresh = await rpdApiRequest("bootstrap", { id_token: rpdUser.id_token });
-            const freshRows = rpdNormalizeExistingRows(fresh.rpd ?? fresh.data ?? fresh);
-            freshRows.forEach(item => {
-                if (item.id_rpd) savedById.set(String(item.id_rpd), item);
-            });
-        } catch (reloadError) {
-            console.warn("Reload RPD setelah save gagal:", reloadError);
-        }
-
-        rpdExisting = [...savedById.values()];
+        rpdMergeSavedRows([localSaved, ...savedRows]);
 
         bootstrap.Modal.getInstance(document.getElementById("rpdEditorModal"))?.hide();
         rpdRenderDetilTable();
@@ -547,22 +550,23 @@ async function rpdInitData() {
 
         rpdMasterRows = builtMaster;
 
-        // API tetap dipakai hanya untuk mengambil RPD yang sudah tersimpan.
-        // Jika API master lama masih hanya berisi akun perjalanan, ia tidak
-        // lagi membatasi pilihan master pada halaman RPD.
-        let result = { rpd: [] };
-        try {
-            result = await rpdApiRequest("bootstrap", { id_token: rpdUser.id_token });
-        } catch (apiError) {
-            console.warn("Bootstrap RPD lama gagal, master DATA_APLIKASI tetap digunakan:", apiError);
-        }
-
-        rpdExisting = rpdNormalizeExistingRows(result.rpd ?? result.data ?? result);
-
-        // Gabungkan data RPD tersimpan yang ID-nya memakai rowIndex lama.
-        // Untuk data baru, ID dibuat deterministik dari row DATA_APLIKASI.
+        // Tampilkan cache RPD lebih dulu agar halaman tidak menunggu API.
+        rpdExisting = rpdLoadLocalCache();
         rpdRefreshFilters({ keepAkun: false });
         rpdRenderDetilTable();
+
+        // Ambil RPD tersimpan dari API secara background. API tidak lagi
+        // membangun MASTER dari DATA_APLIKASI sehingga jauh lebih ringan.
+        try {
+            const result = await rpdApiRequest("list", { id_token: rpdUser.id_token });
+            rpdMergeSavedRows(result.rpd ?? result.data ?? result);
+            rpdRenderDetilTable();
+        } catch (apiError) {
+            console.warn("List RPD dari API gagal; cache lokal tetap digunakan:", apiError);
+            if (rpdExisting.length) {
+                rpdSetStatus("RPD ditampilkan dari cache terakhir. Sinkronisasi server gagal.", "warning");
+            }
+        }
 
         document.getElementById("rpdTotalDetil").textContent =
             rpdMasterRows.length.toLocaleString("id-ID");
