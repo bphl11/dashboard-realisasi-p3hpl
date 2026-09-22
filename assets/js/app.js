@@ -49,7 +49,19 @@ document.addEventListener("DOMContentLoaded", async function () {
         });
 
         tampilkanRingkasanDashboard(total);
-        tampilkanGrafikBulananDashboard(normalData);
+
+        // Grafik Realisasi Bulanan menggunakan NILAI BULANAN LANGSUNG
+        // dari DATA_APLIKASI. Jangan menggunakan normalData karena itu
+        // hanya menyaring Status Pagu = Normal dan dapat membuat grafik
+        // berbeda dari total realisasi bulanan pada sumber.
+        const bulananDataAplikasi = typeof ambilBulananDataAplikasi === "function"
+            ? ambilBulananDataAplikasi(dashboardRawData)
+            : null;
+
+        tampilkanGrafikBulananDashboard(
+            bulananDataAplikasi || normalData
+        );
+
         tampilkanKomponenDashboard(normalData);
         tampilkanSubKomponenDashboard(normalData);
         tampilkanDiagramAkunBelanjaDashboard(normalData);
@@ -140,32 +152,45 @@ function tampilkanRingkasanDashboard(total) {
     setTextDashboard("totalPersen", formatPersenDashboard(total.persen));
 }
 
-function tampilkanGrafikBulananDashboard(items) {
+function tampilkanGrafikBulananDashboard(bulanan) {
     const container = document.getElementById("grafikBulanan");
     if (!container) return;
 
-    const bulan = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
-    const total = {};
-    bulan.forEach(function (nama) { total[nama] = 0; });
+    const bulan = [
+        "Januari","Februari","Maret","April","Mei","Juni",
+        "Juli","Agustus","September","Oktober","November","Desember"
+    ];
 
-    (items || []).forEach(function (item) {
-        bulan.forEach(function (nama) {
-            total[nama] += Number(item && item.bulanan && item.bulanan[nama]) || 0;
-        });
+    // Nilai bulanan berasal langsung dari DATA_APLIKASI.
+    // Tidak memakai hasil grouping, status Normal/Diblokir, atau
+    // penjumlahan ulang dari parsedData.
+    const nilai = bulan.map(function (nama) {
+        return Number(bulanan && bulanan[nama]) || 0;
     });
 
-    const nilai = bulan.map(function (nama) { return total[nama] || 0; });
     const maksimum = Math.max.apply(null, nilai.concat([1]));
 
     container.innerHTML = '<div class="monthly-chart">' +
         bulan.map(function (nama, index) {
             const value = nilai[index];
             const height = value > 0 ? Math.max((value / maksimum) * 100, 2) : 0;
+
             return '<div class="month-column">' +
-                '<div class="month-tooltip">' + escapeHtmlDashboard(nama) + '<br><strong>' + formatRupiahDashboard(value) + '</strong></div>' +
-                '<div class="month-value">' + formatSingkatRupiahDashboard(value) + '</div>' +
-                '<div class="month-bar-area"><div class="month-bar" style="height:' + height + '%"></div></div>' +
-                '<div class="month-name">' + escapeHtmlDashboard(nama.substring(0, 3)) + '</div>' +
+                '<div class="month-tooltip">' +
+                    escapeHtmlDashboard(nama) +
+                    '<br><strong>' +
+                    formatRupiahDashboard(value) +
+                    '</strong>' +
+                '</div>' +
+                '<div class="month-value">' +
+                    formatSingkatRupiahDashboard(value) +
+                '</div>' +
+                '<div class="month-bar-area"><div class="month-bar" style="height:' +
+                    height +
+                    '%"></div></div>' +
+                '<div class="month-name">' +
+                    escapeHtmlDashboard(nama.substring(0, 3)) +
+                '</div>' +
             '</div>';
         }).join("") +
     '</div>';
