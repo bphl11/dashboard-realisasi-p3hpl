@@ -27,11 +27,13 @@ async function rpdApiRequest(action, payload = {}) {
         ...payload
     });
 
+    // Google Apps Script Web App mengembalikan ContentService melalui
+    // redirect satu-kali ke script.googleusercontent.com. Untuk POST dari
+    // browser, jangan menambahkan header Content-Type secara eksplisit;
+    // header tersebut dapat memicu perilaku CORS/redirect yang membuat
+    // Chrome mengulang request sebagai GET dan berakhir 404.
     const response = await fetch(RPD_CONFIG.RPD_API_URL, {
         method: "POST",
-        headers: {
-            "Content-Type": "text/plain;charset=utf-8"
-        },
         body,
         redirect: "follow",
         credentials: "omit"
