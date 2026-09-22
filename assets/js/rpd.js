@@ -12,11 +12,11 @@ const RPD_EMPTY = {
     tw1: 0, tw2: 0, tw3: 0, tw4: 0, catatan: ""
 };
 
-const RPD_LOCAL_CACHE_KEY = "p3hpl_rpd_saved_v3";
+const RPD_LOCAL_CACHE_KEY = "p3hpl_rpd_saved_v4";
 
 function rpdLoadLocalCache() {
     try {
-        const raw = sessionStorage.getItem(RPD_LOCAL_CACHE_KEY);
+        const raw = localStorage.getItem(RPD_LOCAL_CACHE_KEY);
         return raw ? rpdNormalizeExistingRows(JSON.parse(raw)) : [];
     } catch (e) {
         return [];
@@ -25,7 +25,7 @@ function rpdLoadLocalCache() {
 
 function rpdSaveLocalCache(rows) {
     try {
-        sessionStorage.setItem(RPD_LOCAL_CACHE_KEY, JSON.stringify(rows || []));
+        localStorage.setItem(RPD_LOCAL_CACHE_KEY, JSON.stringify(rows || []));
     } catch (e) {}
 }
 
