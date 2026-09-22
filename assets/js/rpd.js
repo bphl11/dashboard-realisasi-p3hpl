@@ -437,7 +437,7 @@ function rpdPrintAll() {
                     '</tr>'
                 );
             });
-        }
+        });
 
         // Subtotal per Sub Komponen.
         detailRows.push(
