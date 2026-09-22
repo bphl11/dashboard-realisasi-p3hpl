@@ -318,6 +318,204 @@ async function rpdSave() {
     finally{button.disabled=false;button.innerHTML='<i class="bi bi-save"></i> Simpan RPD';}
 }
 
+
+
+function rpdGetPrintRows() {
+    const masterById = new Map(
+        rpdMasterRows.map(row => [String(row.id_rpd || ""), row])
+    );
+
+    return rpdExisting
+        .map(saved => {
+            const master = masterById.get(String(saved.id_rpd || ""));
+            return {
+                ...(master || {}),
+                ...saved,
+                subKomponen: saved.sub_komponen || saved.subKomponen || master?.subKomponen || "",
+                kodeSubKomponen: saved.kode_sub_komponen || saved.kodeSubKomponen || master?.kodeSubKomponen || "",
+                akun: saved.akun || master?.akun || "",
+                itemAkun: saved.item_akun || saved.itemAkun || master?.itemAkun || "",
+                detilAkun: saved.detil_akun || saved.detilAkun || master?.detilAkun || "",
+                rincianItem: saved.rincian_item || saved.rincianItem || master?.rincianItem || "",
+                pagu: rpdNumber(saved.pagu_detil ?? saved.pagu ?? master?.pagu ?? 0)
+            };
+        })
+        .filter(row => {
+            const q = rpdQuarterTotals(row);
+            return (q.tw1 + q.tw2 + q.tw3 + q.tw4) > 0;
+        });
+}
+
+function rpdPrintAll() {
+    const rows = rpdGetPrintRows();
+
+    if (!rows.length) {
+        rpdSetStatus("Belum ada RPD yang terisi untuk dicetak.", "warning");
+        return;
+    }
+
+    const grouped = new Map();
+    rows.forEach(row => {
+        const key = row.subKomponen || "Sub Komponen Tidak Diketahui";
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key).push(row);
+    });
+
+    const yearSet = [...new Set(rows.map(row => String(row.tahun || "").trim()).filter(Boolean))];
+    const yearLabel = yearSet.length === 1 ? yearSet[0] : yearSet.join(", ");
+
+    const summaryRows = [];
+    let grandPagu = 0;
+    let grandTotal = 0;
+
+    grouped.forEach((items, sub) => {
+        const subPagu = items.reduce((sum, row) => sum + rpdNumber(row.pagu), 0);
+        const subTotal = items.reduce((sum, row) => {
+            const q = rpdQuarterTotals(row);
+            return sum + q.tw1 + q.tw2 + q.tw3 + q.tw4;
+        }, 0);
+        grandPagu += subPagu;
+        grandTotal += subTotal;
+        summaryRows.push(
+            '<tr><td class="no">' + (summaryRows.length + 1) + '</td>' +
+            '<td><strong>' + rpdEsc(sub) + '</strong></td>' +
+            '<td class="num">' + items.length.toLocaleString("id-ID") + '</td>' +
+            '<td class="num">' + rpdFormatRupiah(subPagu) + '</td>' +
+            '<td class="num">' + rpdFormatRupiah(subTotal) + '</td>' +
+            '<td class="num">' + rpdFormatRupiah(Math.max(subPagu - subTotal, 0)) + '</td></tr>'
+        );
+    });
+
+    const detailRows = [];
+    let detailNo = 0;
+
+    grouped.forEach((items, sub) => {
+        detailRows.push(
+            '<tr class="group-row"><td colspan="10"><strong>SUB KOMPONEN: ' +
+            rpdEsc(sub) + '</strong></td></tr>'
+        );
+
+        items.forEach(row => {
+            detailNo++;
+            const q = rpdQuarterTotals(row);
+            const total = q.tw1 + q.tw2 + q.tw3 + q.tw4;
+            const label = [
+                row.itemAkun ? row.itemAkun : "",
+                row.akun || "",
+                row.detilAkun ? "Detil: " + row.detilAkun : "",
+                row.rincianItem ? "Rincian: " + row.rincianItem : ""
+            ].filter(Boolean).join(" — ");
+
+            detailRows.push(
+                '<tr>' +
+                '<td class="no">' + detailNo + '</td>' +
+                '<td>' + rpdEsc(row.itemAkun || "-") + '</td>' +
+                '<td>' + rpdEsc(row.akun || "-") + '</td>' +
+                '<td>' + rpdEsc(row.detilAkun || "-") + '</td>' +
+                '<td>' + rpdEsc(row.rincianItem || "-") + '</td>' +
+                '<td class="num">' + rpdFormatRupiah(row.pagu) + '</td>' +
+                '<td class="num">' + rpdFormatRupiah(q.tw1) + '</td>' +
+                '<td class="num">' + rpdFormatRupiah(q.tw2) + '</td>' +
+                '<td class="num">' + rpdFormatRupiah(q.tw3) + '</td>' +
+                '<td class="num">' + rpdFormatRupiah(q.tw4) + '</td>' +
+                '<td class="num"><strong>' + rpdFormatRupiah(total) + '</strong></td>' +
+                '<td class="num">' + rpdFormatRupiah(Math.max(row.pagu - total, 0)) + '</td>' +
+                '</tr>'
+            );
+
+            const weekly = RPD_WEEK_FIELDS.map(key => rpdNumber(row[key]));
+            const hasWeekly = weekly.some(value => value !== 0);
+
+            if (hasWeekly) {
+                detailRows.push(
+                    '<tr class="weekly-parent"><td></td><td colspan="11">' +
+                    '<strong>Rincian Mingguan</strong></td></tr>'
+                );
+
+                RPD_MONTHS.forEach(month => {
+                    const values = [1,2,3,4].map(week =>
+                        rpdNumber(row[month.key + "_m" + week])
+                    );
+                    const monthTotal = values.reduce((a,b) => a + b, 0);
+                    detailRows.push(
+                        '<tr class="weekly-row">' +
+                        '<td></td><td colspan="4"><strong>' + month.label + '</strong></td>' +
+                        '<td class="num">' + rpdFormatRupiah(values[0]) + '</td>' +
+                        '<td class="num">' + rpdFormatRupiah(values[1]) + '</td>' +
+                        '<td class="num">' + rpdFormatRupiah(values[2]) + '</td>' +
+                        '<td class="num">' + rpdFormatRupiah(values[3]) + '</td>' +
+                        '<td class="num"><strong>' + rpdFormatRupiah(monthTotal) + '</strong></td>' +
+                        '<td colspan="2"></td>' +
+                        '</tr>'
+                    );
+                });
+            }
+        });
+    });
+
+    const generated = new Date().toLocaleString("id-ID");
+    const printWindow = window.open("", "_blank", "width=1400,height=900");
+
+    if (!printWindow) {
+        rpdSetStatus("Jendela cetak diblokir browser. Izinkan pop-up untuk halaman ini lalu coba lagi.", "warning");
+        return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(
+        '<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">' +
+        '<title>Cetak RPD P3HPL</title>' +
+        '<style>' +
+        '@page{size:A4 landscape;margin:12mm}' +
+        '*{box-sizing:border-box}' +
+        'body{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:10px;margin:0}' +
+        'h1{font-size:18px;margin:0 0 3px;text-align:center}' +
+        'h2{font-size:13px;margin:0 0 12px;text-align:center;font-weight:normal}' +
+        '.meta{display:flex;justify-content:space-between;border-bottom:1px solid #999;padding-bottom:6px;margin-bottom:10px}' +
+        '.cards{display:flex;gap:8px;margin-bottom:12px}' +
+        '.card{border:1px solid #aaa;padding:6px 9px;flex:1}' +
+        '.card strong{display:block;font-size:12px}' +
+        'table{width:100%;border-collapse:collapse;margin-bottom:14px}' +
+        'th,td{border:1px solid #888;padding:4px;vertical-align:top}' +
+        'th{background:#e9ecef;text-align:center;font-weight:700}' +
+        '.num{text-align:right;white-space:nowrap}' +
+        '.no{width:28px;text-align:center}' +
+        '.group-row td{background:#dfeadd;font-size:11px;padding:6px}' +
+        '.weekly-parent td{background:#f3f5f3}' +
+        '.weekly-row td{font-size:9px;background:#fafafa}' +
+        '.section-title{font-size:12px;font-weight:700;margin:10px 0 5px}' +
+        '.summary th,.summary td{font-size:10px}' +
+        '.detail th:nth-child(1){width:28px}.detail th:nth-child(6){width:78px}.detail th:nth-child(n+7){width:70px}' +
+        '.footer{margin-top:14px;font-size:9px;color:#555}' +
+        '.sign{margin-top:35px;display:flex;justify-content:flex-end}' +
+        '.sign-box{width:260px;text-align:center}' +
+        '@media print{.no-print{display:none}.group-row{break-inside:avoid}.weekly-row{break-inside:avoid}}' +
+        '</style></head><body>' +
+        '<h1>RENCANA PENARIKAN DANA (RPD)</h1>' +
+        '<h2>P3HPL — BPHL XI Banjarbaru</h2>' +
+        '<div class="meta"><div><strong>Tahun Anggaran:</strong> ' + rpdEsc(yearLabel || "-") + '</div>' +
+        '<div><strong>Dicetak:</strong> ' + rpdEsc(generated) + '</div></div>' +
+        '<div class="cards">' +
+        '<div class="card"><span>Jumlah Sub Komponen</span><strong>' + grouped.size.toLocaleString("id-ID") + '</strong></div>' +
+        '<div class="card"><span>Jumlah Detil RPD</span><strong>' + rows.length.toLocaleString("id-ID") + '</strong></div>' +
+        '<div class="card"><span>Total Pagu</span><strong>' + rpdFormatRupiah(grandPagu) + '</strong></div>' +
+        '<div class="card"><span>Total RPD</span><strong>' + rpdFormatRupiah(grandTotal) + '</strong></div>' +
+        '<div class="card"><span>Sisa</span><strong>' + rpdFormatRupiah(Math.max(grandPagu - grandTotal, 0)) + '</strong></div>' +
+        '</div>' +
+        '<div class="section-title">Rekapitulasi RPD per Sub Komponen</div>' +
+        '<table class="summary"><thead><tr><th>No</th><th>Sub Komponen</th><th>Jumlah Detil</th><th>Pagu</th><th>Total RPD</th><th>Sisa</th></tr></thead>' +
+        '<tbody>' + summaryRows.join("") + '</tbody></table>' +
+        '<div class="section-title">Rincian RPD</div>' +
+        '<table class="detail"><thead><tr><th>No</th><th>Item Akun</th><th>Akun Belanja</th><th>Detil Akun</th><th>Rincian Item</th><th>Pagu</th><th>TW I</th><th>TW II</th><th>TW III</th><th>TW IV</th><th>Total RPD</th><th>Sisa</th></tr></thead>' +
+        '<tbody>' + detailRows.join("") + '</tbody></table>' +
+        '<div class="footer">Dokumen ini dicetak dari Modul RPD. RPD merupakan rencana penarikan dana dan tidak menggunakan data realisasi.</div>' +
+        '<div class="sign"><div class="sign-box">Mengetahui,<br><br><br><br>____________________________<br>Pejabat yang berwenang</div></div>' +
+        '<script>window.onload=function(){setTimeout(function(){window.print();},350);};<\/script>' +
+        '</body></html>'
+    );
+    printWindow.document.close();
+}
+
 function rpdBuildMasterRows(rawData) {
     if (!Array.isArray(rawData) || !rawData.length) return [];
 
@@ -583,4 +781,5 @@ document.addEventListener("DOMContentLoaded", function () {
         rpdRenderDetilTable();
     });    document.getElementById("rpdAkun")?.addEventListener("change", rpdRenderDetilTable);
     document.getElementById("rpdSaveButton")?.addEventListener("click", rpdSave);
+    document.getElementById("rpdPrintButton")?.addEventListener("click", rpdPrintAll);
 });
