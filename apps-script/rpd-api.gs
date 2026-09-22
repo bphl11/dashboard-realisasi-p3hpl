@@ -29,7 +29,8 @@ const RPD_SHEETS = {
 
 const RPD_HEADERS = [
   "ID_RPD","TAHUN","KODE_SUB_KOMPONEN","SUB_KOMPONEN","AKUN","ITEM_AKUN",
-  "DETIL_AKUN","PAGU_DETIL","TW1","TW2","TW3","TW4","TOTAL_RPD",
+  "DETIL_AKUN","RINCIAN_ITEM","PAGU_DETIL","TW1","TW2","TW3","TW4","TOTAL_RPD",
+  "JAN_M1","JAN_M2","JAN_M3","JAN_M4","FEB_M1","FEB_M2","FEB_M3","FEB_M4","MAR_M1","MAR_M2","MAR_M3","MAR_M4","APR_M1","APR_M2","APR_M3","APR_M4","MEI_M1","MEI_M2","MEI_M3","MEI_M4","JUN_M1","JUN_M2","JUN_M3","JUN_M4","JUL_M1","JUL_M2","JUL_M3","JUL_M4","AGU_M1","AGU_M2","AGU_M3","AGU_M4","SEP_M1","SEP_M2","SEP_M3","SEP_M4","OKT_M1","OKT_M2","OKT_M3","OKT_M4","NOV_M1","NOV_M2","NOV_M3","NOV_M4","DES_M1","DES_M2","DES_M3","DES_M4",
   "CATATAN","UPDATED_AT","UPDATED_BY"
 ];
 
@@ -68,13 +69,16 @@ function getSpreadsheet_() {
 }
 
 function ensureRpdSchema_(sheet) {
-  let headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0]
+  const lastColumn = Math.max(sheet.getLastColumn(), 1);
+  let headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0]
     .map(v => String(v ?? "").trim().toUpperCase());
-  if (!headers.includes("RINCIAN_ITEM")) {
-    const pagu = headers.indexOf("PAGU_DETIL");
-    const insertAt = pagu >= 0 ? pagu + 1 : sheet.getLastColumn() + 1;
-    sheet.insertColumnBefore(insertAt);
-    sheet.getRange(1, insertAt).setValue("RINCIAN_ITEM");
+
+  // Tambahkan kolom baru di ujung sheet agar data lama tidak bergeser.
+  // Ini membuat migrasi 48 minggu aman untuk record RPD yang sudah ada.
+  const missing = RPD_HEADERS.filter(header => !headers.includes(header));
+  if (missing.length) {
+    const start = sheet.getLastColumn() + 1;
+    sheet.getRange(1, start, 1, missing.length).setValues([missing]);
   }
 }
 
@@ -244,43 +248,91 @@ function readRpd_(sheet) {
   if (values.length < 2) return [];
 
   const index = headerIndex_(values[0]);
-  return values.slice(1).filter(row => row.some(cell => String(cell ?? "").trim() !== "")).map(row => {
-    const existingId = String(row[index.ID_RPD] || "").trim();
-    const tahun = String(row[index.TAHUN] || "");
-    const kodeSub = String(row[index.KODE_SUB_KOMPONEN] || "");
-    const sub = String(row[index.SUB_KOMPONEN] || "");
-    const akun = String(row[index.AKUN] || "");
-    const item = String(row[index.ITEM_AKUN] || "");
-    const detil = String(row[index.DETIL_AKUN] || "");
-    const rincian = String(row[index.RINCIAN_ITEM] || "");
-    const paguDetil = parseAmount_(row[index.PAGU_DETIL]);
-    // ID lama yang kosong harus dapat dipadankan ke master. Sertakan rincian
-    // dan pagu sebagai bagian identitas agar akun yang sama dengan banyak baris
-    // tidak tertukar.
-    const generatedId = existingId || makeRpdId_(tahun, kodeSub, sub, akun, item, detil, rincian, paguDetil);
+  return values.slice(1)
+    .filter(row => row.some(cell => String(cell ?? "").trim() !== ""))
+    .map(row => {
+      const existingId = String(row[index.ID_RPD] || "").trim();
+      const tahun = String(row[index.TAHUN] || "");
+      const kodeSub = String(row[index.KODE_SUB_KOMPONEN] || "");
+      const sub = String(row[index.SUB_KOMPONEN] || "");
+      const akun = String(row[index.AKUN] || "");
+      const item = String(row[index.ITEM_AKUN] || "");
+      const detil = String(row[index.DETIL_AKUN] || "");
+      const rincian = String(row[index.RINCIAN_ITEM] || "");
+      const paguDetil = parseAmount_(row[index.PAGU_DETIL]);
+      const generatedId = existingId || makeRpdId_(tahun, kodeSub, sub, akun, item, detil, rincian, paguDetil);
 
-    return {
-    id_rpd: generatedId,
-    tahun: String(row[index.TAHUN] || ""),
-    kode_sub_komponen: String(row[index.KODE_SUB_KOMPONEN] || ""),
-    sub_komponen: String(row[index.SUB_KOMPONEN] || ""),
-    akun: String(row[index.AKUN] || ""),
-    item_akun: String(row[index.ITEM_AKUN] || ""),
-    detil_akun: String(row[index.DETIL_AKUN] || ""),
-    rincian_item: String(row[index.RINCIAN_ITEM] || ""),
-    pagu_detil: parseAmount_(row[index.PAGU_DETIL]),
-    tw1: parseAmount_(row[index.TW1]),
-    tw2: parseAmount_(row[index.TW2]),
-    tw3: parseAmount_(row[index.TW3]),
-    tw4: parseAmount_(row[index.TW4]),
-    total_rpd: parseAmount_(row[index.TOTAL_RPD]),
-    catatan: String(row[index.CATATAN] || ""),
-    updated_at: row[index.UPDATED_AT] || "",
-    updated_by: String(row[index.UPDATED_BY] || "")
-    };
-  });
+      const result = {
+        id_rpd: generatedId,
+        tahun,
+        kode_sub_komponen: kodeSub,
+        sub_komponen: sub,
+        akun,
+        item_akun: item,
+        detil_akun: detil,
+        rincian_item: rincian,
+        pagu_detil: paguDetil,
+        tw1: parseAmount_(row[index.TW1]),
+        tw2: parseAmount_(row[index.TW2]),
+        tw3: parseAmount_(row[index.TW3]),
+        tw4: parseAmount_(row[index.TW4]),
+        total_rpd: parseAmount_(row[index.TOTAL_RPD]),
+        catatan: String(row[index.CATATAN] || ""),
+        updated_at: row[index.UPDATED_AT] || "",
+        updated_by: String(row[index.UPDATED_BY] || "")
+      };
+
+      result.jan_m1 = parseAmount_(row[index.JAN_M1]);
+      result.jan_m2 = parseAmount_(row[index.JAN_M2]);
+      result.jan_m3 = parseAmount_(row[index.JAN_M3]);
+      result.jan_m4 = parseAmount_(row[index.JAN_M4]);
+      result.feb_m1 = parseAmount_(row[index.FEB_M1]);
+      result.feb_m2 = parseAmount_(row[index.FEB_M2]);
+      result.feb_m3 = parseAmount_(row[index.FEB_M3]);
+      result.feb_m4 = parseAmount_(row[index.FEB_M4]);
+      result.mar_m1 = parseAmount_(row[index.MAR_M1]);
+      result.mar_m2 = parseAmount_(row[index.MAR_M2]);
+      result.mar_m3 = parseAmount_(row[index.MAR_M3]);
+      result.mar_m4 = parseAmount_(row[index.MAR_M4]);
+      result.apr_m1 = parseAmount_(row[index.APR_M1]);
+      result.apr_m2 = parseAmount_(row[index.APR_M2]);
+      result.apr_m3 = parseAmount_(row[index.APR_M3]);
+      result.apr_m4 = parseAmount_(row[index.APR_M4]);
+      result.mei_m1 = parseAmount_(row[index.MEI_M1]);
+      result.mei_m2 = parseAmount_(row[index.MEI_M2]);
+      result.mei_m3 = parseAmount_(row[index.MEI_M3]);
+      result.mei_m4 = parseAmount_(row[index.MEI_M4]);
+      result.jun_m1 = parseAmount_(row[index.JUN_M1]);
+      result.jun_m2 = parseAmount_(row[index.JUN_M2]);
+      result.jun_m3 = parseAmount_(row[index.JUN_M3]);
+      result.jun_m4 = parseAmount_(row[index.JUN_M4]);
+      result.jul_m1 = parseAmount_(row[index.JUL_M1]);
+      result.jul_m2 = parseAmount_(row[index.JUL_M2]);
+      result.jul_m3 = parseAmount_(row[index.JUL_M3]);
+      result.jul_m4 = parseAmount_(row[index.JUL_M4]);
+      result.agu_m1 = parseAmount_(row[index.AGU_M1]);
+      result.agu_m2 = parseAmount_(row[index.AGU_M2]);
+      result.agu_m3 = parseAmount_(row[index.AGU_M3]);
+      result.agu_m4 = parseAmount_(row[index.AGU_M4]);
+      result.sep_m1 = parseAmount_(row[index.SEP_M1]);
+      result.sep_m2 = parseAmount_(row[index.SEP_M2]);
+      result.sep_m3 = parseAmount_(row[index.SEP_M3]);
+      result.sep_m4 = parseAmount_(row[index.SEP_M4]);
+      result.okt_m1 = parseAmount_(row[index.OKT_M1]);
+      result.okt_m2 = parseAmount_(row[index.OKT_M2]);
+      result.okt_m3 = parseAmount_(row[index.OKT_M3]);
+      result.okt_m4 = parseAmount_(row[index.OKT_M4]);
+      result.nov_m1 = parseAmount_(row[index.NOV_M1]);
+      result.nov_m2 = parseAmount_(row[index.NOV_M2]);
+      result.nov_m3 = parseAmount_(row[index.NOV_M3]);
+      result.nov_m4 = parseAmount_(row[index.NOV_M4]);
+      result.des_m1 = parseAmount_(row[index.DES_M1]);
+      result.des_m2 = parseAmount_(row[index.DES_M2]);
+      result.des_m3 = parseAmount_(row[index.DES_M3]);
+      result.des_m4 = parseAmount_(row[index.DES_M4]);
+      return result;
+    });
 }
-
 function saveRpd_(idToken, row) {
   const user = authenticate_(idToken).user;
   if (!row || !row.id_rpd) throw new Error("ID RPD tidak lengkap.");
@@ -292,20 +344,99 @@ function saveRpd_(idToken, row) {
 
   const index = headerIndex_(sheet.getRange(1,1,1,sheet.getLastColumn()).getValues()[0]);
   const pagu = parseAmount_(row.pagu_detil);
-  const tw1 = parseAmount_(row.tw1);
-  const tw2 = parseAmount_(row.tw2);
-  const tw3 = parseAmount_(row.tw3);
-  const tw4 = parseAmount_(row.tw4);
+
+  const weeklyValues = {
+    jan_m1: parseAmount_(row.jan_m1),
+    jan_m2: parseAmount_(row.jan_m2),
+    jan_m3: parseAmount_(row.jan_m3),
+    jan_m4: parseAmount_(row.jan_m4),
+    feb_m1: parseAmount_(row.feb_m1),
+    feb_m2: parseAmount_(row.feb_m2),
+    feb_m3: parseAmount_(row.feb_m3),
+    feb_m4: parseAmount_(row.feb_m4),
+    mar_m1: parseAmount_(row.mar_m1),
+    mar_m2: parseAmount_(row.mar_m2),
+    mar_m3: parseAmount_(row.mar_m3),
+    mar_m4: parseAmount_(row.mar_m4),
+    apr_m1: parseAmount_(row.apr_m1),
+    apr_m2: parseAmount_(row.apr_m2),
+    apr_m3: parseAmount_(row.apr_m3),
+    apr_m4: parseAmount_(row.apr_m4),
+    mei_m1: parseAmount_(row.mei_m1),
+    mei_m2: parseAmount_(row.mei_m2),
+    mei_m3: parseAmount_(row.mei_m3),
+    mei_m4: parseAmount_(row.mei_m4),
+    jun_m1: parseAmount_(row.jun_m1),
+    jun_m2: parseAmount_(row.jun_m2),
+    jun_m3: parseAmount_(row.jun_m3),
+    jun_m4: parseAmount_(row.jun_m4),
+    jul_m1: parseAmount_(row.jul_m1),
+    jul_m2: parseAmount_(row.jul_m2),
+    jul_m3: parseAmount_(row.jul_m3),
+    jul_m4: parseAmount_(row.jul_m4),
+    agu_m1: parseAmount_(row.agu_m1),
+    agu_m2: parseAmount_(row.agu_m2),
+    agu_m3: parseAmount_(row.agu_m3),
+    agu_m4: parseAmount_(row.agu_m4),
+    sep_m1: parseAmount_(row.sep_m1),
+    sep_m2: parseAmount_(row.sep_m2),
+    sep_m3: parseAmount_(row.sep_m3),
+    sep_m4: parseAmount_(row.sep_m4),
+    okt_m1: parseAmount_(row.okt_m1),
+    okt_m2: parseAmount_(row.okt_m2),
+    okt_m3: parseAmount_(row.okt_m3),
+    okt_m4: parseAmount_(row.okt_m4),
+    nov_m1: parseAmount_(row.nov_m1),
+    nov_m2: parseAmount_(row.nov_m2),
+    nov_m3: parseAmount_(row.nov_m3),
+    nov_m4: parseAmount_(row.nov_m4),
+    des_m1: parseAmount_(row.des_m1),
+    des_m2: parseAmount_(row.des_m2),
+    des_m3: parseAmount_(row.des_m3),
+    des_m4: parseAmount_(row.des_m4)
+  };
+  const weekList = Object.values(weeklyValues);
+  if (weekList.some(value => value < 0)) throw new Error("Nilai RPD mingguan tidak boleh negatif.");
+
+  const tw1 = weekList.slice(0,12).reduce((a,b)=>a+b,0);
+  const tw2 = weekList.slice(12,24).reduce((a,b)=>a+b,0);
+  const tw3 = weekList.slice(24,36).reduce((a,b)=>a+b,0);
+  const tw4 = weekList.slice(36,48).reduce((a,b)=>a+b,0);
   const total = tw1 + tw2 + tw3 + tw4;
 
-  if (total > pagu) throw new Error("Total RPD melebihi Pagu Detil.");
+  // Kompatibilitas: record lama yang belum mempunyai slot mingguan
+  // tetap dapat diedit. Nilai TW lama akan dipertahankan sebagai
+  // subtotal sampai operator memasukkan nilai mingguan.
+  const legacyProvided = weekList.some(value => value > 0);
+  if (!legacyProvided) {
+    const legacy = [
+      parseAmount_(row.tw1), parseAmount_(row.tw2),
+      parseAmount_(row.tw3), parseAmount_(row.tw4)
+    ];
+    legacy.forEach((value,i) => {
+      if (value > 0) {
+        const firstIndex = i * 12;
+        const key = Object.keys(weeklyValues)[firstIndex];
+        weeklyValues[key] = value;
+      }
+    });
+  }
+
+  const finalWeeks = Object.values(weeklyValues);
+  const finalTw1 = finalWeeks.slice(0,12).reduce((a,b)=>a+b,0);
+  const finalTw2 = finalWeeks.slice(12,24).reduce((a,b)=>a+b,0);
+  const finalTw3 = finalWeeks.slice(24,36).reduce((a,b)=>a+b,0);
+  const finalTw4 = finalWeeks.slice(36,48).reduce((a,b)=>a+b,0);
+  const finalTotal = finalTw1 + finalTw2 + finalTw3 + finalTw4;
+
+  if (finalTotal > pagu) throw new Error("Total RPD 48 minggu melebihi Pagu Detil.");
 
   const now = new Date();
   const values = sheet.getDataRange().getValues();
   let targetRow = -1;
   let oldData = null;
-
   const requestedId = String(row.id_rpd || "").trim();
+
   for (let i = 1; i < values.length; i++) {
     const currentId = String(values[i][index.ID_RPD] || "").trim();
     const sameId = requestedId && currentId === requestedId;
@@ -314,10 +445,7 @@ function saveRpd_(idToken, row) {
       String(values[i][index.AKUN] || "").trim() === String(row.akun || "").trim() &&
       String(values[i][index.ITEM_AKUN] || "").trim() === String(row.item_akun || "").trim() &&
       String(values[i][index.DETIL_AKUN] || "").trim() === String(row.detil_akun || "").trim() &&
-      (
-        index.RINCIAN_ITEM === undefined ||
-        String(values[i][index.RINCIAN_ITEM] || "").trim() === String(row.rincian_item || "").trim()
-      ) &&
+      String(values[i][index.RINCIAN_ITEM] || "").trim() === String(row.rincian_item || "").trim() &&
       Number(values[i][index.PAGU_DETIL] || 0) === Number(pagu || 0);
 
     if (sameId || (!currentId && sameIdentity)) {
@@ -327,7 +455,7 @@ function saveRpd_(idToken, row) {
     }
   }
 
-  const stableId = String(row.id_rpd || "").trim() || makeRpdId_(row.tahun, row.kode_sub_komponen, row.sub_komponen, row.akun, row.item_akun, row.detil_akun, row.rincian_item, pagu);
+  const stableId = requestedId || makeRpdId_(row.tahun,row.kode_sub_komponen,row.sub_komponen,row.akun,row.item_akun,row.detil_akun,row.rincian_item,pagu);
   const record = {
     id_rpd: stableId,
     tahun: String(row.tahun || ""),
@@ -336,16 +464,15 @@ function saveRpd_(idToken, row) {
     akun: String(row.akun || ""),
     item_akun: String(row.item_akun || ""),
     detil_akun: String(row.detil_akun || ""),
+    rincian_item: String(row.rincian_item || ""),
     pagu_detil: pagu,
-    tw1, tw2, tw3, tw4,
-    total_rpd: total,
+    tw1: finalTw1, tw2: finalTw2, tw3: finalTw3, tw4: finalTw4,
+    total_rpd: finalTotal,
     catatan: String(row.catatan || ""),
     updated_at: now,
     updated_by: user.email
   };
 
-  // Buat array DENSE sesuai urutan header agar ID_RPD selalu ditulis
-  // pada kolom A dan tidak bergeser ketika appendRow().
   const output = new Array(sheet.getLastColumn()).fill("");
   output[index.ID_RPD] = record.id_rpd;
   output[index.TAHUN] = record.tahun;
@@ -354,13 +481,61 @@ function saveRpd_(idToken, row) {
   output[index.AKUN] = record.akun;
   output[index.ITEM_AKUN] = record.item_akun;
   output[index.DETIL_AKUN] = record.detil_akun;
-  if (index.RINCIAN_ITEM !== undefined) output[index.RINCIAN_ITEM] = String(row.rincian_item || "");
+  output[index.RINCIAN_ITEM] = record.rincian_item;
   output[index.PAGU_DETIL] = record.pagu_detil;
   output[index.TW1] = record.tw1;
   output[index.TW2] = record.tw2;
   output[index.TW3] = record.tw3;
   output[index.TW4] = record.tw4;
   output[index.TOTAL_RPD] = record.total_rpd;
+  output[index.JAN_M1] = weeklyValues.jan_m1;
+  output[index.JAN_M2] = weeklyValues.jan_m2;
+  output[index.JAN_M3] = weeklyValues.jan_m3;
+  output[index.JAN_M4] = weeklyValues.jan_m4;
+  output[index.FEB_M1] = weeklyValues.feb_m1;
+  output[index.FEB_M2] = weeklyValues.feb_m2;
+  output[index.FEB_M3] = weeklyValues.feb_m3;
+  output[index.FEB_M4] = weeklyValues.feb_m4;
+  output[index.MAR_M1] = weeklyValues.mar_m1;
+  output[index.MAR_M2] = weeklyValues.mar_m2;
+  output[index.MAR_M3] = weeklyValues.mar_m3;
+  output[index.MAR_M4] = weeklyValues.mar_m4;
+  output[index.APR_M1] = weeklyValues.apr_m1;
+  output[index.APR_M2] = weeklyValues.apr_m2;
+  output[index.APR_M3] = weeklyValues.apr_m3;
+  output[index.APR_M4] = weeklyValues.apr_m4;
+  output[index.MEI_M1] = weeklyValues.mei_m1;
+  output[index.MEI_M2] = weeklyValues.mei_m2;
+  output[index.MEI_M3] = weeklyValues.mei_m3;
+  output[index.MEI_M4] = weeklyValues.mei_m4;
+  output[index.JUN_M1] = weeklyValues.jun_m1;
+  output[index.JUN_M2] = weeklyValues.jun_m2;
+  output[index.JUN_M3] = weeklyValues.jun_m3;
+  output[index.JUN_M4] = weeklyValues.jun_m4;
+  output[index.JUL_M1] = weeklyValues.jul_m1;
+  output[index.JUL_M2] = weeklyValues.jul_m2;
+  output[index.JUL_M3] = weeklyValues.jul_m3;
+  output[index.JUL_M4] = weeklyValues.jul_m4;
+  output[index.AGU_M1] = weeklyValues.agu_m1;
+  output[index.AGU_M2] = weeklyValues.agu_m2;
+  output[index.AGU_M3] = weeklyValues.agu_m3;
+  output[index.AGU_M4] = weeklyValues.agu_m4;
+  output[index.SEP_M1] = weeklyValues.sep_m1;
+  output[index.SEP_M2] = weeklyValues.sep_m2;
+  output[index.SEP_M3] = weeklyValues.sep_m3;
+  output[index.SEP_M4] = weeklyValues.sep_m4;
+  output[index.OKT_M1] = weeklyValues.okt_m1;
+  output[index.OKT_M2] = weeklyValues.okt_m2;
+  output[index.OKT_M3] = weeklyValues.okt_m3;
+  output[index.OKT_M4] = weeklyValues.okt_m4;
+  output[index.NOV_M1] = weeklyValues.nov_m1;
+  output[index.NOV_M2] = weeklyValues.nov_m2;
+  output[index.NOV_M3] = weeklyValues.nov_m3;
+  output[index.NOV_M4] = weeklyValues.nov_m4;
+  output[index.DES_M1] = weeklyValues.des_m1;
+  output[index.DES_M2] = weeklyValues.des_m2;
+  output[index.DES_M3] = weeklyValues.des_m3;
+  output[index.DES_M4] = weeklyValues.des_m4;
   output[index.CATATAN] = record.catatan;
   output[index.UPDATED_AT] = record.updated_at;
   output[index.UPDATED_BY] = record.updated_by;
@@ -373,13 +548,14 @@ function saveRpd_(idToken, row) {
     writeLog_("INSERT", record, null, user.email);
   }
 
+  // Jangan membaca ulang seluruh sheet setelah save.
+  // Client sudah mempunyai payload lengkap; response cukup satu record.
   return {
     ok: true,
     message: "RPD tersimpan.",
-    data: readRpd_(sheet)
+    data: record
   };
 }
-
 function writeLog_(action, record, oldData, email) {
   const sheet = getSpreadsheet_().getSheetByName(RPD_SHEETS.LOG);
   if (!sheet) return;
