@@ -19,8 +19,12 @@ async function rpdApiRequest(action, payload = {}) {
         }
     };
 
-    if (!RPD_CONFIG.RPD_API_URL) {
-        throw new Error("RPD_API_URL belum dikonfigurasi.");
+    const apiBaseUrl = String(
+        RPD_CONFIG.RPD_PROXY_URL || apiBaseUrl || ""
+    ).trim();
+
+    if (!apiBaseUrl) {
+        throw new Error("RPD_PROXY_URL / RPD_API_URL belum dikonfigurasi.");
     }
 
     const parseResponse = async (response) => {
@@ -73,7 +77,7 @@ async function rpdApiRequest(action, payload = {}) {
             id_token: String(payload.id_token || "")
         });
 
-        const response = await fetch(RPD_CONFIG.RPD_API_URL, {
+        const response = await fetch(apiBaseUrl, {
             method: "POST",
             headers: {
                 "Content-Type": "text/plain;charset=utf-8"
@@ -97,7 +101,7 @@ async function rpdApiRequest(action, payload = {}) {
         ...payload
     });
 
-    const response = await fetch(RPD_CONFIG.RPD_API_URL, {
+    const response = await fetch(apiBaseUrl, {
         method: "POST",
         headers: {
             "Content-Type": "text/plain;charset=utf-8"
