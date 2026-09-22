@@ -14,7 +14,7 @@ const RPD_CONFIG = {
     // Cloudflare Worker proxy.
     // Isi setelah Worker dibuat, contoh:
     // https://rpd-proxy.<akun>.workers.dev/rpd
-    RPD_PROXY_URL: "",
+    RPD_PROXY_URL: "https://rpd-p3hpl-proxy.asterales-niza.workers.dev/rpd",
 
     // URL Apps Script tetap dipertahankan sebagai upstream/fallback.
     RPD_API_URL: "https://script.google.com/macros/s/AKfycbxxncp8pn5sF5pGOzErDG2vmHiDWfR0R3_m9QXRUXxfb41R9MqbkLyRmMiE98CmIeth7Q/exec",
