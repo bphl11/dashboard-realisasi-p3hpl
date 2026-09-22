@@ -77,20 +77,32 @@ async function rpdHandleCredentialResponse(response) {
     rpdSetLoginLoading(true);
 
     try {
+        console.log("RPD: mengirim autentikasi Google ke Apps Script...");
+
         const result = await rpdApiRequest("auth", {
             id_token: response.credential
         });
 
-        if (!result.ok || !result.user) {
-            rpdShowMessage(result.message || "Email Anda belum terdaftar sebagai Operator RPD.");
+        if (!result?.ok || !result?.user) {
+            rpdClearStoredUser();
+            rpdShowLogin();
+            rpdShowMessage(
+                result?.message || "Email Anda belum terdaftar sebagai Operator RPD."
+            );
             return;
         }
 
+        // Hanya simpan user setelah server Apps Script menyatakan
+        // token valid dan email masuk whitelist.
         rpdSetStoredUser(result.user);
         rpdShowApp(result.user);
+
+        // Setelah autentikasi sukses, baru ambil master/RPD tersimpan.
         await rpdInitData();
     } catch (error) {
         console.error("RPD login error:", error);
+        rpdClearStoredUser();
+        rpdShowLogin();
         rpdShowMessage(error.message || "Login RPD gagal.");
     } finally {
         rpdSetLoginLoading(false);
