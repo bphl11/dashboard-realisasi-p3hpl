@@ -223,7 +223,12 @@ function readRpd_(sheet) {
     const akun = String(row[index.AKUN] || "");
     const item = String(row[index.ITEM_AKUN] || "");
     const detil = String(row[index.DETIL_AKUN] || "");
-    const generatedId = existingId || makeRpdId_(tahun, kodeSub, sub, akun, item, detil);
+    const rincian = String(row[index.RINCIAN_ITEM] || "");
+    const paguDetil = parseAmount_(row[index.PAGU_DETIL]);
+    // ID lama yang kosong harus dapat dipadankan ke master. Sertakan rincian
+    // dan pagu sebagai bagian identitas agar akun yang sama dengan banyak baris
+    // tidak tertukar.
+    const generatedId = existingId || makeRpdId_(tahun, kodeSub, sub, akun, item, detil, rincian, paguDetil);
 
     return {
     id_rpd: generatedId,
@@ -233,6 +238,7 @@ function readRpd_(sheet) {
     akun: String(row[index.AKUN] || ""),
     item_akun: String(row[index.ITEM_AKUN] || ""),
     detil_akun: String(row[index.DETIL_AKUN] || ""),
+    rincian_item: String(row[index.RINCIAN_ITEM] || ""),
     pagu_detil: parseAmount_(row[index.PAGU_DETIL]),
     tw1: parseAmount_(row[index.TW1]),
     tw2: parseAmount_(row[index.TW2]),
@@ -269,16 +275,31 @@ function saveRpd_(idToken, row) {
   let targetRow = -1;
   let oldData = null;
 
+  const requestedId = String(row.id_rpd || "").trim();
   for (let i = 1; i < values.length; i++) {
-    if (String(values[i][index.ID_RPD] || "") === String(row.id_rpd)) {
+    const currentId = String(values[i][index.ID_RPD] || "").trim();
+    const sameId = requestedId && currentId === requestedId;
+    const sameIdentity =
+      String(values[i][index.TAHUN] || "") === String(row.tahun || "") &&
+      String(values[i][index.AKUN] || "").trim() === String(row.akun || "").trim() &&
+      String(values[i][index.ITEM_AKUN] || "").trim() === String(row.item_akun || "").trim() &&
+      String(values[i][index.DETIL_AKUN] || "").trim() === String(row.detil_akun || "").trim() &&
+      (
+        index.RINCIAN_ITEM === undefined ||
+        String(values[i][index.RINCIAN_ITEM] || "").trim() === String(row.rincian_item || "").trim()
+      ) &&
+      Number(values[i][index.PAGU_DETIL] || 0) === Number(pagu || 0);
+
+    if (sameId || (!currentId && sameIdentity)) {
       targetRow = i + 1;
       oldData = values[i].slice();
       break;
     }
   }
 
+  const stableId = String(row.id_rpd || "").trim() || makeRpdId_(row.tahun, row.kode_sub_komponen, row.sub_komponen, row.akun, row.item_akun, row.detil_akun, row.rincian_item, pagu);
   const record = {
-    id_rpd: String(row.id_rpd),
+    id_rpd: stableId,
     tahun: String(row.tahun || ""),
     kode_sub_komponen: String(row.kode_sub_komponen || ""),
     sub_komponen: String(row.sub_komponen || ""),
@@ -303,6 +324,7 @@ function saveRpd_(idToken, row) {
   output[index.AKUN] = record.akun;
   output[index.ITEM_AKUN] = record.item_akun;
   output[index.DETIL_AKUN] = record.detil_akun;
+  if (index.RINCIAN_ITEM !== undefined) output[index.RINCIAN_ITEM] = String(row.rincian_item || "");
   output[index.PAGU_DETIL] = record.pagu_detil;
   output[index.TW1] = record.tw1;
   output[index.TW2] = record.tw2;
@@ -342,8 +364,8 @@ function writeLog_(action, record, oldData, email) {
   ]);
 }
 
-function makeRpdId_(tahun, kodeSub, sub, akun, item, detil) {
-  return [tahun, kodeSub, sub, akun, item, detil]
+function makeRpdId_(tahun, kodeSub, sub, akun, item, detil, rincian, paguDetil) {
+  return [tahun, kodeSub, sub, akun, item, detil, rincian, paguDetil]
     .map(normalizeKey_)
     .join("|");
 }
