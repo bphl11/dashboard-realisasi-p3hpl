@@ -65,6 +65,14 @@ function rpdUniqueSorted(rows, key) {
         .sort((a, b) => a.localeCompare(b, "id"));
 }
 
+function rpdStableId(row) {
+    const normalize = value => String(value ?? "").trim().toUpperCase().replace(/\s+/g, " ").replace(/\|/g, "/");
+    return [
+        row.tahun, row.kodeSubKomponen, row.subKomponen, row.akun,
+        row.itemAkun, row.detilAkun, row.rincianItem, row.pagu
+    ].map(normalize).join("|");
+}
+
 function rpdNormalizeSavedRow(row) {
     const source = row && typeof row === "object" ? row : {};
     return {
@@ -471,7 +479,7 @@ function rpdBuildMasterRows(rawData) {
         out.push({
             rowIndex: i,
             sourceFormat: "RPD_RAW",
-            id_rpd: "RPD-" + i,
+            id_rpd: rpdStableId({ tahun: get(row, ["Tahun", "Tahun Anggaran"]) || new Date().getFullYear(), kodeSubKomponen: kodeSub, subKomponen: sub, akun: akun, itemAkun: item || "", detilAkun: detil || "", rincianItem: rincian || "", pagu: pagu }),
             tahun: get(row, ["Tahun", "Tahun Anggaran"]) || new Date().getFullYear(),
             kodeSubKomponen: kodeSub,
             subKomponen: sub,
@@ -526,7 +534,7 @@ async function rpdInitData() {
                 .filter(row => row.detilAkun && row.detilAkun !== "-")
                 .map(row => ({
                     ...row,
-                    id_rpd: "RPD-" + String(row.rowIndex),
+                    id_rpd: rpdStableId({ tahun: row.tahun || new Date().getFullYear(), kodeSubKomponen: row.kodeSubKomponen || row.subKomponen, subKomponen: row.subKomponen, akun: row.akun, itemAkun: row.itemAkun || "", detilAkun: row.detilAkun, rincianItem: row.rincianItem || "", pagu: Number(row.pagu) || 0 }),
                     tahun: row.tahun || new Date().getFullYear(),
                     kodeSubKomponen: row.kodeSubKomponen || row.subKomponen,
                     subKomponen: row.subKomponen,
