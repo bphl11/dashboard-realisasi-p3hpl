@@ -5,6 +5,19 @@
 // ============================================================
 
 async function rpdApiRequest(action, payload = {}) {
+    // Credential Google Identity Services (id_token) bersifat sementara.
+    // Jika Apps Script menyatakan token kedaluwarsa, jangan biarkan UI
+    // terlihat seperti "data hilang". Arahkan pengguna untuk login ulang.
+    const handleAuthExpired = () => {
+        if (typeof rpdClearStoredUser === "function") rpdClearStoredUser();
+        if (typeof rpdShowLogin === "function") rpdShowLogin();
+        if (typeof rpdShowMessage === "function") {
+            rpdShowMessage("Sesi Google RPD sudah kedaluwarsa. Silakan login Google kembali.", "warning");
+        }
+        if (typeof rpdInitGoogleLogin === "function") {
+            try { rpdInitGoogleLogin(); } catch (e) { console.warn(e); }
+        }
+    };
     if (!RPD_CONFIG.RPD_API_URL) {
         throw new Error("RPD_API_URL belum dikonfigurasi.");
     }
@@ -38,7 +51,11 @@ async function rpdApiRequest(action, payload = {}) {
     }
 
     if (result?.ok === false) {
-        throw new Error(result.message || "Permintaan RPD ditolak.");
+        const message = result.message || "Permintaan RPD ditolak.";
+        if (/token.*(valid|kadaluarsa|kedaluwarsa)|kedaluwarsa.*token|sesi.*(berakhir|kadaluarsa|kedaluwarsa)/i.test(message)) {
+            handleAuthExpired();
+        }
+        throw new Error(message);
     }
 
     return result;
