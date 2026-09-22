@@ -1,6 +1,6 @@
 // ============================================================
 // RPD MODULE
-// VERSION: 20260922-08-reschedule
+// VERSION: 20260922-09-realisasi-available-budget
 // VERSION: 20260922-07-legacy-week-migration
 // Input RPD per triwulan pada level Detil Akun.
 // ============================================================
@@ -120,6 +120,12 @@ function rpdMergeSavedRows(rows) {
 
     rpdExisting = [...byId.values()];
     rpdSaveLocalCache(rpdExisting);
+}
+
+function rpdDanaTersedia(row) {
+    const pagu = rpdNumber(row?.pagu);
+    const realisasi = rpdNumber(row?.realisasi);
+    return Math.max(pagu - realisasi, 0);
 }
 
 function rpdFormatRupiah(value) {
@@ -280,12 +286,14 @@ function rpdRefreshFilters(options = {}) {
 function rpdRenderDetilTable() {
     const tbody=document.getElementById("rpdTableBody"); if(!tbody)return;
     const rows=rpdGetFilteredRows();
-    if(!rows.length){tbody.innerHTML='<tr><td colspan="9" class="text-center text-muted py-4">Pilih Sub Komponen dan/atau Akun untuk menampilkan Detil.</td></tr>';return;}
+    if(!rows.length){tbody.innerHTML='<tr><td colspan="10" class="text-center text-muted py-4">Pilih Sub Komponen dan/atau Akun untuk menampilkan Detil.</td></tr>';return;}
     tbody.innerHTML=rows.map(row=>{
         const saved=rpdFindSavedForMaster(row)||RPD_EMPTY, q=rpdQuarterTotals(saved);
-        const total=q.tw1+q.tw2+q.tw3+q.tw4, sisa=Math.max(rpdNumber(row.pagu)-total,0);
+        const realisasi=rpdNumber(row.realisasi);
+        const danaTersedia=rpdDanaTersedia(row);
+        const total=q.tw1+q.tw2+q.tw3+q.tw4, sisa=Math.max(danaTersedia-total,0);
         return '<tr><td><strong>'+rpdEsc(row.itemAkun?row.itemAkun+" — ":"")+rpdEsc(row.akun)+'</strong><div class="small text-muted">'+(row.detilAkun?'Detil: '+rpdEsc(row.detilAkun):'Detil: -')+'</div><div class="small">'+(row.rincianItem?'Rincian: '+rpdEsc(row.rincianItem):'')+'</div></td>'+
-        '<td class="text-end">'+rpdFormatRupiah(row.pagu)+'</td><td class="text-end">'+rpdFormatRupiah(q.tw1)+'</td><td class="text-end">'+rpdFormatRupiah(q.tw2)+'</td><td class="text-end">'+rpdFormatRupiah(q.tw3)+'</td><td class="text-end">'+rpdFormatRupiah(q.tw4)+'</td><td class="text-end fw-bold">'+rpdFormatRupiah(total)+'</td><td class="text-end">'+rpdFormatRupiah(sisa)+'</td>'+
+        '<td class="text-end">'+rpdFormatRupiah(row.pagu)+'</td><td class="text-end">'+rpdFormatRupiah(realisasi)+'</td><td class="text-end">'+rpdFormatRupiah(danaTersedia)+'</td><td class="text-end">'+rpdFormatRupiah(q.tw1)+'</td><td class="text-end">'+rpdFormatRupiah(q.tw2)+'</td><td class="text-end">'+rpdFormatRupiah(q.tw3)+'</td><td class="text-end">'+rpdFormatRupiah(q.tw4)+'</td><td class="text-end fw-bold">'+rpdFormatRupiah(total)+'</td><td class="text-end">'+rpdFormatRupiah(sisa)+'</td>'+
         '<td><button type="button" class="btn btn-sm btn-success rpd-edit-btn" data-rpd-id="'+rpdEsc(row.id_rpd)+'"><i class="bi bi-pencil-square"></i> Input/Edit</button></td></tr>';
     }).join("");
     tbody.querySelectorAll(".rpd-edit-btn").forEach(button=>button.addEventListener("click",function(){rpdOpenEditor(this.dataset.rpdId);}));
@@ -325,6 +333,12 @@ function rpdOpenEditor(id) {
     document.getElementById("rpdEditItem").textContent=row.itemAkun||"-";
     document.getElementById("rpdEditRincian").textContent=row.rincianItem?"Rincian: "+row.rincianItem:"";
     document.getElementById("rpdEditPagu").textContent=rpdFormatRupiah(row.pagu);
+    const realisasi=rpdNumber(row.realisasi);
+    const danaTersedia=rpdDanaTersedia(row);
+    const realisasiEl=document.getElementById("rpdEditRealisasi");
+    const danaTersediaEl=document.getElementById("rpdEditDanaTersedia");
+    if(realisasiEl) realisasiEl.textContent=rpdFormatRupiah(realisasi);
+    if(danaTersediaEl) danaTersediaEl.textContent=rpdFormatRupiah(danaTersedia);
     RPD_WEEK_FIELDS.forEach(key=>{const el=document.getElementById("rpd_"+key);if(el)el.value=rpdNumber(saved[key])||"";});
     document.getElementById("rpdCatatan").value=saved.catatan||"";
     rpdUpdateEditorTotal();
@@ -333,16 +347,18 @@ function rpdOpenEditor(id) {
 
 function rpdUpdateEditorTotal() {
     const pagu=rpdNumber(rpdCurrentSelection?.pagu);
+    const realisasi=rpdNumber(rpdCurrentSelection?.realisasi);
+    const danaTersedia=Math.max(pagu-realisasi,0);
     const q={1:0,2:0,3:0,4:0};
     let total=0, negative=false;
     RPD_MONTHS.forEach(month=>{for(let week=1;week<=4;week++){const v=rpdNumber(document.getElementById("rpd_"+month.key+"_m"+week)?.value);q[month.tw]+=v;total+=v;if(v<0)negative=true;}});
-    const valid=!negative&&total<=pagu;
+    const valid=!negative&&total<=danaTersedia;
     ["rpdTw1Summary","rpdTw2Summary","rpdTw3Summary","rpdTw4Summary"].forEach((id,i)=>document.getElementById(id).textContent=rpdFormatRupiah(q[i+1]));
     document.getElementById("rpdEditTotal").textContent=rpdFormatRupiah(total);
-    document.getElementById("rpdEditSisa").textContent=rpdFormatRupiah(Math.max(pagu-total,0));
+    document.getElementById("rpdEditSisa").textContent=rpdFormatRupiah(Math.max(danaTersedia-total,0));
     const state=document.getElementById("rpdEditValidation");
     state.className="small mt-2 "+(valid?"text-success":"text-danger");
-    state.textContent=negative?"Tidak valid: nilai mingguan tidak boleh negatif.":(valid?"Valid: total 48 minggu tidak melebihi pagu.":"Tidak valid: total 48 minggu melebihi pagu.");
+    state.textContent=negative?"Tidak valid: nilai mingguan tidak boleh negatif.":(valid?"Valid: total RPD tidak melebihi dana tersedia setelah realisasi.":"Tidak valid: total RPD melebihi dana tersedia setelah realisasi.");
     document.getElementById("rpdSaveButton").disabled=!valid;
 }
 
@@ -370,7 +386,9 @@ async function rpdSave() {
 
     const total=RPD_WEEK_FIELDS.reduce((sum,key)=>sum+payload[key],0);
     if(RPD_WEEK_FIELDS.some(key=>payload[key]<0)){rpdSetStatus("Nilai RPD mingguan tidak boleh negatif.","danger");return;}
-    if(total>payload.pagu_detil){rpdSetStatus("Total RPD 48 minggu melebihi pagu detil.","danger");return;}
+    const realisasiTerkini=rpdNumber(rpdCurrentSelection?.realisasi);
+    const danaTersedia=Math.max(rpdNumber(payload.pagu_detil)-realisasiTerkini,0);
+    if(total>danaTersedia){rpdSetStatus("Total RPD 48 minggu melebihi dana tersedia setelah realisasi.","danger");return;}
     const q={1:0,2:0,3:0,4:0};
     RPD_MONTHS.forEach(month=>{for(let week=1;week<=4;week++)q[month.tw]+=payload[month.key+"_m"+week];});
     payload.tw1=q[1];payload.tw2=q[2];payload.tw3=q[3];payload.tw4=q[4];payload.total_rpd=total;
@@ -758,7 +776,8 @@ function rpdBuildMasterRows(rawData) {
             itemAkun: item || "",
             detilAkun: detil || "",
             rincianItem: rincian || "",
-            pagu: pagu
+            pagu: pagu,
+            realisasi: money(get(row, ["Realisasi", "Jumlah Realisasi"]))
         });
     }
 
@@ -814,7 +833,8 @@ async function rpdInitData() {
                     akun: row.akun,
                     itemAkun: row.itemAkun || "",
                     detilAkun: row.detilAkun,
-                    pagu: Number(row.pagu) || 0
+                    pagu: Number(row.pagu) || 0,
+                    realisasi: Number(row.realisasi) || 0
                 }));
         }
 
