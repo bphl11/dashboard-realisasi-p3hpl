@@ -1,5 +1,6 @@
 // ============================================================
 // RPD MODULE
+// VERSION: 20260922-08-reschedule
 // VERSION: 20260922-07-legacy-week-migration
 // Input RPD per triwulan pada level Detil Akun.
 // ============================================================
@@ -8,6 +9,7 @@ let rpdUser = null;
 let rpdMasterRows = [];
 let rpdExisting = [];
 let rpdCurrentSelection = null;
+let rpdOriginalWeekly = {};
 
 const RPD_MONTHS = [
     { key: "jan", label: "Januari", tw: 1 }, { key: "feb", label: "Februari", tw: 1 },
@@ -315,6 +317,7 @@ function rpdFindSavedForMaster(masterRow) {
 function rpdOpenEditor(id) {
     const row=rpdMasterRows.find(r=>String(r.id_rpd)===String(id)); if(!row)return;
     const saved=rpdFindSavedForMaster(row)||RPD_EMPTY; rpdCurrentSelection=row;
+    rpdOriginalWeekly = Object.fromEntries(RPD_WEEK_FIELDS.map(key => [key, rpdNumber(saved?.[key])]));
     document.getElementById("rpdEditId").value=row.id_rpd;
     document.getElementById("rpdEditLabel").textContent=row.detilAkun||"-";
     document.getElementById("rpdEditSub").textContent=row.subKomponen||"-";
@@ -347,6 +350,24 @@ async function rpdSave() {
     if(!rpdCurrentSelection||!rpdUser)return;
     const payload={id_rpd:rpdCurrentSelection.id_rpd,tahun:rpdCurrentSelection.tahun,kode_sub_komponen:rpdCurrentSelection.kodeSubKomponen,sub_komponen:rpdCurrentSelection.subKomponen,akun:rpdCurrentSelection.akun,item_akun:rpdCurrentSelection.itemAkun,detil_akun:rpdCurrentSelection.detilAkun,rincian_item:rpdCurrentSelection.rincianItem,pagu_detil:rpdCurrentSelection.pagu,catatan:document.getElementById("rpdCatatan").value.trim()};
     RPD_WEEK_FIELDS.forEach(key=>payload[key]=rpdNumber(document.getElementById("rpd_"+key)?.value));
+
+    // MODE EDIT/JADWAL ULANG:
+    // Jika record sebelumnya hanya memiliki satu minggu berisi nilai,
+    // lalu operator memasukkan nilai pada minggu lain, anggap ini
+    // sebagai pemindahan jadwal (mis. Oktober M4 -> Oktober M1).
+    // Minggu lama dikosongkan agar operator tidak perlu menghapus
+    // nilai lama secara manual. Jika sebelumnya ada beberapa minggu
+    // terisi, semua nilai dipertahankan sehingga pembagian tetap aman.
+    const originalFilled = RPD_WEEK_FIELDS.filter(key => rpdNumber(rpdOriginalWeekly[key]) > 0);
+    const currentFilled = RPD_WEEK_FIELDS.filter(key => rpdNumber(payload[key]) > 0);
+    if (originalFilled.length === 1 && currentFilled.length >= 2) {
+        const oldField = originalFilled[0];
+        const newFields = currentFilled.filter(key => key !== oldField);
+        if (newFields.length === 1) {
+            payload[oldField] = 0;
+        }
+    }
+
     const total=RPD_WEEK_FIELDS.reduce((sum,key)=>sum+payload[key],0);
     if(RPD_WEEK_FIELDS.some(key=>payload[key]<0)){rpdSetStatus("Nilai RPD mingguan tidak boleh negatif.","danger");return;}
     if(total>payload.pagu_detil){rpdSetStatus("Total RPD 48 minggu melebihi pagu detil.","danger");return;}
