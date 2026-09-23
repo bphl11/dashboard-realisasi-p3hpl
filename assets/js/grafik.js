@@ -50,6 +50,41 @@ let chartPersentase = null;
 let grafikRpdBulanan = Array(12).fill(0);
 let grafikRpdTotal = 0;
 
+function hitungRpdBulananGrafik(rows, tersedia = true) {
+    const fields = [
+        ["jan_m1","jan_m2","jan_m3","jan_m4"],
+        ["feb_m1","feb_m2","feb_m3","feb_m4"],
+        ["mar_m1","mar_m2","mar_m3","mar_m4"],
+        ["apr_m1","apr_m2","apr_m3","apr_m4"],
+        ["mei_m1","mei_m2","mei_m3","mei_m4"],
+        ["jun_m1","jun_m2","jun_m3","jun_m4"],
+        ["jul_m1","jul_m2","jul_m3","jul_m4"],
+        ["agu_m1","agu_m2","agu_m3","agu_m4"],
+        ["sep_m1","sep_m2","sep_m3","sep_m4"],
+        ["okt_m1","okt_m2","okt_m3","okt_m4"],
+        ["nov_m1","nov_m2","nov_m3","nov_m4"],
+        ["des_m1","des_m2","des_m3","des_m4"]
+    ];
+
+    const bulanan = Array(12).fill(0);
+
+    (Array.isArray(rows) ? rows : []).forEach(function (row) {
+        fields.forEach(function (monthFields, monthIndex) {
+            monthFields.forEach(function (field) {
+                bulanan[monthIndex] += Number(row?.[field]) || 0;
+            });
+        });
+    });
+
+    return {
+        bulanan: bulanan,
+        total: bulanan.reduce(function (sum, value) {
+            return sum + value;
+        }, 0),
+        tersedia: tersedia
+    };
+}
+
 async function ambilRpdBulananGrafik() {
     const kosong = { bulanan: Array(12).fill(0), total: 0, tersedia: false };
 
@@ -58,7 +93,21 @@ async function ambilRpdBulananGrafik() {
         const user = rawUser ? JSON.parse(rawUser) : null;
         const token = String(user?.id_token || "").trim();
 
-        if (!token) return kosong;
+        if (!token) {
+            // Grafik dan halaman RPD dapat berada pada tab berbeda.
+            // sessionStorage tidak dibagi antar-tab, sehingga gunakan
+            // cache RPD lokal yang memang sudah dipelihara oleh modul RPD.
+            try {
+                const rawCache = localStorage.getItem("p3hpl_rpd_saved_v4");
+                const cachedRows = rawCache ? JSON.parse(rawCache) : [];
+                if (Array.isArray(cachedRows) && cachedRows.length) {
+                    return hitungRpdBulananGrafik(cachedRows, true);
+                }
+            } catch (error) {
+                console.warn("Cache RPD lokal tidak dapat dibaca:", error);
+            }
+            return kosong;
+        }
 
         const apiUrl =
             typeof RPD_CONFIG !== "undefined"
@@ -89,6 +138,9 @@ async function ambilRpdBulananGrafik() {
         }
 
         const rows = Array.isArray(result.rpd) ? result.rpd : [];
+        return hitungRpdBulananGrafik(rows, true);
+
+        /* legacy parsing retained below for reference only */
         const fields = [
             ["jan_m1","jan_m2","jan_m3","jan_m4"],
             ["feb_m1","feb_m2","feb_m3","feb_m4"],
@@ -104,23 +156,6 @@ async function ambilRpdBulananGrafik() {
             ["des_m1","des_m2","des_m3","des_m4"]
         ];
 
-        const bulanan = Array(12).fill(0);
-
-        rows.forEach(function (row) {
-            fields.forEach(function (monthFields, monthIndex) {
-                monthFields.forEach(function (field) {
-                    bulanan[monthIndex] += Number(row?.[field]) || 0;
-                });
-            });
-        });
-
-        return {
-            bulanan: bulanan,
-            total: bulanan.reduce(function (sum, value) {
-                return sum + value;
-            }, 0),
-            tersedia: true
-        };
     } catch (error) {
         console.warn("RPD grafik tidak dapat dimuat:", error);
         return kosong;
