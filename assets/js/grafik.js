@@ -9,7 +9,7 @@
 // - Chart.js
 //
 // GRAFIK:
-// 1. Realisasi Bulanan
+// 1. Realisasi + RPD Bulanan
 // 2. Normal vs Diblokir
 // 3. Pagu vs Realisasi vs Sisa
 // 4. Persentase Penyerapan
@@ -46,6 +46,89 @@ let chartStatusAnggaran = null;
 let chartPerbandingan = null;
 
 let chartPersentase = null;
+
+let grafikRpdBulanan = Array(12).fill(0);
+
+let grafikRpdTotal = 0;
+
+function ambilRpdBulananGrafik() {
+    const kosong = { bulanan: Array(12).fill(0), total: 0, tersedia: false };
+
+    try {
+        const rawUser = sessionStorage.getItem("p3hpl_rpd_user_v1");
+        const user = rawUser ? JSON.parse(rawUser) : null;
+        const token = String(user?.id_token || "").trim();
+
+        if (!token) return Promise.resolve(kosong);
+
+        const apiUrl =
+            typeof RPD_CONFIG !== "undefined"
+                ? String(RPD_CONFIG.RPD_PROXY_URL || RPD_CONFIG.RPD_API_URL || "").trim()
+                : "";
+
+        if (!apiUrl) return Promise.resolve(kosong);
+
+        return fetch(apiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({ action: "list", id_token: token }),
+            redirect: "follow",
+            credentials: "omit",
+            cache: "no-store"
+        }).then(function (response) {
+            return response.text().then(function (text) {
+                let result;
+                try {
+                    result = JSON.parse(text);
+                } catch (error) {
+                    throw new Error("Respons RPD bukan JSON yang valid.");
+                }
+
+                if (!response.ok || result?.ok === false) {
+                    throw new Error(result?.message || "Data RPD tidak dapat dibaca.");
+                }
+
+                const rows = Array.isArray(result.rpd) ? result.rpd : [];
+                const fields = [
+                    "jan_m1","jan_m2","jan_m3","jan_m4",
+                    "feb_m1","feb_m2","feb_m3","feb_m4",
+                    "mar_m1","mar_m2","mar_m3","mar_m4",
+                    "apr_m1","apr_m2","apr_m3","apr_m4",
+                    "mei_m1","mei_m2","mei_m3","mei_m4",
+                    "jun_m1","jun_m2","jun_m3","jun_m4",
+                    "jul_m1","jul_m2","jul_m3","jul_m4",
+                    "agu_m1","agu_m2","agu_m3","agu_m4",
+                    "sep_m1","sep_m2","sep_m3","sep_m4",
+                    "okt_m1","okt_m2","okt_m3","okt_m4",
+                    "nov_m1","nov_m2","nov_m3","nov_m4",
+                    "des_m1","des_m2","des_m3","des_m4"
+                ];
+                const bulanan = Array(12).fill(0);
+
+                rows.forEach(function (row) {
+                    for (let month = 0; month < 12; month++) {
+                        const start = month * 4;
+                        for (let week = 0; week < 4; week++) {
+                            bulanan[month] += Number(row?.[fields[start + week]]) || 0;
+                        }
+                    }
+                });
+
+                return {
+                    bulanan,
+                    total: bulanan.reduce((sum, value) => sum + value, 0),
+                    tersedia: true
+                };
+            });
+        }).catch(function (error) {
+            console.warn("RPD grafik tidak dapat dimuat:", error);
+            return kosong;
+        });
+    } catch (error) {
+        console.warn("RPD grafik gagal membaca sesi login:", error);
+        return Promise.resolve(kosong);
+    }
+}
 
 
 // ============================================================
@@ -237,6 +320,17 @@ document.addEventListener(
 
             const totalData = { ...calculation.total, bulanan: ambilDataUtamaGrafik(grafikRawData).bulanan };
 
+            const rpdGrafik = await ambilRpdBulananGrafik();
+            grafikRpdBulanan = rpdGrafik.bulanan;
+            grafikRpdTotal = rpdGrafik.total;
+
+            const statusRpdGrafik = document.getElementById("statusRpdGrafik");
+            if (statusRpdGrafik) {
+                statusRpdGrafik.textContent = rpdGrafik.tersedia
+                    ? "RPD terisi: " + formatRupiahGrafik(grafikRpdTotal)
+                    : "RPD belum dapat dimuat pada sesi ini. Login pada halaman RPD untuk menampilkan RPD terisi.";
+            }
+
 
             console.log(
 
@@ -280,7 +374,9 @@ document.addEventListener(
 
             buatGrafikBulanan(
 
-                totalData.bulanan
+                totalData.bulanan,
+
+                grafikRpdBulanan
 
             );
 
@@ -530,7 +626,8 @@ function tampilkanCardGrafik(
 // ============================================================
 
 function buatGrafikBulanan(
-    bulanan
+    bulanan,
+    rpdBulanan = Array(12).fill(0)
 ) {
 
     const canvas =
@@ -639,7 +736,7 @@ function buatGrafikBulanan(
 
                             label:
 
-                                "Realisasi Bulanan",
+                                "Realisasi",
 
 
                             data:
@@ -656,6 +753,30 @@ function buatGrafikBulanan(
 
                                 "rgb(25, 135, 84)",
 
+
+                            borderWidth:
+
+                                1
+
+                        },
+
+                        {
+
+                            label:
+
+                                "RPD Terisi",
+
+                            data:
+
+                                rpdBulanan,
+
+                            backgroundColor:
+
+                                "rgba(13, 110, 253, 0.55)",
+
+                            borderColor:
+
+                                "rgb(13, 110, 253)",
 
                             borderWidth:
 
@@ -700,7 +821,7 @@ function buatGrafikBulanan(
 
                                         return (
 
-                                            "Realisasi: "
+                                            context.dataset.label + ": "
 
                                             +
 
@@ -997,1205 +1118,3 @@ function buatGrafikStatusAnggaran(
                                             +
 
                                             ": "
-
-                                            +
-
-                                            formatRupiahGrafik(
-
-                                                context.raw
-
-                                            )
-
-                                        );
-
-                                    },
-
-
-                                afterBody:
-
-                                    function (
-                                        tooltipItems
-                                    ) {
-
-                                        if (
-                                            !tooltipItems ||
-                                            tooltipItems.length === 0
-                                        ) {
-
-                                            return "";
-
-                                        }
-
-
-                                        const index =
-
-                                            tooltipItems[0]
-                                                .dataIndex;
-
-
-                                        const statusData =
-
-                                            index === 0
-
-                                                ? data.normal
-
-                                                : data.diblokir;
-
-
-                                        return [
-
-                                            "Sisa: " +
-
-                                            formatRupiahGrafik(
-
-                                                statusData.sisa
-
-                                            ),
-
-
-                                            "Persentase: " +
-
-                                            formatPersenGrafik(
-
-                                                statusData.persen
-
-                                            )
-
-                                        ];
-
-                                    }
-
-                            }
-
-                        }
-
-                    },
-
-
-                    scales: {
-
-                        y: {
-
-                            beginAtZero:
-                                true,
-
-
-                            ticks: {
-
-                                callback:
-
-                                    function (
-                                        value
-                                    ) {
-
-                                        return (
-
-                                            formatSingkatRupiah(
-
-                                                value
-
-                                            )
-
-                                        );
-
-                                    }
-
-                            }
-
-                        }
-
-                    }
-
-                }
-
-            }
-
-        );
-
-}
-
-
-
-// ============================================================
-// GRAFIK PERBANDINGAN
-//
-// Pagu
-// Realisasi
-// Sisa Anggaran
-// ============================================================
-
-function buatGrafikPerbandingan(
-    data
-) {
-
-    const canvas =
-
-        document.getElementById(
-
-            "grafikPerbandingan"
-
-        );
-
-
-    if (!canvas) {
-
-        console.warn(
-
-            "Canvas grafikPerbandingan tidak ditemukan."
-
-        );
-
-
-        return;
-
-    }
-
-
-    if (
-        typeof Chart ===
-        "undefined"
-    ) {
-
-        return;
-
-    }
-
-
-    if (chartPerbandingan) {
-
-        chartPerbandingan.destroy();
-
-    }
-
-
-    chartPerbandingan =
-
-        new Chart(
-
-            canvas,
-
-            {
-
-                plugins: [directValueLabelsPlugin],
-
-                type:
-                    "bar",
-
-
-                data: {
-
-                    labels: [
-
-                        "Pagu",
-
-                        "Realisasi",
-
-                        "Sisa Anggaran"
-
-                    ],
-
-
-                    datasets: [
-
-                        {
-
-                            label:
-
-                                "Nilai Anggaran",
-
-
-                            data: [
-
-                                data.pagu,
-
-                                data.realisasi,
-
-                                data.sisa
-
-                            ],
-
-
-                            backgroundColor: [
-
-                                "rgba(13, 110, 253, 0.70)",
-
-                                "rgba(25, 135, 84, 0.70)",
-
-                                "rgba(108, 117, 125, 0.70)"
-
-                            ],
-
-
-                            borderWidth:
-
-                                1
-
-                        }
-
-                    ]
-
-                },
-
-
-                options: {
-
-                    responsive:
-                        true,
-
-
-                    maintainAspectRatio:
-                        false,
-
-
-                    plugins: {
-
-                        legend: {
-
-                            display:
-                                false
-
-                        },
-
-
-                        tooltip: {
-
-                            callbacks: {
-
-                                label:
-
-                                    function (
-                                        context
-                                    ) {
-
-                                        return (
-
-                                            formatRupiahGrafik(
-
-                                                context.raw
-
-                                            )
-
-                                        );
-
-                                    }
-
-                            }
-
-                        }
-
-                    },
-
-
-                    scales: {
-
-                        y: {
-
-                            beginAtZero:
-                                true,
-
-
-                            ticks: {
-
-                                callback:
-
-                                    function (
-                                        value
-                                    ) {
-
-                                        return (
-
-                                            formatSingkatRupiah(
-
-                                                value
-
-                                            )
-
-                                        );
-
-                                    }
-
-                            }
-
-                        }
-
-                    }
-
-                }
-
-            }
-
-        );
-
-}
-
-
-
-// ============================================================
-// GRAFIK PERSENTASE PENYERAPAN
-//
-// Doughnut:
-// Realisasi
-// Sisa
-// ============================================================
-
-function buatGrafikPersentase(
-    data
-) {
-
-    const canvas =
-
-        document.getElementById(
-
-            "grafikPersentase"
-
-        );
-
-
-    if (!canvas) {
-
-        console.warn(
-
-            "Canvas grafikPersentase tidak ditemukan."
-
-        );
-
-
-        return;
-
-    }
-
-
-    if (
-        typeof Chart ===
-        "undefined"
-    ) {
-
-        return;
-
-    }
-
-
-    if (chartPersentase) {
-
-        chartPersentase.destroy();
-
-    }
-
-
-    chartPersentase =
-
-        new Chart(
-
-            canvas,
-
-            {
-
-                plugins: [directValueLabelsPlugin],
-
-                type:
-                    "doughnut",
-
-
-                data: {
-
-                    labels: [
-
-                        "Realisasi",
-
-                        "Sisa Anggaran"
-
-                    ],
-
-
-                    datasets: [
-
-                        {
-
-                            data: [
-
-                                data.realisasi,
-
-                                data.sisa
-
-                            ],
-
-
-                            backgroundColor: [
-
-                                "rgba(25, 135, 84, 0.80)",
-
-                                "rgba(222, 226, 230, 0.90)"
-
-                            ],
-
-
-                            borderWidth:
-
-                                1
-
-                        }
-
-                    ]
-
-                },
-
-
-                options: {
-
-                    responsive:
-                        true,
-
-
-                    maintainAspectRatio:
-                        false,
-
-
-                    cutout:
-                        "65%",
-
-
-                    plugins: {
-
-                        legend: {
-
-                            position:
-                                "top"
-
-                        },
-
-
-                        tooltip: {
-
-                            callbacks: {
-
-                                label:
-
-                                    function (
-                                        context
-                                    ) {
-
-                                        const nilai =
-
-                                            context.raw || 0;
-
-
-                                        return (
-
-                                            context.label
-
-                                            +
-
-                                            ": "
-
-                                            +
-
-                                            formatRupiahGrafik(
-
-                                                nilai
-
-                                            )
-
-                                        );
-
-                                    }
-
-                            }
-
-                        }
-
-                    }
-
-                }
-
-            }
-
-        );
-
-}
-
-
-
-// ============================================================
-// PARSE NUMBER
-// ============================================================
-
-function parseNumberGrafik(
-    value
-) {
-
-    if (
-        value === null ||
-        value === undefined
-    ) {
-
-        return null;
-
-    }
-
-
-    let text =
-
-        String(
-
-            value
-
-        ).trim();
-
-
-    if (
-        text === "" ||
-        text === "-"
-    ) {
-
-        return null;
-
-    }
-
-
-    if (
-        text.includes(
-            "%"
-        )
-    ) {
-
-        return null;
-
-    }
-
-
-    // ========================================================
-    // HAPUS Rp
-    // ========================================================
-
-    text =
-
-        text.replace(
-
-            /Rp/gi,
-
-            ""
-
-        );
-
-
-    // ========================================================
-    // HAPUS SPASI
-    // ========================================================
-
-    text =
-
-        text.replace(
-
-            /\s/g,
-
-            ""
-
-        );
-
-
-    // ========================================================
-    // TITIK + KOMA
-    // ========================================================
-
-    if (
-        text.includes(
-            "."
-        ) &&
-        text.includes(
-            ","
-        )
-    ) {
-
-        const lastDot =
-
-            text.lastIndexOf(
-                "."
-            );
-
-
-        const lastComma =
-
-            text.lastIndexOf(
-                ","
-            );
-
-
-        // ====================================================
-        // FORMAT INDONESIA
-        // 3.133.003.500,00
-        // ====================================================
-
-        if (
-            lastComma >
-            lastDot
-        ) {
-
-            text =
-
-                text.replace(
-
-                    /\./g,
-
-                    ""
-
-                );
-
-
-            text =
-
-                text.replace(
-
-                    ",",
-
-                    "."
-
-                );
-
-        }
-
-
-        // ====================================================
-        // FORMAT INTERNASIONAL
-        // 3,133,003,500.00
-        // ====================================================
-
-        else {
-
-            text =
-
-                text.replace(
-
-                    /,/g,
-
-                    ""
-
-                );
-
-        }
-
-    }
-
-
-    // ========================================================
-    // HANYA TITIK
-    // ========================================================
-
-    else if (
-        text.includes(
-            "."
-        )
-    ) {
-
-        const bagian =
-
-            text.split(
-                "."
-            );
-
-
-        if (
-            bagian.length > 1 &&
-            bagian
-                .slice(
-                    1
-                )
-                .every(
-
-                    function (
-                        x
-                    ) {
-
-                        return (
-
-                            x.length ===
-                            3
-
-                        );
-
-                    }
-
-                )
-        ) {
-
-            text =
-
-                bagian.join(
-                    ""
-                );
-
-        }
-
-    }
-
-
-    // ========================================================
-    // HANYA KOMA
-    // ========================================================
-
-    else if (
-        text.includes(
-            ","
-        )
-    ) {
-
-        const bagian =
-
-            text.split(
-                ","
-            );
-
-
-        if (
-            bagian.length > 1 &&
-            bagian
-                .slice(
-                    1
-                )
-                .every(
-
-                    function (
-                        x
-                    ) {
-
-                        return (
-
-                            x.length ===
-                            3
-
-                        );
-
-                    }
-
-                )
-        ) {
-
-            text =
-
-                bagian.join(
-                    ""
-                );
-
-        }
-
-        else {
-
-            text =
-
-                text.replace(
-
-                    ",",
-
-                    "."
-
-                );
-
-        }
-
-    }
-
-
-    // ========================================================
-    // SISAKAN ANGKA
-    // ========================================================
-
-    text =
-
-        text.replace(
-
-            /[^0-9.-]/g,
-
-            ""
-
-        );
-
-
-    if (!text) {
-
-        return null;
-
-    }
-
-
-    const number =
-
-        Number(
-            text
-        );
-
-
-    if (
-        !Number.isFinite(
-            number
-        )
-    ) {
-
-        return null;
-
-    }
-
-
-    return number;
-
-}
-
-
-
-// ============================================================
-// FORMAT RUPIAH
-// ============================================================
-
-function formatRupiahGrafik(
-    value
-) {
-
-    const number =
-
-        Number(
-            value
-        ) || 0;
-
-
-    return (
-
-        "Rp"
-
-        +
-
-        Math.round(
-
-            number
-
-        ).toLocaleString(
-
-            "id-ID"
-
-        )
-
-    );
-
-}
-
-
-
-// ============================================================
-// FORMAT RUPIAH SINGKAT
-// ============================================================
-
-function formatSingkatRupiah(
-    value
-) {
-
-    const number =
-
-        Number(
-            value
-        ) || 0;
-
-
-    // ========================================================
-    // MILIAR
-    // ========================================================
-
-    if (
-        number >=
-        1000000000
-    ) {
-
-        return (
-
-            "Rp"
-
-            +
-
-            (
-                number /
-                1000000000
-            )
-                .toLocaleString(
-
-                    "id-ID",
-
-                    {
-
-                        maximumFractionDigits:
-                            1
-
-                    }
-
-                )
-
-            +
-
-            " M"
-
-        );
-
-    }
-
-
-    // ========================================================
-    // JUTA
-    // ========================================================
-
-    if (
-        number >=
-        1000000
-    ) {
-
-        return (
-
-            "Rp"
-
-            +
-
-            (
-                number /
-                1000000
-            )
-                .toLocaleString(
-
-                    "id-ID",
-
-                    {
-
-                        maximumFractionDigits:
-                            1
-
-                    }
-
-                )
-
-            +
-
-            " Jt"
-
-        );
-
-    }
-
-
-    // ========================================================
-    // RIBU
-    // ========================================================
-
-    if (
-        number >=
-        1000
-    ) {
-
-        return (
-
-            "Rp"
-
-            +
-
-            (
-                number /
-                1000
-            )
-                .toLocaleString(
-
-                    "id-ID",
-
-                    {
-
-                        maximumFractionDigits:
-                            1
-
-                    }
-
-                )
-
-            +
-
-            " Rb"
-
-        );
-
-    }
-
-
-    return (
-
-        "Rp"
-
-        +
-
-        number.toLocaleString(
-
-            "id-ID"
-
-        )
-
-    );
-
-}
-
-
-
-// ============================================================
-// FORMAT PERSEN
-// ============================================================
-
-function formatPersenGrafik(
-    value
-) {
-
-    const number =
-
-        Number(
-            value
-        ) || 0;
-
-
-    return (
-
-        number.toLocaleString(
-
-            "id-ID",
-
-            {
-
-                minimumFractionDigits:
-                    2,
-
-                maximumFractionDigits:
-                    2
-
-            }
-
-        )
-
-        +
-
-        "%"
-
-    );
-
-}
-
-
-
-// ============================================================
-// SET TEXT
-// ============================================================
-
-function setTextGrafik(
-    id,
-    value
-) {
-
-    const element =
-
-        document.getElementById(
-
-            id
-
-        );
-
-
-    if (element) {
-
-        element.textContent =
-
-            value;
-
-    }
-
-}
-
-
-
-// ============================================================
-// CLEAN TEXT
-// ============================================================
-
-function cleanGrafik(
-    value
-) {
-
-    if (
-        value === null ||
-        value === undefined
-    ) {
-
-        return "";
-
-    }
-
-
-    return String(
-
-        value
-
-    )
-
-        .replace(
-
-            /\s+/g,
-
-            " "
-
-        )
-
-        .trim();
-
-}
-
-
-
-// ============================================================
-// ESCAPE HTML
-// ============================================================
-
-function escapeHtmlGrafik(
-    value
-) {
-
-    return String(
-
-        value ?? ""
-
-    )
-
-        .replace(
-
-            /&/g,
-
-            "&amp;"
-
-        )
-
-        .replace(
-
-            /</g,
-
-            "&lt;"
-
-        )
-
-        .replace(
-
-            />/g,
-
-            "&gt;"
-
-        )
-
-        .replace(
-
-            /"/g,
-
-            "&quot;"
-
-        )
-
-        .replace(
-
-            /'/g,
-
-            "&#039;"
-
-        );
-
-}
