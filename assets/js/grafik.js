@@ -357,9 +357,13 @@ document.addEventListener(
             grafikRpdTotal = rpdGrafik.total;
 
             // Persentase gabungan = (Realisasi + RPD Terisi) / Pagu.
+            // Nilai gabungan untuk kartu: Realisasi + RPD.
+            totalData.realisasiRpd = (Number(totalData.realisasi) || 0) + grafikRpdTotal;
+            totalData.sisaRpd = Math.max((Number(totalData.pagu) || 0) - totalData.realisasiRpd, 0);
+
             if (Number(totalData.pagu) > 0) {
                 totalData.persen = (
-                    ((Number(totalData.realisasi) || 0) + grafikRpdTotal) /
+                    totalData.realisasiRpd /
                     Number(totalData.pagu)
                 ) * 100;
             } else {
@@ -628,7 +632,7 @@ function tampilkanCardGrafik(
 
         formatRupiahGrafik(
 
-            data.realisasi
+            data.realisasiRpd ?? data.realisasi
 
         )
 
@@ -641,7 +645,7 @@ function tampilkanCardGrafik(
 
         formatRupiahGrafik(
 
-            data.sisa
+            data.sisaRpd ?? data.sisa
 
         )
 
