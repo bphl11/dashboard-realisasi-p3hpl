@@ -356,6 +356,16 @@ document.addEventListener(
             grafikRpdBulanan = rpdGrafik.bulanan;
             grafikRpdTotal = rpdGrafik.total;
 
+            // Persentase gabungan = (Realisasi + RPD Terisi) / Pagu.
+            if (Number(totalData.pagu) > 0) {
+                totalData.persen = (
+                    ((Number(totalData.realisasi) || 0) + grafikRpdTotal) /
+                    Number(totalData.pagu)
+                ) * 100;
+            } else {
+                totalData.persen = 0;
+            }
+
             const statusRpdGrafik = document.getElementById("statusRpdGrafik");
             if (statusRpdGrafik) {
                 statusRpdGrafik.textContent = rpdGrafik.tersedia
