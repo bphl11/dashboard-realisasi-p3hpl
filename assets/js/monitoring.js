@@ -698,7 +698,7 @@ function jalankanFilterMonitoring() {
 
                 if (
                     komponen &&
-                    item.komponen !== komponen
+                    clean(item.komponen) !== clean(komponen)
                 ) {
 
                     return false;
@@ -712,7 +712,7 @@ function jalankanFilterMonitoring() {
 
                 if (
                     subKomponen &&
-                    item.subKomponen !== subKomponen
+                    clean(item.subKomponen) !== clean(subKomponen)
                 ) {
 
                     return false;
@@ -726,7 +726,7 @@ function jalankanFilterMonitoring() {
 
                 if (
                     akun &&
-                    item.akun !== akun
+                    clean(item.akun) !== clean(akun)
                 ) {
 
                     return false;
@@ -740,7 +740,7 @@ function jalankanFilterMonitoring() {
 
                 if (
                     status &&
-                    item.statusPagu !== status
+                    clean(item.statusPagu) !== clean(status)
                 ) {
 
                     return false;
