@@ -77,6 +77,70 @@ let apiLoadingPromise = null;
 
 
 // ============================================================
+// INPUT REALISASI TAMBAHAN
+//
+// Dashboard/Monitoring tetap memakai DATA_APLIKASI sebagai master.
+// Transaksi pada REALISASI P3HPL dibaca terpisah melalui proxy RPD,
+// lalu ditempel sebagai metadata non-enumerable pada array raw agar
+// parser dapat menggabungkannya tanpa mengubah sumber DATA_APLIKASI.
+// ============================================================
+
+async function fetchInputRealisasiMonitoring() {
+    const endpoint = String(CONFIG?.RPD_PROXY_URL || "").trim();
+    if (!endpoint) return [];
+
+    try {
+        const response = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+                "Content-Type": "text/plain;charset=utf-8"
+            },
+            body: JSON.stringify({
+                action: "realisasi_monitoring"
+            }),
+            redirect: "follow",
+            credentials: "omit",
+            cache: "no-store"
+        });
+
+        const text = await response.text();
+        let result = null;
+        try {
+            result = JSON.parse(text);
+        } catch (error) {
+            throw new Error("Respons realisasi monitoring bukan JSON yang valid.");
+        }
+
+        if (!response.ok || result?.ok === false) {
+            throw new Error(result?.message || ("HTTP " + response.status));
+        }
+
+        return Array.isArray(result?.realisasi) ? result.realisasi : [];
+    } catch (error) {
+        console.warn("INPUT_REALISASI monitoring tidak dapat dimuat:", error);
+        return [];
+    }
+}
+
+function attachInputRealisasiToRawData(data, inputRealisasi) {
+    if (!Array.isArray(data)) return data;
+
+    try {
+        Object.defineProperty(data, "__inputRealisasi", {
+            value: Array.isArray(inputRealisasi) ? inputRealisasi : [],
+            writable: true,
+            configurable: true,
+            enumerable: false
+        });
+    } catch (error) {
+        data.__inputRealisasi = Array.isArray(inputRealisasi) ? inputRealisasi : [];
+    }
+
+    return data;
+}
+
+
+// ============================================================
 // AMBIL DATA GOOGLE SHEET
 //
 // DATA_APLIKASI adalah satu-satunya sumber data Dashboard/Monitoring.
