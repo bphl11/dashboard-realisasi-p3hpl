@@ -99,6 +99,7 @@ let apiLoadingPromise = null;
 
 let inputRealisasiCache = null;
 let inputRealisasiCacheAt = 0;
+let inputRealisasiLoadingPromise = null;
 
 // 30 detik cukup pendek untuk perubahan eksternal, tetapi menghindari
 // request berulang ketika user berpindah Dashboard -> Monitoring -> Grafik.
@@ -110,7 +111,6 @@ async function fetchInputRealisasiMonitoring(forceRefresh = false) {
 
     const now = Date.now();
 
-    // Gunakan cache transaksi jika masih segar.
     if (
         !forceRefresh &&
         Array.isArray(inputRealisasiCache) &&
@@ -119,52 +119,63 @@ async function fetchInputRealisasiMonitoring(forceRefresh = false) {
         return inputRealisasiCache;
     }
 
-    try {
-        const response = await fetch(endpoint, {
-            method: "POST",
-            headers: {
-                "Content-Type": "text/plain;charset=utf-8"
-            },
-            body: JSON.stringify({
-                action: "realisasi_monitoring"
-            }),
-            redirect: "follow",
-            credentials: "omit",
-            cache: "no-store"
-        });
-
-        const text = await response.text();
-        let result = null;
-
-        try {
-            result = JSON.parse(text);
-        } catch (error) {
-            throw new Error("Respons realisasi monitoring bukan JSON yang valid.");
-        }
-
-        if (!response.ok || result?.ok === false) {
-            throw new Error(result?.message || ("HTTP " + response.status));
-        }
-
-        const rows = Array.isArray(result?.realisasi)
-            ? result.realisasi
-            : [];
-
-        inputRealisasiCache = rows;
-        inputRealisasiCacheAt = Date.now();
-
-        return rows;
-    } catch (error) {
-        console.warn("INPUT_REALISASI monitoring tidak dapat dimuat:", error);
-
-        // Jika request gagal tetapi cache lama masih ada, gunakan cache lama
-        // agar Dashboard/Monitoring tidak kehilangan angka sementara.
-        if (Array.isArray(inputRealisasiCache)) {
-            return inputRealisasiCache;
-        }
-
-        return [];
+    // Jika request yang sama sedang berjalan, ikut request tersebut.
+    // Mencegah Dashboard/Monitoring/Grafik membuat beberapa request
+    // REALISASI_MONITORING secara bersamaan.
+    if (inputRealisasiLoadingPromise) {
+        return await inputRealisasiLoadingPromise;
     }
+
+    inputRealisasiLoadingPromise = (async function () {
+        try {
+            const response = await fetch(endpoint, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "text/plain;charset=utf-8"
+                },
+                body: JSON.stringify({
+                    action: "realisasi_monitoring"
+                }),
+                redirect: "follow",
+                credentials: "omit",
+                cache: "no-store"
+            });
+
+            const text = await response.text();
+            let result = null;
+
+            try {
+                result = JSON.parse(text);
+            } catch (error) {
+                throw new Error("Respons realisasi monitoring bukan JSON yang valid.");
+            }
+
+            if (!response.ok || result?.ok === false) {
+                throw new Error(result?.message || ("HTTP " + response.status));
+            }
+
+            const rows = Array.isArray(result?.realisasi)
+                ? result.realisasi
+                : [];
+
+            inputRealisasiCache = rows;
+            inputRealisasiCacheAt = Date.now();
+
+            return rows;
+        } catch (error) {
+            console.warn("INPUT_REALISASI monitoring tidak dapat dimuat:", error);
+
+            if (Array.isArray(inputRealisasiCache)) {
+                return inputRealisasiCache;
+            }
+
+            return [];
+        } finally {
+            inputRealisasiLoadingPromise = null;
+        }
+    })();
+
+    return await inputRealisasiLoadingPromise;
 }
 
 function attachInputRealisasiToRawData(data, inputRealisasi) {
@@ -279,6 +290,7 @@ function invalidateApiCache() {
     // Cache INPUT_REALISASI
     inputRealisasiCache = null;
     inputRealisasiCacheAt = 0;
+    inputRealisasiLoadingPromise = null;
 }
 
 
