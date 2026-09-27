@@ -6,10 +6,9 @@
 // ============================================================
 // CACHE DATA
 //
-// Dashboard hanya membaca DATA_APLIKASI.
-// INPUT_REALISASI tidak dipanggil pada saat load Dashboard/Monitoring.
-// Cache diberi versi baru agar cache lama yang masih menyimpan metadata
-// INPUT_REALISASI tidak ikut digunakan.
+// DATA_APLIKASI tetap menjadi sumber master anggaran.
+// INPUT_REALISASI aktif ditempel sebagai metadata raw dan digabungkan
+// oleh parser menjadi Realisasi Final untuk Dashboard/Monitoring/Grafik/Laporan.
 // ============================================================
 
 const API_CACHE_KEY = "p3hpl_data_cache_v2";
