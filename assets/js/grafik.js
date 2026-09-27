@@ -431,6 +431,15 @@ document.addEventListener(
 
             );
 
+            // =================================================
+            // GRAFIK KUMULATIF REALISASI VS RPD
+            // =================================================
+
+            buatGrafikKumulatif(
+                totalData.bulanan,
+                grafikRpdBulanan
+            );
+
 
             // =================================================
             // GRAFIK NORMAL VS DIBLOKIR
