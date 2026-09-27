@@ -405,12 +405,33 @@ function gabungkanInputRealisasi(items, inputRealisasi) {
 
     const byId = new Map();
     const byIndex = new Map();
+    const byMaster = new Map();
+
+    const makeMasterKey = function (item) {
+        return [
+            item?.tahun || "",
+            item?.kodeSubKomponen || "",
+            item?.subKomponen || "",
+            item?.akun || "",
+            item?.itemAkun || "",
+            item?.detilAkun || "",
+            item?.rincianItem || "",
+            item?.pagu || 0
+        ].map(function (value) {
+            return String(value ?? "")
+                .trim()
+                .toUpperCase()
+                .replace(/\s+/g, " ")
+                .replace(/\|/g, "/");
+        }).join("|");
+    };
 
     items.forEach(function (item) {
         if (item?.idAnggaran) {
             byId.set(String(item.idAnggaran), item);
         }
         byIndex.set(Number(item?.rowIndex), item);
+        byMaster.set(makeMasterKey(item), item);
     });
 
     let diterapkan = 0;
@@ -440,9 +461,28 @@ function gabungkanInputRealisasi(items, inputRealisasi) {
             transaksi?.nominalRealisasi
         );
 
-        // Utamakan ID_ANGGARAN. Index baris hanya fallback untuk kompatibilitas.
+        // Utamakan ID_ANGGARAN. Jika tidak cocok, gunakan identitas
+        // master transaksi. Index baris tetap menjadi fallback terakhir.
+        const masterKey = [
+            transaksi?.tahun || "",
+            transaksi?.kode_sub_komponen || transaksi?.KODE_SUB_KOMPONEN || "",
+            transaksi?.sub_komponen || transaksi?.SUB_KOMPONEN || "",
+            transaksi?.akun || transaksi?.AKUN || "",
+            transaksi?.item_akun || transaksi?.ITEM_AKUN || "",
+            transaksi?.detil_akun || transaksi?.DETIL_AKUN || "",
+            transaksi?.rincian_item || transaksi?.RINCIAN_ITEM || "",
+            transaksi?.pagu_detil || transaksi?.PAGU_DETIL || 0
+        ].map(function (value) {
+            return String(value ?? "")
+                .trim()
+                .toUpperCase()
+                .replace(/\s+/g, " ")
+                .replace(/\|/g, "/");
+        }).join("|");
+
         const item =
             (idAnggaran && byId.get(idAnggaran)) ||
+            byMaster.get(masterKey) ||
             byIndex.get(indexRecord);
 
         if (!item || !bulan || !Number.isFinite(nominal) || nominal <= 0) {
