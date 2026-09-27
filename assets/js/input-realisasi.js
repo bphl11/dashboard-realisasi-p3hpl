@@ -7,6 +7,7 @@
 let realisasiMaster = [];
 let realisasiRows = [];
 let selectedMaster = null;
+let editingRealisasiId = null;
 
 const BULAN_REALISASI = [
     "Januari","Februari","Maret","April","Mei","Juni",
@@ -192,9 +193,14 @@ function renderListInputRealisasi() {
                 <td class="text-end">${rupiahInput(item.nominal_realisasi)}</td>
                 <td>${escapeHtmlInputRealisasi(item.keterangan || "-")}</td>
                 <td><span class="badge text-bg-success">${escapeHtmlInputRealisasi(item.status || "AKTIF")}</span></td>
+                <td class="text-center">
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="editInputRealisasi('${escapeHtmlInputRealisasi(item.id_realisasi)}')">
+                        <i class="bi bi-pencil-square"></i> Edit
+                    </button>
+                </td>
             </tr>
         `).join("")
-        : '<tr><td colspan="7" class="text-center text-muted py-4">Belum ada Input Realisasi.</td></tr>';
+        : '<tr><td colspan="8" class="text-center text-muted py-4">Belum ada Input Realisasi.</td></tr>';
 }
 
 async function loadInputRealisasiData() {
@@ -264,29 +270,116 @@ async function submitInputRealisasi(event) {
     button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Menyimpan...';
 
     try {
-        const result = await realisasiSave({
+        const payload = {
             tahun: selectedMaster.tahun,
             id_anggaran: selectedMaster.id_anggaran,
             bulan_realisasi: bulan,
             nominal_realisasi: nominal,
             keterangan
-        });
+        };
+
+        const result = editingRealisasiId
+            ? await realisasiUpdate({ ...payload, id_realisasi: editingRealisasiId })
+            : await realisasiSave(payload);
 
         if (!result?.ok) throw new Error(result?.message || "Realisasi gagal disimpan.");
 
-        realisasiRows.push(result.data);
+        if (editingRealisasiId) {
+            const index = realisasiRows.findIndex(item => item.id_realisasi === editingRealisasiId);
+            if (index >= 0) realisasiRows[index] = result.data;
+        } else {
+            realisasiRows.push(result.data);
+        }
+
+        const wasEditing = Boolean(editingRealisasiId);
+        editingRealisasiId = null;
         renderListInputRealisasi();
         renderMasterInfoInputRealisasi();
         resetFormInputRealisasi();
+        setInputRealisasiEditMode(false);
 
-        setStatusInputRealisasi("Realisasi bulan " + bulan + " berhasil disimpan.", "success");
+        if (typeof invalidateApiCache === "function") invalidateApiCache();
+
+        setStatusInputRealisasi(
+            wasEditing ? "Realisasi berhasil diperbarui." : "Realisasi bulan " + bulan + " berhasil disimpan.",
+            "success"
+        );
     } catch (error) {
         console.error(error);
         setStatusInputRealisasi(error.message || "Gagal menyimpan realisasi.", "danger");
     } finally {
         button.disabled = false;
-        button.innerHTML = '<i class="bi bi-save"></i> Simpan Realisasi';
+        setInputRealisasiEditMode(Boolean(editingRealisasiId));
     }
+}
+
+
+function setInputRealisasiEditMode(editing) {
+    const button = document.getElementById("realisasiSaveButton");
+    const text = document.getElementById("realisasiSaveButtonText");
+    if (text) text.textContent = editing ? "Perbarui Realisasi" : "Simpan Realisasi";
+    if (button) {
+        button.classList.toggle("btn-warning", editing);
+        button.classList.toggle("btn-success", !editing);
+    }
+
+    let cancel = document.getElementById("realisasiCancelEditButton");
+    if (editing && !cancel) {
+        cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.id = "realisasiCancelEditButton";
+        cancel.className = "btn btn-outline-secondary";
+        cancel.innerHTML = '<i class="bi bi-x-circle"></i> Batal Edit';
+        cancel.addEventListener("click", cancelEditInputRealisasi);
+        button?.parentElement?.appendChild(cancel);
+    } else if (!editing && cancel) {
+        cancel.remove();
+    }
+}
+
+function editInputRealisasi(id) {
+    const item = realisasiRows.find(row => row.id_realisasi === id);
+    if (!item) {
+        setStatusInputRealisasi("Transaksi realisasi tidak ditemukan.", "warning");
+        return;
+    }
+
+    if (String(item.status || "AKTIF").toUpperCase() !== "AKTIF") {
+        setStatusInputRealisasi("Hanya transaksi aktif yang dapat diedit.", "warning");
+        return;
+    }
+
+    const master = realisasiMaster.find(row =>
+        row.id_anggaran === item.id_anggaran &&
+        String(row.tahun) === String(item.tahun)
+    );
+
+    if (!master) {
+        setStatusInputRealisasi("Master anggaran untuk transaksi ini tidak ditemukan.", "danger");
+        return;
+    }
+
+    editingRealisasiId = id;
+    selectedMaster = master;
+    document.getElementById("realisasiSubKomponen").value = master.subKomponen || "";
+    populateDetilInputRealisasi();
+    document.getElementById("realisasiDetil").value = master.id_anggaran;
+    selectedMaster = master;
+    document.getElementById("realisasiBulan").value = item.bulan || "";
+    document.getElementById("realisasiNominal").value = Number(item.nominal_realisasi) || "";
+    document.getElementById("realisasiKeterangan").value = item.keterangan || "";
+    renderMasterInfoInputRealisasi();
+    setInputRealisasiEditMode(true);
+
+    document.getElementById("realisasiForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setStatusInputRealisasi("Mode Edit aktif. Ubah bulan, nominal, atau keterangan lalu klik Perbarui Realisasi.", "info");
+}
+
+function cancelEditInputRealisasi() {
+    editingRealisasiId = null;
+    resetFormInputRealisasi();
+    setInputRealisasiEditMode(false);
+    setStatusInputRealisasi("Edit dibatalkan.", "secondary");
 }
 
 function setupInputRealisasi() {
