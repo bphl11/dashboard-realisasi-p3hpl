@@ -20,7 +20,9 @@ async function rpdApiRequest(action, payload = {}) {
     };
 
     const apiBaseUrl = String(
-        RPD_CONFIG.RPD_PROXY_URL || apiBaseUrl || ""
+        RPD_CONFIG.RPD_PROXY_URL ||
+        RPD_CONFIG.RPD_API_URL ||
+        ""
     ).trim();
 
     if (!apiBaseUrl) {
