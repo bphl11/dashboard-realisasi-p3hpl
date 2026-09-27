@@ -182,6 +182,8 @@ function buildRealisasiMasterFromDataAplikasi_() {
     const detilAkun = headerValue_(row, context.map, ["Detil Akun","Detail Akun","Detil"]);
     const rincianItem = headerValue_(row, context.map, ["Rincian Item","Rincian"]);
     const pagu = parseAmount_(headerValue_(row, context.map, ["Pagu"]));
+    // Realisasi yang sudah tercatat di DATA_APLIKASI menjadi realisasi dasar.
+    const realisasi = parseAmount_(headerValue_(row, context.map, ["Realisasi","Jumlah Realisasi"]));
     const status = headerValue_(row, context.map, ["Status Pagu","Status"]);
     const tahun = headerValue_(row, context.map, ["Tahun","Tahun Anggaran"]) || new Date().getFullYear();
 
@@ -197,7 +199,8 @@ function buildRealisasiMasterFromDataAplikasi_() {
       itemAkun: itemAkun || "",
       detilAkun: detilAkun || "",
       rincianItem: rincianItem || "",
-      pagu: pagu
+      pagu: pagu,
+      realisasi: realisasi
     };
     item.id_anggaran = realisasiMasterKey_(item);
 
@@ -300,10 +303,16 @@ function saveRealisasi_(idToken, row) {
     .filter(item => item.id_anggaran === idAnggaran && item.tahun === tahun && String(item.status).toUpperCase() === "AKTIF")
     .reduce((sum, item) => sum + (Number(item.nominal_realisasi) || 0), 0);
 
-  if (activeTotal + nominal > target.pagu) {
+  const baseRealisasi = Number(target.realisasi) || 0;
+  const totalSetelahInput = baseRealisasi + activeTotal + nominal;
+
+  if (totalSetelahInput > target.pagu) {
     throw new Error(
-      "Total Input Realisasi akan melebihi Pagu Detil. " +
-      "Pagu: " + target.pagu + ", sudah diinput: " + activeTotal + ", tambahan: " + nominal + "."
+      "Total Realisasi akan melebihi Pagu Detil. " +
+      "Pagu: " + target.pagu +
+      ", realisasi DATA_APLIKASI: " + baseRealisasi +
+      ", input bulanan: " + activeTotal +
+      ", tambahan: " + nominal + "."
     );
   }
 
@@ -366,8 +375,10 @@ function saveRealisasi_(idToken, row) {
     user: { email: user.email, name: user.name || user.email, role: user.role || "OPERATOR" },
     data: record,
     pagu: target.pagu,
+    realisasi_data_aplikasi: baseRealisasi,
     total_realisasi_input: activeTotal + nominal,
-    sisa_pagu_input: Math.max(target.pagu - activeTotal - nominal, 0)
+    total_realisasi: baseRealisasi + activeTotal + nominal,
+    sisa_pagu_input: Math.max(target.pagu - baseRealisasi - activeTotal - nominal, 0)
   };
 }
 
