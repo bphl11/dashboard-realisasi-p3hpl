@@ -202,6 +202,7 @@ function parseDataAplikasi(data) {
 
         const kodeKomponen = nilaiHeaderDataAplikasi(row, map, ["Kode Komponen", "KodeKomponen"]);
         const komponen = nilaiHeaderDataAplikasi(row, map, ["Komponen", "Nama Komponen"]);
+        const kodeSubKomponen = nilaiHeaderDataAplikasi(row, map, ["Kode Sub Komponen", "KodeSubKomponen"]);
         const subKomponen = nilaiHeaderDataAplikasi(row, map, ["Sub Komponen", "Subkomponen", "Nama Sub Komponen"]);
         const akun = nilaiHeaderDataAplikasi(row, map, ["Akun Belanja", "Akun"]);
         const itemAkun = nilaiHeaderDataAplikasi(row, map, ["Item Akun", "Item"]);
@@ -228,6 +229,7 @@ function parseDataAplikasi(data) {
             output: output || "-",
             kodeSubOutput: kodeSubOutput || "-",
             subOutput: subOutput || kodeSubOutput || "-",
+            kodeSubKomponen: kodeSubKomponen || "",
             kodeKomponen: kodeKomponen || "-",
             komponen: komponen || "-",
             subKomponen: subKomponen || "-",
