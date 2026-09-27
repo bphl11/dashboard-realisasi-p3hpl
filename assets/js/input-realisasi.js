@@ -1,7 +1,8 @@
 // ============================================================
-// INPUT REALISASI - TAHAP 1
-// Hanya menyimpan transaksi bulanan ke sheet REALISASI P3HPL.
-// Dashboard/Monitoring belum diubah pada tahap ini.
+// INPUT REALISASI
+// Menyimpan transaksi bulanan ke sheet REALISASI P3H3PL.
+// Transaksi aktif otomatis digabungkan ke Realisasi Final
+// yang dipakai Dashboard, Grafik, Monitoring, dan Laporan.
 // ============================================================
 
 let realisasiMaster = [];
