@@ -142,8 +142,8 @@ function attachInputRealisasiToRawData(data, inputRealisasi) {
 // ============================================================
 // AMBIL DATA GOOGLE SHEET
 //
-// DATA_APLIKASI adalah satu-satunya sumber data Dashboard/Monitoring.
-// INPUT_REALISASI tidak digunakan oleh Dashboard/Monitoring.
+// DATA_APLIKASI tetap menjadi sumber master anggaran.
+// INPUT_REALISASI aktif ikut dimuat dan dipakai parser sebagai transaksi tambahan.
 // ============================================================
 
 async function fetchSheetData(forceRefresh = false) {
