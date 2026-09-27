@@ -60,6 +60,7 @@ function doPost(e) {
     if (action === "realisasi_list") return jsonOutput(listRealisasi_(request.id_token));
     if (action === "realisasi_monitoring") return jsonOutput(listRealisasiMonitoring_());
     if (action === "realisasi_save") return jsonOutput(saveRealisasi_(request.id_token, request.row));
+    if (action === "realisasi_update") return jsonOutput(updateRealisasi_(request.id_token, request.row));
 
     return jsonOutput({ ok: false, message: "Action API tidak dikenal." });
   } catch (error) {
@@ -487,6 +488,151 @@ function saveRealisasi_(idToken, row) {
     total_realisasi_input: activeTotal + nominal,
     total_realisasi: baseRealisasi + activeTotal + nominal,
     sisa_pagu_input: Math.max(target.pagu - baseRealisasi - activeTotal - nominal, 0)
+  };
+}
+
+
+function updateRealisasi_(idToken, row) {
+  const user = authenticate_(idToken).user;
+  if (!row) throw new Error("Data realisasi tidak ditemukan.");
+
+  const idRealisasi = String(row.id_realisasi || row.id || "").trim();
+  if (!idRealisasi) throw new Error("ID realisasi tidak ditemukan.");
+
+  const bulan = normalisasiBulanRealisasi_(row.bulan_realisasi || row.bulan);
+  const nominal = parseAmount_(row.nominal_realisasi);
+  const tahun = String(row.tahun || "").trim();
+  const idAnggaran = String(row.id_anggaran || "").trim();
+  const keterangan = String(row.keterangan || "").trim();
+
+  if (!tahun) throw new Error("Tahun anggaran belum dipilih.");
+  if (!idAnggaran) throw new Error("Detil anggaran belum dipilih.");
+  if (!bulan) throw new Error("Bulan realisasi tidak valid.");
+  if (!(nominal > 0)) throw new Error("Nominal realisasi harus lebih besar dari 0.");
+
+  const master = buildRealisasiMasterFromDataAplikasi_();
+  const target = master.find(item => item.id_anggaran === idAnggaran && item.tahun === tahun);
+  if (!target) throw new Error("Detil anggaran tidak ditemukan pada DATA_APLIKASI.");
+  if (target.pagu <= 0) throw new Error("Pagu detil tidak valid.");
+
+  const sheet = getRealisasiSheet_();
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) throw new Error("Transaksi realisasi tidak ditemukan.");
+
+  const index = realisasiHeaderIndex_(values[0]);
+  const idCol = index.ID_REALISASI;
+  if (idCol === undefined) throw new Error("Kolom ID_REALISASI tidak ditemukan.");
+
+  let rowNumber = -1;
+  let oldRecord = null;
+
+  for (let i = 1; i < values.length; i++) {
+    const currentId = String(values[i][idCol] || "").trim();
+    if (currentId === idRealisasi) {
+      rowNumber = i + 1;
+      break;
+    }
+  }
+
+  if (rowNumber < 0) throw new Error("Transaksi realisasi tidak ditemukan.");
+  oldRecord = readRealisasi_(sheet).find(item => item.id_realisasi === idRealisasi);
+  if (!oldRecord) throw new Error("Data transaksi realisasi tidak dapat dibaca.");
+  if (String(oldRecord.status || "AKTIF").toUpperCase() !== "AKTIF") {
+    throw new Error("Transaksi yang tidak aktif tidak dapat diedit.");
+  }
+
+  // Keluarkan transaksi lama dari total sebelum memvalidasi transaksi baru.
+  const existing = readRealisasi_(sheet);
+  const activeTotalTanpaLama = existing
+    .filter(item =>
+      item.id_anggaran === idAnggaran &&
+      item.tahun === tahun &&
+      String(item.status || "AKTIF").toUpperCase() === "AKTIF" &&
+      item.id_realisasi !== idRealisasi
+    )
+    .reduce((sum, item) => sum + (Number(item.nominal_realisasi) || 0), 0);
+
+  const baseRealisasi = Number(target.realisasi) || 0;
+  const totalSetelahEdit = baseRealisasi + activeTotalTanpaLama + nominal;
+
+  if (totalSetelahEdit > target.pagu) {
+    throw new Error(
+      "Total Realisasi setelah edit akan melebihi Pagu Detil. " +
+      "Pagu: " + target.pagu +
+      ", realisasi DATA_APLIKASI: " + baseRealisasi +
+      ", input aktif lainnya: " + activeTotalTanpaLama +
+      ", nominal baru: " + nominal + "."
+    );
+  }
+
+  const now = new Date();
+  const output = values[rowNumber - 1].slice();
+
+  const set = (name, value) => {
+    const idx = index[name] !== undefined ? index[name] : index[name.replace(/_/g, " ")];
+    if (idx !== undefined) output[idx] = value;
+  };
+
+  set("ID_REALISASI", idRealisasi);
+  set("TAHUN", tahun);
+  set("ID_ANGGARAN", idAnggaran);
+  set("KODE_SUB_KOMPONEN", target.kodeSubKomponen);
+  set("SUB_KOMPONEN", target.subKomponen);
+  set("AKUN", target.akun);
+  set("ITEM_AKUN", target.itemAkun);
+  set("DETIL_AKUN", target.detilAkun);
+  set("RINCIAN_ITEM", target.rincianItem);
+  set("PAGU_DETIL", target.pagu);
+  set("BULAN_REALISASI", bulan);
+  set("NOMINAL_REALISASI", nominal);
+  set("KETERANGAN", keterangan);
+  set("STATUS", "AKTIF");
+  set("UPDATED_AT", now);
+  set("UPDATED_BY", user.email);
+
+  sheet.getRange(rowNumber, 1, 1, output.length).setValues([output]);
+
+  const record = {
+    id_realisasi: idRealisasi,
+    tahun,
+    id_anggaran: idAnggaran,
+    kode_sub_komponen: target.kodeSubKomponen,
+    sub_komponen: target.subKomponen,
+    akun: target.akun,
+    item_akun: target.itemAkun,
+    detil_akun: target.detilAkun,
+    rincian_item: target.rincianItem,
+    pagu_detil: target.pagu,
+    bulan,
+    nominal_realisasi: nominal,
+    keterangan,
+    status: "AKTIF",
+    created_at: oldRecord.created_at,
+    created_by: oldRecord.created_by,
+    updated_at: now,
+    updated_by: user.email
+  };
+
+  getRealisasiLogSheet_().appendRow([
+    now,
+    "UPDATE",
+    idRealisasi,
+    user.email,
+    JSON.stringify(oldRecord),
+    JSON.stringify(record),
+    "Edit realisasi bulanan"
+  ]);
+
+  return {
+    ok: true,
+    message: "Realisasi berhasil diperbarui.",
+    user: { email: user.email, name: user.name || user.email, role: user.role || "OPERATOR" },
+    data: record,
+    pagu: target.pagu,
+    realisasi_data_aplikasi: baseRealisasi,
+    total_realisasi_input: activeTotalTanpaLama + nominal,
+    total_realisasi: baseRealisasi + activeTotalTanpaLama + nominal,
+    sisa_pagu_input: Math.max(target.pagu - baseRealisasi - activeTotalTanpaLama - nominal, 0)
   };
 }
 
