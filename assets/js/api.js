@@ -84,9 +84,40 @@ let apiLoadingPromise = null;
 // parser dapat menggabungkannya tanpa mengubah sumber DATA_APLIKASI.
 // ============================================================
 
-async function fetchInputRealisasiMonitoring() {
+// ============================================================
+// CACHE TRANSAKSI INPUT REALISASI
+//
+// DATA_APLIKASI dan INPUT_REALISASI mempunyai cache terpisah.
+// Tujuannya:
+// - tidak meminta REALISASI_MONITORING berulang kali setiap halaman;
+// - setelah Save/Edit/Delete, cache transaksi dapat di-invalidasi saja;
+// - DATA_APLIKASI tetap memakai cache yang sudah ada.
+//
+// Cache transaksi dibuat singkat karena data dapat berubah dari halaman
+// Input Realisasi. Setelah mutasi, invalidateApiCache() menghapusnya.
+// ============================================================
+
+let inputRealisasiCache = null;
+let inputRealisasiCacheAt = 0;
+
+// 30 detik cukup pendek untuk perubahan eksternal, tetapi menghindari
+// request berulang ketika user berpindah Dashboard -> Monitoring -> Grafik.
+const INPUT_REALISASI_CACHE_TTL = 30000;
+
+async function fetchInputRealisasiMonitoring(forceRefresh = false) {
     const endpoint = String(CONFIG?.RPD_PROXY_URL || "").trim();
     if (!endpoint) return [];
+
+    const now = Date.now();
+
+    // Gunakan cache transaksi jika masih segar.
+    if (
+        !forceRefresh &&
+        Array.isArray(inputRealisasiCache) &&
+        (now - inputRealisasiCacheAt) < INPUT_REALISASI_CACHE_TTL
+    ) {
+        return inputRealisasiCache;
+    }
 
     try {
         const response = await fetch(endpoint, {
@@ -104,6 +135,7 @@ async function fetchInputRealisasiMonitoring() {
 
         const text = await response.text();
         let result = null;
+
         try {
             result = JSON.parse(text);
         } catch (error) {
@@ -114,9 +146,23 @@ async function fetchInputRealisasiMonitoring() {
             throw new Error(result?.message || ("HTTP " + response.status));
         }
 
-        return Array.isArray(result?.realisasi) ? result.realisasi : [];
+        const rows = Array.isArray(result?.realisasi)
+            ? result.realisasi
+            : [];
+
+        inputRealisasiCache = rows;
+        inputRealisasiCacheAt = Date.now();
+
+        return rows;
     } catch (error) {
         console.warn("INPUT_REALISASI monitoring tidak dapat dimuat:", error);
+
+        // Jika request gagal tetapi cache lama masih ada, gunakan cache lama
+        // agar Dashboard/Monitoring tidak kehilangan angka sementara.
+        if (Array.isArray(inputRealisasiCache)) {
+            return inputRealisasiCache;
+        }
+
         return [];
     }
 }
@@ -227,8 +273,21 @@ async function fetchSheetData(forceRefresh = false) {
 // ============================================================
 
 function invalidateApiCache() {
+    // Cache DATA_APLIKASI
     hapusCacheApi();
+
+    // Cache INPUT_REALISASI
+    inputRealisasiCache = null;
+    inputRealisasiCacheAt = 0;
 }
+
+
+// Memaksa mengambil transaksi terbaru tanpa mengunduh DATA_APLIKASI ulang.
+// Dipakai bila suatu halaman memang membutuhkan sinkronisasi segera.
+async function refreshInputRealisasiCache() {
+    return await fetchInputRealisasiMonitoring(true);
+}
+
 
 
 // ============================================================
