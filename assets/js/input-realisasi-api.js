@@ -32,3 +32,11 @@ async function realisasiUpdate(row) {
         row
     });
 }
+
+
+async function realisasiDelete(row) {
+    return await realisasiApiRequest("realisasi_delete", {
+        id_token: rpdGetStoredUser()?.id_token || "",
+        row
+    });
+}
