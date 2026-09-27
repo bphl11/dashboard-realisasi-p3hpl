@@ -222,7 +222,7 @@ async function loadInputRealisasiData() {
             result.user?.name || result.user?.email || "Operator";
 
         setStatusInputRealisasi(
-            "Data master berhasil dimuat. Tahap 1: transaksi tersimpan terpisah dan belum mengubah Dashboard/Monitoring.",
+            "Data master berhasil dimuat. Transaksi aktif akan masuk ke Realisasi Final Dashboard, Grafik, Monitoring, dan Laporan.",
             "info"
         );
     } catch (error) {
