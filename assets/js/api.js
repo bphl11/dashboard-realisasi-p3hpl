@@ -97,31 +97,159 @@ let apiLoadingPromise = null;
 // Input Realisasi. Setelah mutasi, invalidateApiCache() menghapusnya.
 // ============================================================
 
+const INPUT_REALISASI_CACHE_KEY = "p3hpl_input_realisasi_cache_v1";
+const INPUT_REALISASI_CACHE_TTL = 2 * 60 * 1000;
+
 let inputRealisasiCache = null;
 let inputRealisasiCacheAt = 0;
 let inputRealisasiLoadingPromise = null;
+let inputRealisasiRefreshQueued = false;
 
-// 30 detik cukup pendek untuk perubahan eksternal, tetapi menghindari
-// request berulang ketika user berpindah Dashboard -> Monitoring -> Grafik.
-const INPUT_REALISASI_CACHE_TTL = 30000;
+function bacaCacheInputRealisasi() {
+    if (Array.isArray(inputRealisasiCache)) {
+        return inputRealisasiCache;
+    }
+
+    try {
+        const raw = sessionStorage.getItem(INPUT_REALISASI_CACHE_KEY);
+        if (!raw) return null;
+
+        const cached = JSON.parse(raw);
+        if (!cached || !Array.isArray(cached.data)) return null;
+
+        inputRealisasiCache = cached.data;
+        inputRealisasiCacheAt = Number(cached.timestamp || 0);
+
+        return inputRealisasiCache;
+    } catch (error) {
+        console.warn("Cache INPUT_REALISASI tidak dapat dibaca:", error);
+        return null;
+    }
+}
+
+function simpanCacheInputRealisasi(rows) {
+    if (!Array.isArray(rows)) return;
+
+    inputRealisasiCache = rows;
+    inputRealisasiCacheAt = Date.now();
+
+    try {
+        sessionStorage.setItem(
+            INPUT_REALISASI_CACHE_KEY,
+            JSON.stringify({
+                timestamp: inputRealisasiCacheAt,
+                data: rows
+            })
+        );
+    } catch (error) {
+        console.warn("Cache INPUT_REALISASI tidak dapat disimpan:", error);
+    }
+}
+
+function hapusCacheInputRealisasi() {
+    inputRealisasiCache = null;
+    inputRealisasiCacheAt = 0;
+    inputRealisasiLoadingPromise = null;
+
+    try {
+        sessionStorage.removeItem(INPUT_REALISASI_CACHE_KEY);
+    } catch (error) {
+        console.warn("Cache INPUT_REALISASI tidak dapat dihapus:", error);
+    }
+}
+
+// Memperbarui cache lokal segera setelah INSERT/UPDATE/DELETE.
+// Tidak perlu download DATA_APLIKASI ulang.
+function updateCacheInputRealisasiMutasi(action, result) {
+    const current = bacaCacheInputRealisasi();
+    if (!Array.isArray(current)) return;
+
+    const normalizedAction = String(action || "").toLowerCase();
+    const row = result?.data;
+    const id = String(
+        result?.id_realisasi ||
+        row?.id_realisasi ||
+        ""
+    ).trim();
+
+    let next = current.slice();
+
+    if (
+        (normalizedAction === "save" || normalizedAction === "insert") &&
+        row?.id_realisasi
+    ) {
+        next = next.filter(item => item.id_realisasi !== row.id_realisasi);
+        next.push({
+            id_anggaran: String(row.id_anggaran || ""),
+            tahun: String(row.tahun || ""),
+            bulan: String(row.bulan || row.bulan_realisasi || ""),
+            nominal_realisasi: Number(row.nominal_realisasi) || 0,
+            kode_sub_komponen: String(row.kode_sub_komponen || ""),
+            sub_komponen: String(row.sub_komponen || ""),
+            akun: String(row.akun || ""),
+            item_akun: String(row.item_akun || ""),
+            detil_akun: String(row.detil_akun || ""),
+            rincian_item: String(row.rincian_item || ""),
+            pagu_detil: Number(row.pagu_detil) || 0
+        });
+    }
+
+    if (
+        (normalizedAction === "update" || normalizedAction === "edit") &&
+        row?.id_realisasi
+    ) {
+        next = next.filter(item => item.id_realisasi !== row.id_realisasi);
+        next.push({
+            id_anggaran: String(row.id_anggaran || ""),
+            tahun: String(row.tahun || ""),
+            bulan: String(row.bulan || row.bulan_realisasi || ""),
+            nominal_realisasi: Number(row.nominal_realisasi) || 0,
+            kode_sub_komponen: String(row.kode_sub_komponen || ""),
+            sub_komponen: String(row.sub_komponen || ""),
+            akun: String(row.akun || ""),
+            item_akun: String(row.item_akun || ""),
+            detil_akun: String(row.detil_akun || ""),
+            rincian_item: String(row.rincian_item || ""),
+            pagu_detil: Number(row.pagu_detil) || 0
+        });
+    }
+
+    if (normalizedAction === "delete" && id) {
+        // Monitoring cache tidak membawa id_realisasi.
+        // Jika cache berasal dari monitoring, paksa refresh transaksi
+        // pada request berikutnya. DATA_APLIKASI tetap dipertahankan.
+        hapusCacheInputRealisasi();
+        return;
+    }
+
+    simpanCacheInputRealisasi(next);
+}
 
 async function fetchInputRealisasiMonitoring(forceRefresh = false) {
     const endpoint = String(CONFIG?.RPD_PROXY_URL || "").trim();
     if (!endpoint) return [];
 
     const now = Date.now();
+    const cached = bacaCacheInputRealisasi();
+    const cacheAge = cached ? now - Number(inputRealisasiCacheAt || 0) : Infinity;
+    const cacheFresh = Array.isArray(cached) && cacheAge < INPUT_REALISASI_CACHE_TTL;
 
-    if (
-        !forceRefresh &&
-        Array.isArray(inputRealisasiCache) &&
-        (now - inputRealisasiCacheAt) < INPUT_REALISASI_CACHE_TTL
-    ) {
-        return inputRealisasiCache;
+    if (!forceRefresh && cacheFresh) {
+        return cached;
     }
 
-    // Jika request yang sama sedang berjalan, ikut request tersebut.
-    // Mencegah Dashboard/Monitoring/Grafik membuat beberapa request
-    // REALISASI_MONITORING secara bersamaan.
+    // Cache lama langsung dipakai agar perpindahan menu tidak menunggu API.
+    // Sinkronisasi terbaru dijalankan di belakang layar.
+    if (!forceRefresh && Array.isArray(cached)) {
+        if (!inputRealisasiRefreshQueued) {
+            inputRealisasiRefreshQueued = true;
+            setTimeout(function () {
+                fetchInputRealisasiMonitoring(true).catch(function () {});
+            }, 0);
+        }
+        return cached;
+    }
+
     if (inputRealisasiLoadingPromise) {
         return await inputRealisasiLoadingPromise;
     }
@@ -133,16 +261,14 @@ async function fetchInputRealisasiMonitoring(forceRefresh = false) {
                 headers: {
                     "Content-Type": "text/plain;charset=utf-8"
                 },
-                body: JSON.stringify({
-                    action: "realisasi_monitoring"
-                }),
+                body: JSON.stringify({ action: "realisasi_monitoring" }),
                 redirect: "follow",
                 credentials: "omit",
                 cache: "no-store"
             });
 
             const text = await response.text();
-            let result = null;
+            let result;
 
             try {
                 result = JSON.parse(text);
@@ -158,20 +284,14 @@ async function fetchInputRealisasiMonitoring(forceRefresh = false) {
                 ? result.realisasi
                 : [];
 
-            inputRealisasiCache = rows;
-            inputRealisasiCacheAt = Date.now();
-
+            simpanCacheInputRealisasi(rows);
             return rows;
         } catch (error) {
             console.warn("INPUT_REALISASI monitoring tidak dapat dimuat:", error);
-
-            if (Array.isArray(inputRealisasiCache)) {
-                return inputRealisasiCache;
-            }
-
-            return [];
+            return Array.isArray(cached) ? cached : [];
         } finally {
             inputRealisasiLoadingPromise = null;
+            inputRealisasiRefreshQueued = false;
         }
     })();
 
@@ -210,6 +330,9 @@ async function fetchSheetData(forceRefresh = false) {
             console.log("=== MENGGUNAKAN CACHE DATA_APLIKASI ===");
             const inputRealisasi = await fetchInputRealisasiMonitoring();
             attachInputRealisasiToRawData(cached, inputRealisasi);
+
+            // Jika cache transaksi sudah tersedia, halaman langsung lanjut.
+            // Refresh jaringan berjalan di background.
             console.log("JUMLAH INPUT_REALISASI AKTIF:", inputRealisasi.length);
             return cached;
         }
@@ -283,14 +406,18 @@ async function fetchSheetData(forceRefresh = false) {
 // INVALIDASI CACHE
 // ============================================================
 
-function invalidateApiCache() {
-    // Cache DATA_APLIKASI
-    hapusCacheApi();
+function invalidateApiCache(options = {}) {
+    const onlyRealisasi = options?.onlyRealisasi === true;
 
-    // Cache INPUT_REALISASI
-    inputRealisasiCache = null;
-    inputRealisasiCacheAt = 0;
-    inputRealisasiLoadingPromise = null;
+    if (!onlyRealisasi) {
+        hapusCacheApi();
+    }
+
+    hapusCacheInputRealisasi();
+}
+
+function invalidateInputRealisasiCache() {
+    hapusCacheInputRealisasi();
 }
 
 
@@ -301,6 +428,13 @@ async function refreshInputRealisasiCache() {
 }
 
 
+
+
+// Dipanggil setelah Save/Edit/Delete transaksi agar menu berikutnya
+// langsung menggunakan data terbaru tanpa mengunduh DATA_APLIKASI.
+function updateInputRealisasiLocalCache(action, result) {
+    updateCacheInputRealisasiMutasi(action, result);
+}
 
 // ============================================================
 // GET DATA UNTUK DASHBOARD
