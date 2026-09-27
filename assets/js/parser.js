@@ -142,8 +142,8 @@ function normalisasiKeyRealisasiClient(value) {
     return String(value ?? "")
         .trim()
         .toUpperCase()
-        .replace(/\\s+/g, " ")
-        .replace(/\\|/g, "/");
+        .replace(/\s+/g, " ")
+        .replace(/\|/g, "/");
 }
 
 function realisasiMasterKeyClient(item) {
