@@ -24,8 +24,17 @@ const SOURCE_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vShdaPww
 const RPD_SHEETS = {
   RPD: "RPD P3HPL",
   USERS: "USERS",
-  LOG: "RPD_LOG"
+  LOG: "RPD_LOG",
+  REALISASI: "REALISASI P3HPL",
+  REALISASI_LOG: "REALISASI_LOG"
 };
+
+const REALISASI_HEADERS = [
+  "ID_REALISASI","TAHUN","ID_ANGGARAN","KODE_SUB_KOMPONEN","SUB_KOMPONEN",
+  "AKUN","ITEM_AKUN","DETIL_AKUN","RINCIAN_ITEM","PAGU_DETIL",
+  "BULAN_REALISASI","NOMINAL_REALISASI","KETERANGAN",
+  "STATUS","CREATED_AT","CREATED_BY","UPDATED_AT","UPDATED_BY"
+];
 
 const RPD_HEADERS = [
   "ID_RPD","TAHUN","KODE_SUB_KOMPONEN","SUB_KOMPONEN","AKUN","ITEM_AKUN",
@@ -45,6 +54,9 @@ function doPost(e) {
     if (action === "bootstrap") return jsonOutput(bootstrap_(request.id_token));
     if (action === "list") return jsonOutput(listRpd_(request.id_token));
     if (action === "save") return jsonOutput(saveRpd_(request.id_token, request.row));
+    if (action === "realisasi_bootstrap") return jsonOutput(realisasiBootstrap_(request.id_token));
+    if (action === "realisasi_list") return jsonOutput(listRealisasi_(request.id_token));
+    if (action === "realisasi_save") return jsonOutput(saveRealisasi_(request.id_token, request.row));
 
     return jsonOutput({ ok: false, message: "Action API tidak dikenal." });
   } catch (error) {
@@ -54,7 +66,261 @@ function doPost(e) {
 }
 
 function doGet() {
-  return jsonOutput({ ok: true, service: "RPD API", version: "1.0.0" });
+  return jsonOutput({ ok: true, service: "RPD API", version: "1.1.0" });
+}
+
+// ============================================================
+// INPUT REALISASI BULANAN
+// Tahap 1: menyimpan transaksi pada sheet terpisah.
+// Belum mengubah perhitungan Dashboard/Monitoring agar tidak
+// terjadi double-count selama masa migrasi dari DATA_APLIKASI.
+// ============================================================
+
+function ensureRealisasiSchema_(sheet) {
+  const existing = sheet.getLastColumn() > 0
+    ? sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0]
+        .map(v => String(v ?? "").trim().toUpperCase())
+    : [];
+  const missing = REALISASI_HEADERS.filter(h => !existing.includes(h));
+  if (!missing.length) return;
+  const start = Math.max(sheet.getLastColumn(), 0) + 1;
+  sheet.getRange(1, start, 1, missing.length).setValues([missing]);
+}
+
+function getRealisasiSheet_() {
+  const ss = getSpreadsheet_();
+  let sheet = ss.getSheetByName(RPD_SHEETS.REALISASI);
+  if (!sheet) sheet = ss.insertSheet(RPD_SHEETS.REALISASI);
+  ensureRealisasiSchema_(sheet);
+  return sheet;
+}
+
+function getRealisasiLogSheet_() {
+  const ss = getSpreadsheet_();
+  let sheet = ss.getSheetByName(RPD_SHEETS.REALISASI_LOG);
+  if (!sheet) {
+    sheet = ss.insertSheet(RPD_SHEETS.REALISASI_LOG);
+    sheet.getRange(1, 1, 1, 7).setValues([[
+      "TIMESTAMP","ACTION","ID_REALISASI","EMAIL","OLD_DATA","NEW_DATA","KETERANGAN"
+    ]]);
+  }
+  return sheet;
+}
+
+function realisasiHeaderIndex_(headers) {
+  const map = {};
+  headers.forEach((value, i) => {
+    const key = String(value ?? "").trim().toUpperCase().replace(/[._-]/g, " ").replace(/\s+/g, " ");
+    if (key) map[key] = i;
+  });
+  return map;
+}
+
+function realisasiMasterKey_(row) {
+  return makeRpdId_(
+    row.tahun,
+    row.kodeSubKomponen,
+    row.subKomponen,
+    row.akun,
+    row.itemAkun,
+    row.detilAkun,
+    row.rincianItem,
+    row.pagu
+  );
+}
+
+function buildRealisasiMasterFromDataAplikasi_() {
+  if (!SOURCE_CSV_URL) throw new Error("SOURCE_CSV_URL belum diisi.");
+
+  const response = UrlFetchApp.fetch(SOURCE_CSV_URL, {
+    muteHttpExceptions: true,
+    followRedirects: true
+  });
+  if (response.getResponseCode() !== 200) {
+    throw new Error("DATA_APLIKASI tidak dapat dibaca dari sumber CSV.");
+  }
+
+  const values = Utilities.parseCsv(response.getContentText());
+  const context = detectHeader_(values);
+  if (!context) throw new Error("Header DATA_APLIKASI tidak terdeteksi.");
+
+  const out = [];
+  const seen = {};
+
+  for (let i = context.headerIndex + 1; i < values.length; i++) {
+    const row = values[i];
+    const subKomponen = headerValue_(row, context.map, ["Sub Komponen","Subkomponen","Nama Sub Komponen"]);
+    const kodeSubKomponen = headerValue_(row, context.map, ["Kode Sub Komponen","KodeSubKomponen"]);
+    const akun = headerValue_(row, context.map, ["Akun Belanja","Akun"]);
+    const itemAkun = headerValue_(row, context.map, ["Item Akun","Item"]);
+    const detilAkun = headerValue_(row, context.map, ["Detil Akun","Detail Akun","Detil"]);
+    const rincianItem = headerValue_(row, context.map, ["Rincian Item","Rincian"]);
+    const pagu = parseAmount_(headerValue_(row, context.map, ["Pagu"]));
+    const status = headerValue_(row, context.map, ["Status Pagu","Status"]);
+    const tahun = headerValue_(row, context.map, ["Tahun","Tahun Anggaran"]) || new Date().getFullYear();
+
+    if (!subKomponen || !akun || pagu <= 0) continue;
+    if (/blok/i.test(String(status))) continue;
+
+    const item = {
+      id_anggaran: "",
+      tahun: String(tahun),
+      kodeSubKomponen: kodeSubKomponen || "",
+      subKomponen: subKomponen,
+      akun: akun,
+      itemAkun: itemAkun || "",
+      detilAkun: detilAkun || "",
+      rincianItem: rincianItem || "",
+      pagu: pagu
+    };
+    item.id_anggaran = realisasiMasterKey_(item);
+
+    if (seen[item.id_anggaran]) continue;
+    seen[item.id_anggaran] = true;
+    out.push(item);
+  }
+
+  return out;
+}
+
+function readRealisasi_(sheet) {
+  ensureRealisasiSchema_(sheet);
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return [];
+
+  const index = realisasiHeaderIndex_(values[0]);
+  return values.slice(1)
+    .filter(row => row.some(cell => String(cell ?? "").trim() !== ""))
+    .map(row => ({
+      id_realisasi: String(row[index["ID REALISASI"]] || ""),
+      tahun: String(row[index.TAHUN] || ""),
+      id_anggaran: String(row[index.ID_ANGGARAN] || row[index["ID ANGGARAN"]] || ""),
+      kode_sub_komponen: String(row[index.KODE_SUB_KOMPONEN] || row[index["KODE SUB KOMPONEN"]] || ""),
+      sub_komponen: String(row[index.SUB_KOMPONEN] || row[index["SUB KOMPONEN"]] || ""),
+      akun: String(row[index.AKUN] || ""),
+      item_akun: String(row[index.ITEM_AKUN] || row[index["ITEM AKUN"]] || ""),
+      detil_akun: String(row[index.DETIL_AKUN] || row[index["DETIL AKUN"]] || ""),
+      rincian_item: String(row[index.RINCIAN_ITEM] || row[index["RINCIAN ITEM"]] || ""),
+      pagu_detil: parseAmount_(row[index.PAGU_DETIL]),
+      bulan: String(row[index.BULAN_REALISASI] || row[index["BULAN REALISASI"]] || ""),
+      nominal_realisasi: parseAmount_(row[index.NOMINAL_REALISASI] || row[index["NOMINAL REALISASI"]]),
+      keterangan: String(row[index.KETERANGAN] || ""),
+      status: String(row[index.STATUS] || "AKTIF"),
+      created_at: row[index.CREATED_AT] || "",
+      created_by: String(row[index.CREATED_BY] || ""),
+      updated_at: row[index.UPDATED_AT] || "",
+      updated_by: String(row[index.UPDATED_BY] || "")
+    }));
+}
+
+function realisasiBootstrap_(idToken) {
+  const user = authenticate_(idToken);
+  const master = buildRealisasiMasterFromDataAplikasi_();
+  const realisasi = readRealisasi_(getRealisasiSheet_());
+  return { ok: true, user: user.user, master, realisasi };
+}
+
+function listRealisasi_(idToken) {
+  const user = authenticate_(idToken);
+  return { ok: true, user: user.user, realisasi: readRealisasi_(getRealisasiSheet_()) };
+}
+
+function normalisasiBulanRealisasi_(value) {
+  const key = String(value ?? "").trim().toLowerCase();
+  const bulan = {
+    januari:"Januari", februari:"Februari", maret:"Maret", april:"April",
+    mei:"Mei", juni:"Juni", juli:"Juli", agustus:"Agustus",
+    september:"September", oktober:"Oktober", november:"November", desember:"Desember"
+  };
+  return bulan[key] || "";
+}
+
+function saveRealisasi_(idToken, row) {
+  const user = authenticate_(idToken).user;
+  if (!row) throw new Error("Data realisasi tidak ditemukan.");
+
+  const bulan = normalisasiBulanRealisasi_(row.bulan_realisasi || row.bulan);
+  const nominal = parseAmount_(row.nominal_realisasi);
+  const tahun = String(row.tahun || "").trim();
+  const idAnggaran = String(row.id_anggaran || "").trim();
+
+  if (!tahun) throw new Error("Tahun anggaran belum dipilih.");
+  if (!idAnggaran) throw new Error("Detil anggaran belum dipilih.");
+  if (!bulan) throw new Error("Bulan realisasi tidak valid.");
+  if (!(nominal > 0)) throw new Error("Nominal realisasi harus lebih besar dari 0.");
+
+  const master = buildRealisasiMasterFromDataAplikasi_();
+  const target = master.find(item => item.id_anggaran === idAnggaran && item.tahun === tahun);
+  if (!target) throw new Error("Detil anggaran tidak ditemukan pada DATA_APLIKASI.");
+  if (target.pagu <= 0) throw new Error("Pagu detil tidak valid.");
+
+  const sheet = getRealisasiSheet_();
+  const existing = readRealisasi_(sheet);
+  const activeTotal = existing
+    .filter(item => item.id_anggaran === idAnggaran && item.tahun === tahun && String(item.status).toUpperCase() === "AKTIF")
+    .reduce((sum, item) => sum + (Number(item.nominal_realisasi) || 0), 0);
+
+  if (activeTotal + nominal > target.pagu) {
+    throw new Error(
+      "Total Input Realisasi akan melebihi Pagu Detil. " +
+      "Pagu: " + target.pagu + ", sudah diinput: " + activeTotal + ", tambahan: " + nominal + "."
+    );
+  }
+
+  const now = new Date();
+  const id = "REAL-" + Utilities.getUuid();
+  const index = realisasiHeaderIndex_(sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]);
+  const output = new Array(sheet.getLastColumn()).fill("");
+
+  const set = (name, value) => {
+    const idx = index[name] !== undefined ? index[name] : index[name.replace(/_/g, " ")];
+    if (idx !== undefined) output[idx] = value;
+  };
+
+  set("ID_REALISASI", id);
+  set("TAHUN", tahun);
+  set("ID_ANGGARAN", idAnggaran);
+  set("KODE_SUB_KOMPONEN", target.kodeSubKomponen);
+  set("SUB_KOMPONEN", target.subKomponen);
+  set("AKUN", target.akun);
+  set("ITEM_AKUN", target.itemAkun);
+  set("DETIL_AKUN", target.detilAkun);
+  set("RINCIAN_ITEM", target.rincianItem);
+  set("PAGU_DETIL", target.pagu);
+  set("BULAN_REALISASI", bulan);
+  set("NOMINAL_REALISASI", nominal);
+  set("KETERANGAN", String(row.keterangan || "").trim());
+  set("STATUS", "AKTIF");
+  set("CREATED_AT", now);
+  set("CREATED_BY", user.email);
+  set("UPDATED_AT", now);
+  set("UPDATED_BY", user.email);
+
+  sheet.appendRow(output);
+
+  const record = {
+    id_realisasi: id,
+    tahun,
+    id_anggaran: idAnggaran,
+    kode_sub_komponen: target.kodeSubKomponen,
+    sub_komponen: target.subKomponen,
+    akun: target.akun,
+    item_akun: target.itemAkun,
+    detil_akun: target.detilAkun,
+    rincian_item: target.rincianItem,
+    pagu_detil: target.pagu,
+    bulan,
+    nominal_realisasi: nominal,
+    keterangan: String(row.keterangan || "").trim(),
+    status: "AKTIF",
+    created_by: user.email
+  };
+
+  getRealisasiLogSheet_().appendRow([
+    now, "INSERT", id, user.email, "", JSON.stringify(record), "Input realisasi bulanan"
+  ]);
+
+  return { ok: true, message: "Realisasi berhasil disimpan.", data: record };
 }
 
 function jsonOutput(data) {
