@@ -547,3 +547,72 @@ document.addEventListener("DOMContentLoaded", function () {
         if (item) item.remove();
     });
 });
+
+
+// ============================================================
+// NAVIGASI CEPAT
+//
+// GitHub Pages adalah static site. Service Worker membuat halaman,
+// JS, CSS, gambar, dan navigasi menu dapat diambil dari cache.
+// Prefetch saat mouse masuk ke menu membuat klik berikutnya lebih cepat.
+// ============================================================
+
+(function aktifkanNavigasiCepat() {
+    if (!("serviceWorker" in navigator)) return;
+
+    window.addEventListener("load", function () {
+        navigator.serviceWorker.register("./sw.js", {
+            scope: "./"
+        }).then(function () {
+            console.log("P3HPL Service Worker aktif.");
+        }).catch(function (error) {
+            console.warn("Service Worker P3HPL tidak aktif:", error);
+        });
+    });
+
+    let prefetchInProgress = false;
+
+    document.addEventListener("pointerenter", function (event) {
+        const link = event.target?.closest?.(".sidebar a[href]");
+
+        if (!link || prefetchInProgress) return;
+
+        const href = link.getAttribute("href") || "";
+
+        if (
+            !href ||
+            href.startsWith("#") ||
+            href.startsWith("http") ||
+            href.startsWith("javascript:")
+        ) {
+            return;
+        }
+
+        const target = new URL(href, window.location.href);
+
+        if (target.origin !== window.location.origin) return;
+
+        prefetchInProgress = true;
+
+        // Biarkan browser menyiapkan halaman di Cache API.
+        fetch(target.href, {
+            credentials: "same-origin",
+            cache: "no-cache"
+        })
+        .then(function (response) {
+            if (!response || !response.ok) return;
+
+            if ("caches" in window) {
+                return caches.open("p3hpl-static-v1").then(function (cache) {
+                    return cache.put(target.href, response.clone());
+                });
+            }
+        })
+        .catch(function () {})
+        .finally(function () {
+            setTimeout(function () {
+                prefetchInProgress = false;
+            }, 300);
+        });
+    }, true);
+})();
