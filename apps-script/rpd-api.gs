@@ -21,6 +21,8 @@ const RPD_CLIENT_ID = "443412026871-pqoa9tskrfkaffp5u2ohjhtq1l0ds2r1.apps.google
 // URL CSV DATA_APLIKASI yang saat ini dipakai Dashboard.
 const SOURCE_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vShdaPwws12pkv75bkQJL9AYjuC_4xjvANknmsoT6HVmgKeQ2DJsLLm5QzbvlKQJeQvqNGzYALsOk5n/pub?gid=1473286966&single=true&output=csv";
 
+const RPD_API_VERSION = "1.2.0";
+
 const RPD_SHEETS = {
   RPD: "RPD P3HPL",
   USERS: "USERS",
@@ -48,7 +50,7 @@ const USER_HEADERS = ["EMAIL","NAMA","ROLE","AKTIF"];
 function doPost(e) {
   try {
     const request = JSON.parse(e?.postData?.contents || "{}");
-    const action = String(request.action || "").trim();
+    const action = String(request.action || "").trim().toLowerCase();
 
     if (action === "auth") return jsonOutput(authenticate_(request.id_token));
     if (action === "bootstrap") return jsonOutput(bootstrap_(request.id_token));
@@ -65,8 +67,30 @@ function doPost(e) {
   }
 }
 
-function doGet() {
-  return jsonOutput({ ok: true, service: "RPD API", version: "1.1.0" });
+function doGet(e) {
+  const action = String(e?.parameter?.action || "").trim().toLowerCase();
+
+  if (action === "ping" || !action) {
+    return jsonOutput({
+      ok: true,
+      service: "RPD API",
+      version: RPD_API_VERSION,
+      endpoints: [
+        "auth",
+        "bootstrap",
+        "list",
+        "save",
+        "realisasi_bootstrap",
+        "realisasi_list",
+        "realisasi_save"
+      ]
+    });
+  }
+
+  return jsonOutput({
+    ok: false,
+    message: "Gunakan POST untuk endpoint API."
+  });
 }
 
 // ============================================================
@@ -219,12 +243,26 @@ function realisasiBootstrap_(idToken) {
   const user = authenticate_(idToken);
   const master = buildRealisasiMasterFromDataAplikasi_();
   const realisasi = readRealisasi_(getRealisasiSheet_());
-  return { ok: true, user: user.user, master, realisasi };
+  return {
+    ok: true,
+    user: user.user,
+    master,
+    master_count: master.length,
+    realisasi,
+    realisasi_count: realisasi.length,
+    source: "DATA_APLIKASI"
+  };
 }
 
 function listRealisasi_(idToken) {
   const user = authenticate_(idToken);
-  return { ok: true, user: user.user, realisasi: readRealisasi_(getRealisasiSheet_()) };
+  const realisasi = readRealisasi_(getRealisasiSheet_());
+  return {
+    ok: true,
+    user: user.user,
+    realisasi,
+    realisasi_count: realisasi.length
+  };
 }
 
 function normalisasiBulanRealisasi_(value) {
@@ -322,7 +360,15 @@ function saveRealisasi_(idToken, row) {
     now, "INSERT", id, user.email, "", JSON.stringify(record), "Input realisasi bulanan"
   ]);
 
-  return { ok: true, message: "Realisasi berhasil disimpan.", data: record };
+  return {
+    ok: true,
+    message: "Realisasi berhasil disimpan.",
+    user: { email: user.email, name: user.name || user.email, role: user.role || "OPERATOR" },
+    data: record,
+    pagu: target.pagu,
+    total_realisasi_input: activeTotal + nominal,
+    sisa_pagu_input: Math.max(target.pagu - activeTotal - nominal, 0)
+  };
 }
 
 function jsonOutput(data) {
@@ -486,11 +532,11 @@ function buildMasterFromDataAplikasi_() {
     const pagu = parseAmount_(headerValue_(row, context.map, ["Pagu"]));
     const status = headerValue_(row, context.map, ["Status Pagu","Status"]);
 
-    if (!subKomponen || !akun || !detilAkun || pagu <= 0) continue;
+    if (!subKomponen || !akun || pagu <= 0) continue;
     if (/blok/i.test(String(status))) continue;
 
     const tahun = headerValue_(row, context.map, ["Tahun","Tahun Anggaran"]) || new Date().getFullYear();
-    const id = makeRpdId_(tahun, kodeSubKomponen, subKomponen, akun, itemAkun, detilAkun);
+    const id = makeRpdId_(tahun, kodeSubKomponen, subKomponen, akun, itemAkun, detilAkun, rincianItem, pagu);
 
     if (seen[id]) continue;
     seen[id] = true;
