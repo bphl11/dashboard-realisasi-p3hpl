@@ -190,6 +190,13 @@ async function fetchSheetData(forceRefresh = false) {
 
             console.log("JUMLAH BARIS DATA_APLIKASI:", data.length);
 
+            // Ambil transaksi Input Realisasi secara terpisah.
+            // Jika API transaksi sedang tidak tersedia, Dashboard/Monitoring
+            // tetap menggunakan DATA_APLIKASI tanpa gagal total.
+            const inputRealisasi = await fetchInputRealisasiMonitoring();
+            attachInputRealisasiToRawData(data, inputRealisasi);
+            console.log("JUMLAH INPUT_REALISASI AKTIF:", inputRealisasi.length);
+
             simpanCacheApi(data);
             return data;
         } catch (error) {
