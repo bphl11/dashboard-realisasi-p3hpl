@@ -58,6 +58,7 @@ function doPost(e) {
     if (action === "save") return jsonOutput(saveRpd_(request.id_token, request.row));
     if (action === "realisasi_bootstrap") return jsonOutput(realisasiBootstrap_(request.id_token));
     if (action === "realisasi_list") return jsonOutput(listRealisasi_(request.id_token));
+    if (action === "realisasi_monitoring") return jsonOutput(listRealisasiMonitoring_());
     if (action === "realisasi_save") return jsonOutput(saveRealisasi_(request.id_token, request.row));
 
     return jsonOutput({ ok: false, message: "Action API tidak dikenal." });
@@ -337,6 +338,30 @@ function realisasiBootstrap_(idToken) {
     realisasi,
     realisasi_count: realisasi.length,
     source: "DATA_APLIKASI"
+  };
+}
+
+function listRealisasiMonitoring_() {
+  const realisasi = readRealisasi_(getRealisasiSheet_());
+
+  // Monitoring publik hanya menerima data agregasi/transaksi
+  // yang diperlukan untuk perhitungan. Data operator/email/keterangan
+  // tidak dikirim.
+  const rows = realisasi
+    .filter(item => String(item.status || "AKTIF").toUpperCase() === "AKTIF")
+    .filter(item => item.id_anggaran && item.tahun && item.bulan && Number(item.nominal_realisasi) > 0)
+    .map(item => ({
+      id_anggaran: String(item.id_anggaran),
+      tahun: String(item.tahun),
+      bulan: String(item.bulan),
+      nominal_realisasi: Number(item.nominal_realisasi) || 0
+    }));
+
+  return {
+    ok: true,
+    realisasi: rows,
+    realisasi_count: rows.length,
+    source: "REALISASI_P3HPL"
   };
 }
 
