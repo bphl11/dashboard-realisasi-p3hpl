@@ -360,8 +360,8 @@ document.addEventListener(
             grafikRpdBulanan = rpdGrafik.bulanan;
             grafikRpdTotal = rpdGrafik.total;
 
-            // Grafik menggunakan Realisasi AKTUAL sebagai angka resmi.
-            // RPD hanya ditampilkan sebagai data pembanding terpisah.
+            // Realisasi Aktual adalah angka resmi yang harus konsisten
+            // dengan Dashboard. RPD hanya menjadi data pembanding.
             totalData.rpdTerisi = grafikRpdTotal;
             totalData.sisaRpd = Math.max(
                 (Number(totalData.pagu) || 0) -
@@ -424,13 +424,11 @@ document.addEventListener(
             // =================================================
 
             buatGrafikBulanan(
-                totalData.bulanan,
-                grafikRpdBulanan
-            );
 
-            buatGrafikKumulatif(
                 totalData.bulanan,
+
                 grafikRpdBulanan
+
             );
 
 
@@ -616,684 +614,26 @@ function ambilDataUtamaGrafik(data) {
 // ============================================================
 
 function tampilkanCardGrafik(data) {
-    setTextGrafik("totalPagu", formatRupiahGrafik(data.pagu));
-    setTextGrafik("totalRealisasi", formatRupiahGrafik(data.realisasi));
-    setTextGrafik("rpdTerisi", formatRupiahGrafik(data.rpdTerisi || 0));
-    setTextGrafik("sisaAnggaran", formatRupiahGrafik(data.sisaRpd));
-}/ ============================================================
-// GRAFIK.JS
-// GRAFIK REALISASI ANGGARAN P3HPHL
-//
-// Membutuhkan:
-// - config.js
-// - api.js
-// - parser.js
-// - Chart.js
-//
-// GRAFIK:
-// 1. Realisasi Bulanan
-// 2. Normal vs Diblokir
-// 3. Pagu vs Realisasi vs Sisa
-// 4. Persentase Penyerapan
-//
-// LOGIKA STATUS:
-//
-// TOTAL     = Total Utama Excel
-// DIBLOKIR  = Detail yang berstatus Diblokir
-// NORMAL    = TOTAL - DIBLOKIR
-//
-// Dengan demikian:
-//
-// NORMAL + DIBLOKIR = TOTAL
-//
-// Logika ini mengikuti konsep yang sudah digunakan
-// pada halaman Laporan.
-// ============================================================
-
-
-
-// ============================================================
-// VARIABEL GLOBAL
-// ============================================================
-
-let grafikRawData = [];
-
-let grafikParsedData = [];
-
-
-let chartBulanan = null;
-let chartKumulatif = null;
-
-let chartStatusAnggaran = null;
-
-let chartPerbandingan = null;
-
-let chartPersentase = null;
-
-let grafikRpdBulanan = Array(12).fill(0);
-let grafikRpdTotal = 0;
-
-function hitungRpdBulananGrafik(rows, tersedia = true) {
-    const fields = [
-        ["jan_m1","jan_m2","jan_m3","jan_m4"],
-        ["feb_m1","feb_m2","feb_m3","feb_m4"],
-        ["mar_m1","mar_m2","mar_m3","mar_m4"],
-        ["apr_m1","apr_m2","apr_m3","apr_m4"],
-        ["mei_m1","mei_m2","mei_m3","mei_m4"],
-        ["jun_m1","jun_m2","jun_m3","jun_m4"],
-        ["jul_m1","jul_m2","jul_m3","jul_m4"],
-        ["agu_m1","agu_m2","agu_m3","agu_m4"],
-        ["sep_m1","sep_m2","sep_m3","sep_m4"],
-        ["okt_m1","okt_m2","okt_m3","okt_m4"],
-        ["nov_m1","nov_m2","nov_m3","nov_m4"],
-        ["des_m1","des_m2","des_m3","des_m4"]
-    ];
-
-    const bulanan = Array(12).fill(0);
-
-    (Array.isArray(rows) ? rows : []).forEach(function (row) {
-        fields.forEach(function (monthFields, monthIndex) {
-            monthFields.forEach(function (field) {
-                bulanan[monthIndex] += Number(row?.[field]) || 0;
-            });
-        });
-    });
-
-    return {
-        bulanan: bulanan,
-        total: bulanan.reduce(function (sum, value) {
-            return sum + value;
-        }, 0),
-        tersedia: tersedia
-    };
-}
-
-async function ambilRpdBulananGrafik() {
-    const kosong = { bulanan: Array(12).fill(0), total: 0, tersedia: false };
-
-    try {
-        const rawUser = sessionStorage.getItem("p3hpl_rpd_user_v1");
-        const user = rawUser ? JSON.parse(rawUser) : null;
-        const token = String(user?.id_token || "").trim();
-
-        if (!token) {
-            // Grafik dan halaman RPD dapat berada pada tab berbeda.
-            // sessionStorage tidak dibagi antar-tab, sehingga gunakan
-            // cache RPD lokal yang memang sudah dipelihara oleh modul RPD.
-            try {
-                const rawCache = localStorage.getItem("p3hpl_rpd_saved_v4");
-                const cachedRows = rawCache ? JSON.parse(rawCache) : [];
-                if (Array.isArray(cachedRows) && cachedRows.length) {
-                    return hitungRpdBulananGrafik(cachedRows, true);
-                }
-            } catch (error) {
-                console.warn("Cache RPD lokal tidak dapat dibaca:", error);
-            }
-            return kosong;
-        }
-
-        const apiUrl =
-            typeof RPD_CONFIG !== "undefined"
-                ? String(RPD_CONFIG.RPD_PROXY_URL || RPD_CONFIG.RPD_API_URL || "").trim()
-                : "";
-
-        if (!apiUrl) return kosong;
-
-        const response = await fetch(apiUrl, {
-            method: "POST",
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify({ action: "list", id_token: token }),
-            redirect: "follow",
-            credentials: "omit",
-            cache: "no-store"
-        });
-
-        const textResponse = await response.text();
-        let result;
-        try {
-            result = JSON.parse(textResponse);
-        } catch (error) {
-            throw new Error("Respons RPD bukan JSON yang valid.");
-        }
-
-        if (!response.ok || result?.ok === false) {
-            throw new Error(result?.message || "Data RPD tidak dapat dibaca.");
-        }
-
-        const rows = Array.isArray(result.rpd) ? result.rpd : [];
-        return hitungRpdBulananGrafik(rows, true);
-
-        /* legacy parsing retained below for reference only */
-        const fields = [
-            ["jan_m1","jan_m2","jan_m3","jan_m4"],
-            ["feb_m1","feb_m2","feb_m3","feb_m4"],
-            ["mar_m1","mar_m2","mar_m3","mar_m4"],
-            ["apr_m1","apr_m2","apr_m3","apr_m4"],
-            ["mei_m1","mei_m2","mei_m3","mei_m4"],
-            ["jun_m1","jun_m2","jun_m3","jun_m4"],
-            ["jul_m1","jul_m2","jul_m3","jul_m4"],
-            ["agu_m1","agu_m2","agu_m3","agu_m4"],
-            ["sep_m1","sep_m2","sep_m3","sep_m4"],
-            ["okt_m1","okt_m2","okt_m3","okt_m4"],
-            ["nov_m1","nov_m2","nov_m3","nov_m4"],
-            ["des_m1","des_m2","des_m3","des_m4"]
-        ];
-
-    } catch (error) {
-        console.warn("RPD grafik tidak dapat dimuat:", error);
-        return kosong;
-    }
-}
-
-
-// ============================================================
-// LABEL NILAI LANGSUNG PADA DIAGRAM
-//
-// Menampilkan nominal tanpa harus mengarahkan kursor.
-// Berlaku untuk seluruh diagram Chart.js pada halaman Grafik.
-// ============================================================
-
-const directValueLabelsPlugin = {
-    id: "directValueLabels",
-
-    afterDatasetsDraw: function (chart) {
-        const ctx = chart.ctx;
-        const chartArea = chart.chartArea;
-
-        if (!chartArea) return;
-
-        ctx.save();
-
-        chart.data.datasets.forEach(function (dataset, datasetIndex) {
-            const meta = chart.getDatasetMeta(datasetIndex);
-
-            if (meta.hidden) return;
-
-            meta.data.forEach(function (element, index) {
-                const value = Number(dataset.data[index]) || 0;
-
-                // Nilai 0 tidak perlu ditulis agar grafik tetap bersih.
-                if (value === 0) return;
-
-                const text = formatSingkatRupiah(value);
-                const position = element.tooltipPosition();
-
-                ctx.font = "700 11px system-ui, sans-serif";
-                ctx.fillStyle = "#243142";
-                ctx.textAlign = "center";
-
-                if (chart.config.type === "doughnut" || chart.config.type === "pie") {
-                    ctx.textBaseline = "middle";
-                    ctx.fillText(text, position.x, position.y);
-                    return;
-                }
-
-                ctx.textBaseline = "bottom";
-
-                // Pastikan label tetap berada di dalam area chart,
-                // termasuk untuk batang yang sangat tinggi.
-                const y = Math.max(
-                    chartArea.top + 14,
-                    position.y - 8
-                );
-
-                ctx.fillText(text, position.x, y);
-            });
-        });
-
-        ctx.restore();
-    }
-};
-
-
-// ============================================================
-// LOAD HALAMAN GRAFIK
-// ============================================================
-
-document.addEventListener(
-
-    "DOMContentLoaded",
-
-    async function () {
-
-        try {
-
-            console.log(
-                "===================================="
-            );
-
-            console.log(
-                "LOAD HALAMAN GRAFIK"
-            );
-
-            console.log(
-                "===================================="
-            );
-
-
-            // =================================================
-            // CEK FUNGSI API
-            // =================================================
-
-            if (
-                typeof getSheetDataMonitoring !==
-                "function"
-            ) {
-
-                throw new Error(
-
-                    "Fungsi getSheetDataMonitoring() tidak ditemukan."
-
-                );
-
-            }
-
-
-            // =================================================
-            // CEK PARSER
-            // =================================================
-
-            if (
-                typeof parseDataMonitoring !==
-                "function"
-            ) {
-
-                throw new Error(
-
-                    "parser.js belum dimuat. Pastikan parser.js dimuat sebelum grafik.js."
-
-                );
-
-            }
-
-
-            // =================================================
-            // AMBIL DATA GOOGLE SHEET
-            // =================================================
-
-            grafikRawData =
-
-                await getSheetDataMonitoring();
-
-
-            if (
-                !Array.isArray(
-                    grafikRawData
-                )
-            ) {
-
-                throw new Error(
-
-                    "Data Google Sheet tidak valid."
-
-                );
-
-            }
-
-
-            console.log(
-
-                "JUMLAH BARIS RAW:",
-
-                grafikRawData.length
-
-            );
-
-
-            // =================================================
-            // PARSE DATA DETAIL
-            //
-            // Menggunakan parser yang sama dengan Laporan.
-            // =================================================
-
-            grafikParsedData =
-
-                parseDataMonitoring(
-
-                    grafikRawData
-
-                );
-
-
-            console.log(
-
-                "JUMLAH DATA PARSER:",
-
-                grafikParsedData.length
-
-            );
-
-
-            // =================================================
-            // AMBIL TOTAL UTAMA
-            //
-            // Untuk grafik bulanan tetap menggunakan fungsi
-            // khusus karena membutuhkan Januari - Desember.
-            // =================================================
-
-            const calculation = hitungCalculationEngine(grafikRawData, grafikParsedData);
-
-            const totalData = {
-                ...calculation.total,
-                bulanan: ambilDataUtamaGrafik(grafikRawData).bulanan
-            };
-
-            const rpdGrafik = await ambilRpdBulananGrafik();
-            grafikRpdBulanan = rpdGrafik.bulanan;
-            grafikRpdTotal = rpdGrafik.total;
-
-            // Grafik menggunakan Realisasi AKTUAL sebagai angka resmi.
-            // RPD hanya ditampilkan sebagai data pembanding terpisah.
-            totalData.rpdTerisi = grafikRpdTotal;
-            totalData.sisaRpd = Math.max(
-                (Number(totalData.pagu) || 0) -
-                (Number(totalData.realisasi) || 0) -
-                grafikRpdTotal,
-                0
-            );
-
-            totalData.persen = Number(totalData.pagu) > 0
-                ? ((Number(totalData.realisasi) || 0) / Number(totalData.pagu)) * 100
-                : 0;
-
-            const statusRpdGrafik = document.getElementById("statusRpdGrafik");
-            if (statusRpdGrafik) {
-                statusRpdGrafik.textContent = rpdGrafik.tersedia
-                    ? "RPD terisi: " + formatRupiahGrafik(grafikRpdTotal)
-                    : "RPD belum dapat dimuat pada sesi ini. Login pada halaman RPD untuk menampilkan RPD terisi.";
-            }
-
-
-
-            console.log(
-
-                "DATA UTAMA GRAFIK:",
-
-                totalData
-
-            );
-
-
-            // =================================================
-            // HITUNG STATUS NORMAL VS DIBLOKIR
-            // =================================================
-
-            const dataStatus = { normal: calculation.tanpaBlokir, diblokir: calculation.diblokir, total: calculation.total };
-
-
-            console.log(
-
-                "DATA STATUS ANGGARAN:",
-
-                dataStatus
-
-            );
-
-
-            // =================================================
-            // TAMPILKAN CARD TOTAL
-            // =================================================
-
-            tampilkanCardGrafik(
-
-                totalData
-
-            );
-
-
-            // =================================================
-            // GRAFIK BULANAN
-            // =================================================
-
-            buatGrafikBulanan(
-                totalData.bulanan,
-                grafikRpdBulanan
-            );
-
-            buatGrafikKumulatif(
-                totalData.bulanan,
-                grafikRpdBulanan
-            );
-
-
-            // =================================================
-            // GRAFIK NORMAL VS DIBLOKIR
-            // =================================================
-
-            buatGrafikStatusAnggaran(
-
-                dataStatus
-
-            );
-
-
-            // =================================================
-            // GRAFIK PAGU REALISASI SISA
-            // =================================================
-
-            buatGrafikPerbandingan(
-
-                totalData
-
-            );
-
-
-            // =================================================
-            // GRAFIK PERSENTASE
-            // =================================================
-
-            buatGrafikPersentase(
-
-                totalData
-
-            );
-
-
-            // =================================================
-            // HILANGKAN LOADING
-            // =================================================
-
-            const loading =
-
-                document.getElementById(
-
-                    "loadingGrafikBulanan"
-
-                );
-
-
-            if (loading) {
-
-                loading.style.display =
-                    "none";
-
-            }
-
-
-            console.log(
-                "===================================="
-            );
-
-            console.log(
-                "GRAFIK SELESAI DIMUAT"
-            );
-
-            console.log(
-                "===================================="
-            );
-
-
-        }
-
-        catch (error) {
-
-            console.error(
-
-                "ERROR GRAFIK:",
-
-                error
-
-            );
-
-
-            const loading =
-
-                document.getElementById(
-
-                    "loadingGrafikBulanan"
-
-                );
-
-
-            if (loading) {
-
-                loading.innerHTML =
-
-                    '<span class="text-danger">' +
-
-                    "Gagal memuat data grafik: " +
-
-                    escapeHtmlGrafik(
-
-                        error.message
-
-                    )
-
-                    +
-
-                    "</span>";
-
-            }
-
-        }
-
-    }
-
-);
-
-
-
-// ============================================================
-// AMBIL DATA UTAMA GRAFIK
-//
-// Mengambil satu baris total utama.
-//
-// Data bulanan:
-//
-// F = Pagu
-// G = Januari
-// H = Februari
-// ...
-// R = Desember
-//
-// Fungsi lama tetap dipertahankan karena grafik bulanan
-// membutuhkan angka Januari sampai Desember.
-// ============================================================
-
-function ambilDataUtamaGrafik(data) {
-
-    // DATA_APLIKASI: data bulanan dijumlahkan berdasarkan nama header.
-    if (typeof isDataAplikasi === "function" && isDataAplikasi(data) &&
-        typeof ambilBulananDataAplikasi === "function") {
-        const totalBulanan = ambilBulananDataAplikasi(data);
-        const bulan = [
-            "Januari","Februari","Maret","April","Mei","Juni",
-            "Juli","Agustus","September","Oktober","November","Desember"
-        ];
-        return {
-            bulanan: bulan.map(function (nama) {
-                return Number(totalBulanan[nama]) || 0;
-            })
-        };
-    }
-    // Fungsi ini sekarang hanya bertanggung jawab mengambil data bulanan.
-    // Nilai total Pagu/Realisasi/Sisa selalu berasal dari Calculation Engine.
-    let rowTerbaik = null;
-    let skorTerbaik = -1;
-
-    (data || []).forEach(function (row) {
-        let skor = 0;
-        for (let i = 6; i <= 17; i++) {
-            if (parseNumberGrafik(row?.[i]) !== null) skor++;
-        }
-        if (skor > skorTerbaik) {
-            skorTerbaik = skor;
-            rowTerbaik = row;
-        }
-    });
-
-    const bulanan = [];
-    for (let i = 0; i < 12; i++) {
-        bulanan.push(
-            parseNumberGrafik(rowTerbaik?.[6 + i]) || 0
-        );
-    }
-
-    return { bulanan };
-}
-
-// ============================================================
-// // ============================================================
-// TAMPILKAN CARD GRAFIK
-// ============================================================
-
-function tampilkanCardGrafik(
-    data
-) {
-
     setTextGrafik(
-
         "totalPagu",
-
-        formatRupiahGrafik(
-
-            data.pagu
-
-        )
-
+        formatRupiahGrafik(data.pagu)
     );
 
-
     setTextGrafik(
-
         "totalRealisasi",
-
-        formatRupiahGrafik(
-
-            data.realisasiRpd ?? data.realisasi
-
-        )
-
+        formatRupiahGrafik(data.realisasi)
     );
 
+    setTextGrafik(
+        "rpdTerisi",
+        formatRupiahGrafik(data.rpdTerisi || 0)
+    );
 
     setTextGrafik(
-
         "sisaAnggaran",
-
-        formatRupiahGrafik(
-
-            data.sisaRpd ?? data.sisa
-
-        )
-
+        formatRupiahGrafik(data.sisaRpd)
     );
-
-
-    setTextGrafik(
-
-        "persentase",
-
-        formatPersenGrafik(
-
-            data.persen
-
-        )
-
-    );
-
 }
-
 
 
 // ============================================================
@@ -1569,28 +909,34 @@ function buatGrafikBulanan(
 // GRAFIK KUMULATIF REALISASI vs RPD
 // ============================================================
 
-function buatGrafikKumulatif(bulanan, rpdBulanan = Array(12).fill(0)) {
+function buatGrafikKumulatif(
+    bulanan,
+    rpdBulanan = Array(12).fill(0)
+) {
     const canvas = document.getElementById("grafikKumulatif");
-    if (!canvas || typeof Chart === "undefined") return;
+
+    if (!canvas || typeof Chart === "undefined") {
+        return;
+    }
 
     if (chartKumulatif) {
         chartKumulatif.destroy();
     }
 
     const bulan = [
-        "Januari","Februari","Maret","April","Mei","Juni",
-        "Juli","Agustus","September","Oktober","November","Desember"
+        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
     ];
 
     let totalRealisasi = 0;
     let totalRpd = 0;
 
-    const kumulatifRealisasi = (bulanan || []).map(function (value) {
+    const kumulatifRealisasi = (Array.isArray(bulanan) ? bulanan : []).map(function (value) {
         totalRealisasi += Number(value) || 0;
         return totalRealisasi;
     });
 
-    const kumulatifRpd = (rpdBulanan || []).map(function (value) {
+    const kumulatifRpd = (Array.isArray(rpdBulanan) ? rpdBulanan : []).map(function (value) {
         totalRpd += Number(value) || 0;
         return totalRpd;
     });
@@ -1644,12 +990,11 @@ function buatGrafikKumulatif(bulanan, rpdBulanan = Array(12).fill(0)) {
                         },
                         afterBody: function (items) {
                             if (!items || !items.length) return "";
-                            const i = items[0].dataIndex;
-                            const aktual = Number(kumulatifRealisasi[i]) || 0;
-                            const rpd = Number(kumulatifRpd[i]) || 0;
-                            const selisih = aktual - rpd;
+                            const index = items[0].dataIndex;
+                            const aktual = Number(kumulatifRealisasi[index]) || 0;
+                            const rpd = Number(kumulatifRpd[index]) || 0;
                             return "Selisih aktual - RPD: " +
-                                formatRupiahGrafik(selisih);
+                                formatRupiahGrafik(aktual - rpd);
                         }
                     }
                 }
