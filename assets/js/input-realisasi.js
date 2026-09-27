@@ -114,13 +114,23 @@ function onMasterSelectedInputRealisasi() {
     renderMasterInfoInputRealisasi();
 }
 
-function getExistingTotalForMaster(idAnggaran) {
+function getExistingInputTotalForMaster(idAnggaran) {
     return realisasiRows
         .filter(item =>
             item.id_anggaran === idAnggaran &&
             String(item.status || "AKTIF").toUpperCase() === "AKTIF"
         )
         .reduce((sum, item) => sum + (Number(item.nominal_realisasi) || 0), 0);
+}
+
+function getBaseRealisasiForMaster(master) {
+    return Number(master?.realisasi) || 0;
+}
+
+function getTotalRealisasiForMaster(master) {
+    if (!master) return 0;
+    return getBaseRealisasiForMaster(master) +
+        getExistingInputTotalForMaster(master.id_anggaran);
 }
 
 function renderMasterInfoInputRealisasi() {
@@ -132,17 +142,20 @@ function renderMasterInfoInputRealisasi() {
         return;
     }
 
-    const totalInput = getExistingTotalForMaster(selectedMaster.id_anggaran);
-    const sisaInput = Math.max((Number(selectedMaster.pagu) || 0) - totalInput, 0);
+    const baseRealisasi = getBaseRealisasiForMaster(selectedMaster);
+    const inputRealisasi = getExistingInputTotalForMaster(selectedMaster.id_anggaran);
+    const totalRealisasi = baseRealisasi + inputRealisasi;
+    const sisaInput = Math.max((Number(selectedMaster.pagu) || 0) - totalRealisasi, 0);
 
     box.innerHTML = `
         <div class="row g-2">
             <div class="col-md-3"><div class="small text-muted">Akun</div><strong>${escapeHtmlInputRealisasi(selectedMaster.akun)}</strong></div>
             <div class="col-md-3"><div class="small text-muted">Pagu Detil</div><strong>${rupiahInput(selectedMaster.pagu)}</strong></div>
-            <div class="col-md-3"><div class="small text-muted">Input Realisasi</div><strong>${rupiahInput(totalInput)}</strong></div>
+            <div class="col-md-3"><div class="small text-muted">Total Realisasi</div><strong>${rupiahInput(totalRealisasi)}</strong></div>
             <div class="col-md-3"><div class="small text-muted">Sisa Pagu</div><strong>${rupiahInput(sisaInput)}</strong></div>
         </div>
         <div class="small text-muted mt-2">
+            Realisasi DATA_APLIKASI: ${rupiahInput(baseRealisasi)} · Input bulanan: ${rupiahInput(inputRealisasi)}<br>
             ${escapeHtmlInputRealisasi(selectedMaster.detilAkun || selectedMaster.rincianItem || "Detil anggaran")}
         </div>
     `;
@@ -233,12 +246,14 @@ async function submitInputRealisasi(event) {
         return;
     }
 
-    const existingTotal = getExistingTotalForMaster(selectedMaster.id_anggaran);
+    const existingInputTotal = getExistingInputTotalForMaster(selectedMaster.id_anggaran);
+    const baseRealisasi = getBaseRealisasiForMaster(selectedMaster);
+    const totalSebelumInput = baseRealisasi + existingInputTotal;
     const pagu = Number(selectedMaster.pagu) || 0;
 
-    if (existingTotal + nominal > pagu) {
+    if (totalSebelumInput + nominal > pagu) {
         setStatusInputRealisasi(
-            "Nominal melebihi sisa pagu. Sisa saat ini: " + rupiahInput(Math.max(pagu - existingTotal, 0)),
+            "Nominal melebihi sisa pagu. Sisa saat ini: " + rupiahInput(Math.max(pagu - totalSebelumInput, 0)),
             "warning"
         );
         return;
