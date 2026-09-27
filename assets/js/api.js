@@ -355,27 +355,33 @@ async function fetchSheetData(forceRefresh = false) {
                 );
             }
 
-            const response = await fetch(CONFIG.SHEET_URL);
+            // DATA_APLIKASI dan INPUT_REALISASI diambil bersamaan.
+            // Sebelumnya transaksi menunggu CSV selesai, sehingga waktu
+            // tunggu halaman adalah CSV + API Realisasi.
+            const dataPromise = fetch(CONFIG.SHEET_URL).then(async function (response) {
+                if (!response.ok) {
+                    throw new Error(
+                        "Gagal mengambil DATA_APLIKASI. HTTP " + response.status
+                    );
+                }
 
-            if (!response.ok) {
-                throw new Error(
-                    "Gagal mengambil DATA_APLIKASI. HTTP " + response.status
-                );
-            }
+                const csv = await response.text();
 
-            const csv = await response.text();
-            if (!csv) {
-                throw new Error("DATA_APLIKASI mengembalikan data kosong.");
-            }
+                if (!csv) {
+                    throw new Error("DATA_APLIKASI mengembalikan data kosong.");
+                }
 
-            const data = csvToArray(csv);
+                return csvToArray(csv);
+            });
+
+            const inputPromise = fetchInputRealisasiMonitoring();
+
+            const [data, inputRealisasi] = await Promise.all([
+                dataPromise,
+                inputPromise
+            ]);
 
             console.log("JUMLAH BARIS DATA_APLIKASI:", data.length);
-
-            // Ambil transaksi Input Realisasi secara terpisah.
-            // Jika API transaksi sedang tidak tersedia, Dashboard/Monitoring
-            // tetap menggunakan DATA_APLIKASI tanpa gagal total.
-            const inputRealisasi = await fetchInputRealisasiMonitoring();
             attachInputRealisasiToRawData(data, inputRealisasi);
             console.log("JUMLAH INPUT_REALISASI AKTIF:", inputRealisasi.length);
 
