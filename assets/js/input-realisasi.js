@@ -115,11 +115,12 @@ function onMasterSelectedInputRealisasi() {
     renderMasterInfoInputRealisasi();
 }
 
-function getExistingInputTotalForMaster(idAnggaran) {
+function getExistingInputTotalForMaster(idAnggaran, excludeId = "") {
     return realisasiRows
         .filter(item =>
             item.id_anggaran === idAnggaran &&
-            String(item.status || "AKTIF").toUpperCase() === "AKTIF"
+            String(item.status || "AKTIF").toUpperCase() === "AKTIF" &&
+            (!excludeId || item.id_realisasi !== excludeId)
         )
         .reduce((sum, item) => sum + (Number(item.nominal_realisasi) || 0), 0);
 }
@@ -252,7 +253,10 @@ async function submitInputRealisasi(event) {
         return;
     }
 
-    const existingInputTotal = getExistingInputTotalForMaster(selectedMaster.id_anggaran);
+    const existingInputTotal = getExistingInputTotalForMaster(
+        selectedMaster.id_anggaran,
+        editingRealisasiId || ""
+    );
     const baseRealisasi = getBaseRealisasiForMaster(selectedMaster);
     const totalSebelumInput = baseRealisasi + existingInputTotal;
     const pagu = Number(selectedMaster.pagu) || 0;
