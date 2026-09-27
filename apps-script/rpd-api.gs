@@ -355,7 +355,16 @@ function listRealisasiMonitoring_() {
       id_anggaran: String(item.id_anggaran),
       tahun: String(item.tahun),
       bulan: String(item.bulan),
-      nominal_realisasi: Number(item.nominal_realisasi) || 0
+      nominal_realisasi: Number(item.nominal_realisasi) || 0,
+      // Identitas master dikirim sebagai fallback pencocokan jika
+      // ID_ANGGARAN berubah akibat perubahan struktur DATA_APLIKASI.
+      kode_sub_komponen: String(item.kode_sub_komponen || ""),
+      sub_komponen: String(item.sub_komponen || ""),
+      akun: String(item.akun || ""),
+      item_akun: String(item.item_akun || ""),
+      detil_akun: String(item.detil_akun || ""),
+      rincian_item: String(item.rincian_item || ""),
+      pagu_detil: Number(item.pagu_detil) || 0
     }));
 
   return {
