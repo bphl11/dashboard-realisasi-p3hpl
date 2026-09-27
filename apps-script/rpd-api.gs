@@ -182,8 +182,25 @@ function buildRealisasiMasterFromDataAplikasi_() {
     const detilAkun = headerValue_(row, context.map, ["Detil Akun","Detail Akun","Detil"]);
     const rincianItem = headerValue_(row, context.map, ["Rincian Item","Rincian"]);
     const pagu = parseAmount_(headerValue_(row, context.map, ["Pagu"]));
-    // Realisasi yang sudah tercatat di DATA_APLIKASI menjadi realisasi dasar.
-    const realisasi = parseAmount_(headerValue_(row, context.map, ["Realisasi","Jumlah Realisasi"]));
+    // Realisasi dasar dari DATA_APLIKASI.
+    // Jika kolom Realisasi/Jumlah Realisasi bernilai 0/kosong,
+    // gunakan total kolom Januari-Desember sebagai fallback.
+    const realisasiKolom = parseAmount_(
+      headerValue_(row, context.map, ["Realisasi","Jumlah Realisasi"])
+    );
+
+    const realisasiBulanan = [
+      "Januari","Februari","Maret","April","Mei","Juni",
+      "Juli","Agustus","September","Oktober","November","Desember"
+    ].reduce((sum, bulan) => {
+      return sum + parseAmount_(headerValue_(row, context.map, [bulan]));
+    }, 0);
+
+    const realisasi =
+      realisasiKolom > 0
+        ? realisasiKolom
+        : realisasiBulanan;
+
     const status = headerValue_(row, context.map, ["Status Pagu","Status"]);
     const tahun = headerValue_(row, context.map, ["Tahun","Tahun Anggaran"]) || new Date().getFullYear();
 
