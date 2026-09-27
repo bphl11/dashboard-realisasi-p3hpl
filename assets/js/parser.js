@@ -138,6 +138,32 @@ function statusDataAplikasi(value) {
     return text.includes("blok") ? "Diblokir" : "Normal";
 }
 
+function normalisasiKeyRealisasiClient(value) {
+    return String(value ?? "")
+        .trim()
+        .toUpperCase()
+        .replace(/\\s+/g, " ")
+        .replace(/\\|/g, "/");
+}
+
+function realisasiMasterKeyClient(item) {
+    const emptyToBlank = function (value) {
+        const text = String(value ?? "").trim();
+        return text === "-" ? "" : text;
+    };
+
+    return [
+        item.tahun || new Date().getFullYear(),
+        item.kodeSubKomponen || "",
+        item.subKomponen || "",
+        item.akun || "",
+        item.itemAkun || "",
+        item.detilAkun || "",
+        item.rincianItem || "",
+        item.pagu || 0
+    ].map(emptyToBlank).map(normalisasiKeyRealisasiClient).join("|");
+}
+
 function parseDataAplikasi(data) {
     const context = konteksDataAplikasi(data);
     if (!context) return null;
@@ -193,6 +219,7 @@ function parseDataAplikasi(data) {
 
         const item = {
             rowIndex: i,
+            tahun: nilaiHeaderDataAplikasi(row, map, ["Tahun", "Tahun Anggaran"]) || String(new Date().getFullYear()),
             sourceFormat: "DATA_APLIKASI",
             kode: akun || kodeKegiatan || kodeSubOutput || kodeOutput || "-",
             kodeKegiatan: kodeKegiatan || "-",
@@ -216,6 +243,10 @@ function parseDataAplikasi(data) {
             isRincian: Boolean(rincianItem && rincianItem !== "-"),
             bulanan: {}
         };
+
+        // ID stabil ini sama dengan ID_ANGGARAN yang dibuat Apps Script.
+        // Dipakai untuk menggabungkan transaksi Input Realisasi.
+        item.idAnggaran = realisasiMasterKeyClient(item);
 
         bulan.forEach(function (namaBulan) {
             item.bulanan[namaBulan] = angkaDataAplikasi(
@@ -365,211 +396,87 @@ function ambilInputRealisasiDariRaw(data) {
 }
 
 
-function gabungkanInputRealisasi(
-    items,
-    inputRealisasi
-) {
-
-    if (
-        !Array.isArray(
-            items
-        )
-    ) {
-
-        return [];
-
-    }
-
-
-    if (
-        !Array.isArray(
-            inputRealisasi
-        ) ||
-        !inputRealisasi.length
-    ) {
-
+function gabungkanInputRealisasi(items, inputRealisasi) {
+    if (!Array.isArray(items) || !Array.isArray(inputRealisasi) || !inputRealisasi.length) {
         return items;
-
     }
 
+    const byId = new Map();
+    const byIndex = new Map();
 
-    const byIndex =
-        new Map();
-
-
-    items.forEach(
-        function (
-            item
-        ) {
-
-            byIndex.set(
-                Number(
-                    item.rowIndex
-                ),
-                item
-            );
-
+    items.forEach(function (item) {
+        if (item?.idAnggaran) {
+            byId.set(String(item.idAnggaran), item);
         }
-    );
+        byIndex.set(Number(item?.rowIndex), item);
+    });
 
+    let diterapkan = 0;
+    let diabaikan = 0;
 
-    let diterapkan =
-        0;
+    inputRealisasi.forEach(function (transaksi) {
+        const idAnggaran = String(
+            transaksi?.id_anggaran ??
+            transaksi?.ID_ANGGARAN ??
+            ""
+        ).trim();
 
-
-    let diabaikan =
-        0;
-
-
-    inputRealisasi.forEach(
-        function (
-            transaksi
-        ) {
-
-            const indexRecord =
-                Number(
-                    transaksi?.index_record ??
-                    transaksi?.INDEX_RECORD ??
-                    transaksi?.indexRecord
-                );
-
-
-            const bulan =
-                normalisasiBulanInputRealisasi(
-                    transaksi?.bulan ??
-                    transaksi?.BULAN
-                );
-
-
-            const nominal =
-                angkaDataAplikasi(
-                    transaksi?.nominal_realisasi ??
-                    transaksi?.NOMINAL_REALISASI ??
-                    transaksi?.nominalRealisasi
-                );
-
-
-            const item =
-                byIndex.get(
-                    indexRecord
-                );
-
-
-            if (
-                !item ||
-                !bulan ||
-                !Number.isFinite(
-                    nominal
-                ) ||
-                nominal <= 0
-            ) {
-
-                diabaikan++;
-
-                return;
-
-            }
-
-
-            item.bulanan =
-                item.bulanan ||
-                {};
-
-
-            item.bulanan[
-                bulan
-            ] =
-                (
-                    Number(
-                        item.bulanan[
-                            bulan
-                        ]
-                    ) ||
-                    0
-                ) +
-                nominal;
-
-
-            item.realisasi =
-                (
-                    Number(
-                        item.realisasi
-                    ) ||
-                    0
-                ) +
-                nominal;
-
-
-            item.sisa =
-                Math.max(
-                    (
-                        Number(
-                            item.pagu
-                        ) ||
-                        0
-                    ) -
-                    (
-                        Number(
-                            item.realisasi
-                        ) ||
-                        0
-                    ),
-                    0
-                );
-
-
-            item.persen =
-                (
-                    Number(
-                        item.pagu
-                    ) ||
-                    0
-                ) > 0
-
-                    ? (
-                        (
-                            Number(
-                                item.realisasi
-                            ) ||
-                            0
-                        ) /
-                        Number(
-                            item.pagu
-                        )
-                    ) *
-                    100
-
-                    : 0;
-
-
-            diterapkan++;
-
-        }
-    );
-
-
-    console.log(
-        "INPUT_REALISASI diterapkan:",
-        diterapkan
-    );
-
-
-    if (
-        diabaikan > 0
-    ) {
-
-        console.warn(
-            "INPUT_REALISASI diabaikan:",
-            diabaikan
+        const indexRecord = Number(
+            transaksi?.index_record ??
+            transaksi?.INDEX_RECORD ??
+            transaksi?.indexRecord
         );
 
+        const bulan = normalisasiBulanInputRealisasi(
+            transaksi?.bulan ??
+            transaksi?.BULAN
+        );
+
+        const nominal = angkaDataAplikasi(
+            transaksi?.nominal_realisasi ??
+            transaksi?.NOMINAL_REALISASI ??
+            transaksi?.nominalRealisasi
+        );
+
+        // Utamakan ID_ANGGARAN. Index baris hanya fallback untuk kompatibilitas.
+        const item =
+            (idAnggaran && byId.get(idAnggaran)) ||
+            byIndex.get(indexRecord);
+
+        if (!item || !bulan || !Number.isFinite(nominal) || nominal <= 0) {
+            diabaikan++;
+            return;
+        }
+
+        item.bulanan = item.bulanan || {};
+        item.bulanan[bulan] =
+            (Number(item.bulanan[bulan]) || 0) + nominal;
+
+        item.realisasi =
+            (Number(item.realisasi) || 0) + nominal;
+
+        item.sisa = Math.max(
+            (Number(item.pagu) || 0) -
+            (Number(item.realisasi) || 0),
+            0
+        );
+
+        item.persen =
+            (Number(item.pagu) || 0) > 0
+                ? ((Number(item.realisasi) || 0) / Number(item.pagu)) * 100
+                : 0;
+
+        diterapkan++;
+    });
+
+    console.log("INPUT_REALISASI diterapkan:", diterapkan);
+
+    if (diabaikan > 0) {
+        console.warn("INPUT_REALISASI diabaikan:", diabaikan);
     }
 
-
     return items;
-
 }
-
 
 
 // ============================================================
