@@ -152,6 +152,9 @@ async function fetchSheetData(forceRefresh = false) {
         const cached = bacaCacheApi();
         if (cached) {
             console.log("=== MENGGUNAKAN CACHE DATA_APLIKASI ===");
+            const inputRealisasi = await fetchInputRealisasiMonitoring();
+            attachInputRealisasiToRawData(cached, inputRealisasi);
+            console.log("JUMLAH INPUT_REALISASI AKTIF:", inputRealisasi.length);
             return cached;
         }
     }
