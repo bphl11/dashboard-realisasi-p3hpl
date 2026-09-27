@@ -199,6 +199,9 @@ function renderListInputRealisasi() {
                     <button type="button" class="btn btn-sm btn-outline-primary" onclick="editInputRealisasi('${escapeHtmlInputRealisasi(item.id_realisasi)}')">
                         <i class="bi bi-pencil-square"></i> Edit
                     </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteInputRealisasi('${escapeHtmlInputRealisasi(item.id_realisasi)}')">
+                        <i class="bi bi-trash"></i> Hapus
+                    </button>
                 </td>
             </tr>
         `).join("")
@@ -318,6 +321,47 @@ async function submitInputRealisasi(event) {
     }
 }
 
+
+
+async function deleteInputRealisasi(id) {
+    const item = realisasiRows.find(row => row.id_realisasi === id);
+    if (!item) {
+        setStatusInputRealisasi("Transaksi realisasi tidak ditemukan.", "warning");
+        return;
+    }
+
+    const konfirmasi = window.confirm(
+        "Hapus transaksi realisasi ini?\\n\\n" +
+        "Bulan: " + (item.bulan || "-") + "\\n" +
+        "Nominal: " + rupiahInput(item.nominal_realisasi) + "\\n" +
+        "Keterangan: " + (item.keterangan || "-") + "\\n\\n" +
+        "Data akan dihapus permanen dan dapat diinput ulang."
+    );
+    if (!konfirmasi) return;
+
+    try {
+        setStatusInputRealisasi("Menghapus transaksi...", "info");
+        const result = await realisasiDelete({ id_realisasi: id });
+        if (!result?.ok) throw new Error(result?.message || "Gagal menghapus realisasi.");
+
+        realisasiRows = realisasiRows.filter(row => row.id_realisasi !== id);
+
+        if (editingRealisasiId === id) {
+            editingRealisasiId = null;
+            resetFormInputRealisasi();
+            setInputRealisasiEditMode(false);
+        }
+
+        renderListInputRealisasi();
+        renderMasterInfoInputRealisasi();
+        if (typeof invalidateApiCache === "function") invalidateApiCache();
+
+        setStatusInputRealisasi("Realisasi berhasil dihapus. Data dapat diinput ulang.", "success");
+    } catch (error) {
+        console.error(error);
+        setStatusInputRealisasi(error.message || "Gagal menghapus realisasi.", "danger");
+    }
+}
 
 function setInputRealisasiEditMode(editing) {
     const button = document.getElementById("realisasiSaveButton");
