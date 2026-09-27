@@ -107,7 +107,7 @@
 
                         <div class="mt-4 d-flex gap-2">
                             <button type="submit" id="realisasiSaveButton" class="btn btn-success">
-                                <i class="bi bi-save"></i> Simpan Realisasi
+                                <i class="bi bi-save"></i> <span id="realisasiSaveButtonText">Simpan Realisasi</span>
                             </button>
                             <button type="button" class="btn btn-outline-secondary" onclick="window.location.reload()">
                                 <i class="bi bi-arrow-clockwise"></i> Muat Ulang
@@ -142,10 +142,11 @@
                                 <th class="text-end">Nominal</th>
                                 <th>Keterangan</th>
                                 <th>Status</th>
+                                <th class="text-center">Aksi</th>
                             </tr>
                         </thead>
                         <tbody id="realisasiTableBody">
-                            <tr><td colspan="7" class="text-center text-muted py-4">Memuat data...</td></tr>
+                            <tr><td colspan="8" class="text-center text-muted py-4">Memuat data...</td></tr>
                         </tbody>
                     </table>
                 </div>

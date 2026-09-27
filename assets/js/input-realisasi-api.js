@@ -25,3 +25,10 @@ async function realisasiSave(row) {
         row
     });
 }
+
+async function realisasiUpdate(row) {
+    return await realisasiApiRequest("realisasi_update", {
+        id_token: rpdGetStoredUser()?.id_token || "",
+        row
+    });
+}
