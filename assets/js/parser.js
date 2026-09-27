@@ -1453,12 +1453,58 @@ function hitungRingkasanData(
 ) {
 
     // DATA_APLIKASI sudah berupa baris detail final.
-    // Ringkasan harus selalu berasal dari scope yang sama dengan tabel.
+    // Untuk DATA_APLIKASI, filter wajib diterapkan ke detail final
+    // yang sudah mengandung INPUT_REALISASI. Jangan kembali ke raw
+    // summary karena transaksi Input Realisasi berada di adapter ini.
     if (Array.isArray(dataDetail) && dataDetail.some(function (item) {
         return item && item.sourceFormat === "DATA_APLIKASI";
     })) {
-        return ringkasDataAplikasi(dataDetail);
+        const {
+            komponen = "",
+            subKomponen = "",
+            akun = "",
+            status = "",
+            cari = ""
+        } = options;
+
+        let scoped = [...dataDetail];
+
+        if (clean(komponen)) {
+            scoped = scoped.filter(item => clean(item.komponen) === clean(komponen));
+        }
+
+        if (clean(subKomponen)) {
+            scoped = scoped.filter(item => clean(item.subKomponen) === clean(subKomponen));
+        }
+
+        if (clean(akun)) {
+            scoped = scoped.filter(item => clean(item.akun) === clean(akun));
+        }
+
+        if (clean(status)) {
+            scoped = scoped.filter(item => clean(item.statusPagu) === clean(status));
+        }
+
+        if (clean(cari)) {
+            const q = normalisasiNamaUntukPencarian(cari);
+            scoped = scoped.filter(item =>
+                normalisasiNamaUntukPencarian([
+                    item.kegiatan,
+                    item.output,
+                    item.subOutput,
+                    item.komponen,
+                    item.subKomponen,
+                    item.akun,
+                    item.itemAkun,
+                    item.detilAkun,
+                    item.rincianItem
+                ].join(" ")).includes(q)
+            );
+        }
+
+        return ringkasDataAplikasi(scoped);
     }
+
     const {
         adaFilter = false,
         komponen = "",
