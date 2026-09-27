@@ -61,6 +61,7 @@ function doPost(e) {
     if (action === "realisasi_monitoring") return jsonOutput(listRealisasiMonitoring_());
     if (action === "realisasi_save") return jsonOutput(saveRealisasi_(request.id_token, request.row));
     if (action === "realisasi_update") return jsonOutput(updateRealisasi_(request.id_token, request.row));
+    if (action === "realisasi_delete") return jsonOutput(deleteRealisasi_(request.id_token, request.row));
 
     return jsonOutput({ ok: false, message: "Action API tidak dikenal." });
   } catch (error) {
@@ -297,36 +298,73 @@ function buildRealisasiMasterFromDataAplikasi_() {
   return Object.values(byId);
 }
 
+
+function realisasiRecordFromRow_(row, index) {
+  return {
+    id_realisasi: String(row[index.ID_REALISASI] || row[index["ID REALISASI"]] || ""),
+    tahun: String(row[index.TAHUN] || ""),
+    id_anggaran: String(
+      row[index.ID_ANGGARAN] ||
+      row[index["ID ANGGARAN"]] ||
+      ""
+    ),
+    kode_sub_komponen: String(
+      row[index.KODE_SUB_KOMPONEN] ||
+      row[index["KODE SUB KOMPONEN"]] ||
+      ""
+    ),
+    sub_komponen: String(
+      row[index.SUB_KOMPONEN] ||
+      row[index["SUB KOMPONEN"]] ||
+      ""
+    ),
+    akun: String(row[index.AKUN] || ""),
+    item_akun: String(
+      row[index.ITEM_AKUN] ||
+      row[index["ITEM AKUN"]] ||
+      ""
+    ),
+    detil_akun: String(
+      row[index.DETIL_AKUN] ||
+      row[index["DETIL AKUN"]] ||
+      ""
+    ),
+    rincian_item: String(
+      row[index.RINCIAN_ITEM] ||
+      row[index["RINCIAN ITEM"]] ||
+      ""
+    ),
+    pagu_detil: parseAmount_(row[index.PAGU_DETIL]),
+    bulan: String(
+      row[index.BULAN_REALISASI] ||
+      row[index["BULAN REALISASI"]] ||
+      ""
+    ),
+    nominal_realisasi: parseAmount_(
+      row[index.NOMINAL_REALISASI] ||
+      row[index["NOMINAL REALISASI"]]
+    ),
+    keterangan: String(row[index.KETERANGAN] || ""),
+    status: String(row[index.STATUS] || "AKTIF"),
+    created_at: row[index.CREATED_AT] || "",
+    created_by: String(row[index.CREATED_BY] || ""),
+    updated_at: row[index.UPDATED_AT] || "",
+    updated_by: String(row[index.UPDATED_BY] || "")
+  };
+}
+
 function readRealisasi_(sheet) {
   ensureRealisasiSchema_(sheet);
   const values = sheet.getDataRange().getValues();
   if (values.length < 2) return [];
 
   const index = realisasiHeaderIndex_(values[0]);
-  return values.slice(1)
-    .filter(row => row.some(cell => String(cell ?? "").trim() !== ""))
-    .map(row => ({
-      id_realisasi: String(row[index["ID REALISASI"]] || ""),
-      tahun: String(row[index.TAHUN] || ""),
-      id_anggaran: String(row[index.ID_ANGGARAN] || row[index["ID ANGGARAN"]] || ""),
-      kode_sub_komponen: String(row[index.KODE_SUB_KOMPONEN] || row[index["KODE SUB KOMPONEN"]] || ""),
-      sub_komponen: String(row[index.SUB_KOMPONEN] || row[index["SUB KOMPONEN"]] || ""),
-      akun: String(row[index.AKUN] || ""),
-      item_akun: String(row[index.ITEM_AKUN] || row[index["ITEM AKUN"]] || ""),
-      detil_akun: String(row[index.DETIL_AKUN] || row[index["DETIL AKUN"]] || ""),
-      rincian_item: String(row[index.RINCIAN_ITEM] || row[index["RINCIAN ITEM"]] || ""),
-      pagu_detil: parseAmount_(row[index.PAGU_DETIL]),
-      bulan: String(row[index.BULAN_REALISASI] || row[index["BULAN REALISASI"]] || ""),
-      nominal_realisasi: parseAmount_(row[index.NOMINAL_REALISASI] || row[index["NOMINAL REALISASI"]]),
-      keterangan: String(row[index.KETERANGAN] || ""),
-      status: String(row[index.STATUS] || "AKTIF"),
-      created_at: row[index.CREATED_AT] || "",
-      created_by: String(row[index.CREATED_BY] || ""),
-      updated_at: row[index.UPDATED_AT] || "",
-      updated_by: String(row[index.UPDATED_BY] || "")
-    }));
-}
 
+  return values
+    .slice(1)
+    .filter(row => row.some(cell => String(cell ?? "").trim() !== ""))
+    .map(row => realisasiRecordFromRow_(row, index));
+}
 function realisasiBootstrap_(idToken) {
   const user = authenticate_(idToken);
   const master = buildRealisasiMasterFromDataAplikasi_();
@@ -500,6 +538,104 @@ function saveRealisasi_(idToken, row) {
   };
 }
 
+
+
+/**
+ * Hapus permanen satu transaksi INPUT REALISASI.
+ *
+ * Optimasi:
+ * - Tidak memanggil readRealisasi_() untuk mencari ID.
+ * - Hanya membaca kolom ID_REALISASI untuk menemukan baris.
+ * - Membaca satu baris saja untuk audit.
+ * - Menghapus baris dengan deleteRow().
+ *
+ * DATA_APLIKASI tidak disentuh.
+ */
+function deleteRealisasi_(idToken, row) {
+  const user = authenticate_(idToken).user;
+  if (!row) throw new Error("Data realisasi tidak ditemukan.");
+
+  const idRealisasi = String(
+    row.id_realisasi || row.id || ""
+  ).trim();
+
+  if (!idRealisasi) {
+    throw new Error("ID realisasi tidak ditemukan.");
+  }
+
+  const sheet = getRealisasiSheet_();
+  const lastRow = sheet.getLastRow();
+  const lastColumn = sheet.getLastColumn();
+
+  if (lastRow < 2 || lastColumn < 1) {
+    throw new Error("Transaksi realisasi tidak ditemukan.");
+  }
+
+  // Header hanya dibaca sekali.
+  const headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+  const index = realisasiHeaderIndex_(headers);
+
+  const idCol = index.ID_REALISASI;
+  if (idCol === undefined) {
+    throw new Error("Kolom ID_REALISASI tidak ditemukan.");
+  }
+
+  // Hanya baca kolom ID, bukan seluruh sheet.
+  const idValues = sheet
+    .getRange(2, idCol + 1, lastRow - 1, 1)
+    .getDisplayValues();
+
+  let rowNumber = -1;
+
+  for (let i = 0; i < idValues.length; i++) {
+    if (String(idValues[i][0] || "").trim() === idRealisasi) {
+      rowNumber = i + 2;
+      break;
+    }
+  }
+
+  if (rowNumber < 0) {
+    throw new Error("Transaksi realisasi tidak ditemukan.");
+  }
+
+  // Baca hanya baris transaksi yang akan dihapus untuk audit.
+  const oldValues = sheet
+    .getRange(rowNumber, 1, 1, lastColumn)
+    .getValues()[0];
+
+  const oldRecord = realisasiRecordFromRow_(oldValues, index);
+
+  if (String(oldRecord.status || "AKTIF").toUpperCase() !== "AKTIF") {
+    throw new Error("Transaksi realisasi sudah tidak aktif.");
+  }
+
+  // Audit sebelum data fisik dihapus.
+  const now = new Date();
+
+  getRealisasiLogSheet_().appendRow([
+    now,
+    "DELETE",
+    idRealisasi,
+    user.email,
+    JSON.stringify(oldRecord),
+    "",
+    "Hapus transaksi realisasi bulanan"
+  ]);
+
+  // Hapus permanen dari REALISASI P3HPL.
+  sheet.deleteRow(rowNumber);
+
+  return {
+    ok: true,
+    message: "Realisasi berhasil dihapus.",
+    user: {
+      email: user.email,
+      name: user.name || user.email,
+      role: user.role || "OPERATOR"
+    },
+    id_realisasi: idRealisasi
+  };
+}
 
 function updateRealisasi_(idToken, row) {
   const user = authenticate_(idToken).user;
