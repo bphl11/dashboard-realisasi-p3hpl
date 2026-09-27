@@ -111,7 +111,9 @@ function realisasiHeaderIndex_(headers) {
   const map = {};
   headers.forEach((value, i) => {
     const key = String(value ?? "").trim().toUpperCase().replace(/[._-]/g, " ").replace(/\s+/g, " ");
-    if (key) map[key] = i;
+    if (!key) return;
+    map[key] = i;
+    map[key.replace(/ /g, "_")] = i;
   });
   return map;
 }
