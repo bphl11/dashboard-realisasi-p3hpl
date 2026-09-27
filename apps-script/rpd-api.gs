@@ -162,6 +162,7 @@ function buildRealisasiMasterFromDataAplikasi_() {
     muteHttpExceptions: true,
     followRedirects: true
   });
+
   if (response.getResponseCode() !== 200) {
     throw new Error("DATA_APLIKASI tidak dapat dibaca dari sumber CSV.");
   }
@@ -170,30 +171,80 @@ function buildRealisasiMasterFromDataAplikasi_() {
   const context = detectHeader_(values);
   if (!context) throw new Error("Header DATA_APLIKASI tidak terdeteksi.");
 
-  const out = [];
-  const seen = {};
+  /*
+   * DATA_APLIKASI dapat memiliki lebih dari satu baris yang secara
+   * identitas anggaran menghasilkan ID_ANGGARAN yang sama.
+   *
+   * Jangan mengambil realisasi dari baris pertama saja karena baris
+   * pertama bisa bernilai 0 sementara realisasi tersimpan pada baris
+   * lain. Untuk Input Realisasi, seluruh realisasi DATA_APLIKASI
+   * dengan ID_ANGGARAN yang sama harus diagregasikan.
+   *
+   * Pagu tetap memakai nilai pagu dari master pertama. Kita TIDAK
+   * menjumlahkan pagu, karena baris-baris tersebut merupakan duplikasi
+   * identitas detail yang sama.
+   */
+  const byId = {};
 
   for (let i = context.headerIndex + 1; i < values.length; i++) {
     const row = values[i];
-    const subKomponen = headerValue_(row, context.map, ["Sub Komponen","Subkomponen","Nama Sub Komponen"]);
-    const kodeSubKomponen = headerValue_(row, context.map, ["Kode Sub Komponen","KodeSubKomponen"]);
-    const akun = headerValue_(row, context.map, ["Akun Belanja","Akun"]);
-    const itemAkun = headerValue_(row, context.map, ["Item Akun","Item"]);
-    const detilAkun = headerValue_(row, context.map, ["Detil Akun","Detail Akun","Detil"]);
-    const rincianItem = headerValue_(row, context.map, ["Rincian Item","Rincian"]);
-    const pagu = parseAmount_(headerValue_(row, context.map, ["Pagu"]));
-    // Realisasi dasar dari DATA_APLIKASI.
-    // Jika kolom Realisasi/Jumlah Realisasi bernilai 0/kosong,
-    // gunakan total kolom Januari-Desember sebagai fallback.
-    const realisasiKolom = parseAmount_(
-      headerValue_(row, context.map, ["Realisasi","Jumlah Realisasi"])
+
+    const subKomponen = headerValue_(
+      row,
+      context.map,
+      ["Sub Komponen","Subkomponen","Nama Sub Komponen"]
     );
 
+    const kodeSubKomponen = headerValue_(
+      row,
+      context.map,
+      ["Kode Sub Komponen","KodeSubKomponen"]
+    );
+
+    const akun = headerValue_(
+      row,
+      context.map,
+      ["Akun Belanja","Akun"]
+    );
+
+    const itemAkun = headerValue_(
+      row,
+      context.map,
+      ["Item Akun","Item"]
+    );
+
+    const detilAkun = headerValue_(
+      row,
+      context.map,
+      ["Detil Akun","Detail Akun","Detil"]
+    );
+
+    const rincianItem = headerValue_(
+      row,
+      context.map,
+      ["Rincian Item","Rincian"]
+    );
+
+    const pagu = parseAmount_(
+      headerValue_(row, context.map, ["Pagu"])
+    );
+
+    // Realisasi dasar dari kolom Realisasi/Jumlah Realisasi.
+    const realisasiKolom = parseAmount_(
+      headerValue_(row, context.map, [
+        "Realisasi",
+        "Jumlah Realisasi"
+      ])
+    );
+
+    // Jika kolom Realisasi kosong/0, gunakan total Januari-Desember.
     const realisasiBulanan = [
       "Januari","Februari","Maret","April","Mei","Juni",
       "Juli","Agustus","September","Oktober","November","Desember"
     ].reduce((sum, bulan) => {
-      return sum + parseAmount_(headerValue_(row, context.map, [bulan]));
+      return sum + parseAmount_(
+        headerValue_(row, context.map, [bulan])
+      );
     }, 0);
 
     const realisasi =
@@ -201,8 +252,18 @@ function buildRealisasiMasterFromDataAplikasi_() {
         ? realisasiKolom
         : realisasiBulanan;
 
-    const status = headerValue_(row, context.map, ["Status Pagu","Status"]);
-    const tahun = headerValue_(row, context.map, ["Tahun","Tahun Anggaran"]) || new Date().getFullYear();
+    const status = headerValue_(
+      row,
+      context.map,
+      ["Status Pagu","Status"]
+    );
+
+    const tahun =
+      headerValue_(
+        row,
+        context.map,
+        ["Tahun","Tahun Anggaran"]
+      ) || new Date().getFullYear();
 
     if (!subKomponen || !akun || pagu <= 0) continue;
     if (/blok/i.test(String(status))) continue;
@@ -219,14 +280,19 @@ function buildRealisasiMasterFromDataAplikasi_() {
       pagu: pagu,
       realisasi: realisasi
     };
+
     item.id_anggaran = realisasiMasterKey_(item);
 
-    if (seen[item.id_anggaran]) continue;
-    seen[item.id_anggaran] = true;
-    out.push(item);
+    if (!byId[item.id_anggaran]) {
+      byId[item.id_anggaran] = item;
+    } else {
+      // Penting: agregasikan realisasi dari semua baris yang
+      // mempunyai identitas detail anggaran yang sama.
+      byId[item.id_anggaran].realisasi += realisasi;
+    }
   }
 
-  return out;
+  return Object.values(byId);
 }
 
 function readRealisasi_(sheet) {
