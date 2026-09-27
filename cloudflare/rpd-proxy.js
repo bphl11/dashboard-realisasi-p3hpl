@@ -103,36 +103,62 @@ export default {
         "RPD-P3HPL-Cloudflare-Proxy/1.0"
       );
 
-      // Google Apps Script ContentService may redirect the response to
-      // script.googleusercontent.com. Workers follows that redirect
-      // server-side, so the browser never sees the cross-origin redirect.
-      const upstreamRequest = new Request(UPSTREAM_URL, {
-        method: "POST",
-        headers: upstreamHeaders,
-        body
-      });
+      // Google Apps Script ContentService dapat melakukan redirect
+      // dari script.google.com ke script.googleusercontent.com.
+      // Jangan gunakan redirect:"follow" tanpa batas karena pada kondisi
+      // tertentu Cloudflare dapat menerima loop redirect dari Apps Script.
+      let upstreamResponse = null;
+      let currentUrl = UPSTREAM_URL;
+      let currentMethod = "POST";
+      let currentBody = body;
 
-      const upstreamResponse = await fetch(upstreamRequest, {
-        redirect: "follow"
-      });
+      for (let redirectCount = 0; redirectCount < 6; redirectCount++) {
+        const requestHeaders = new Headers(upstreamHeaders);
 
-      const responseHeaders = new Headers(upstreamResponse.headers);
+        if (currentMethod === "GET") {
+          requestHeaders.delete("Content-Type");
+        }
 
-      responseHeaders.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-      responseHeaders.set("Access-Control-Allow-Headers", "Content-Type");
-      responseHeaders.set("Access-Control-Max-Age", "86400");
-      responseHeaders.set("Vary", "Origin");
+        const upstreamRequest = new Request(currentUrl, {
+          method: currentMethod,
+          headers: requestHeaders,
+          body: currentMethod === "GET" || currentMethod === "HEAD"
+            ? undefined
+            : currentBody
+        });
 
-      if (ALLOWED_ORIGINS.has(origin)) {
-        responseHeaders.set("Access-Control-Allow-Origin", origin);
-      } else {
-        responseHeaders.delete("Access-Control-Allow-Origin");
+        upstreamResponse = await fetch(upstreamRequest, {
+          redirect: "manual"
+        });
+
+        const location = upstreamResponse.headers.get("Location");
+
+        if (!location || ![301, 302, 303, 307, 308].includes(upstreamResponse.status)) {
+          break;
+        }
+
+        if (redirectCount === 5) {
+          return json(
+            {
+              ok: false,
+              message: "Google Apps Script terlalu banyak redirect.",
+              detail: "Redirect melebihi batas aman (5).",
+              last_status: upstreamResponse.status
+            },
+            508,
+            origin
+          );
+        }
+
+        currentUrl = new URL(location, currentUrl).toString();
+
+        // Google ContentService biasanya memakai 302/303 untuk
+        // mengalihkan POST ke URL content hasil eksekusi. Ikuti sebagai GET.
+        if ([301, 302, 303].includes(upstreamResponse.status)) {
+          currentMethod = "GET";
+          currentBody = null;
+        }
       }
-
-      responseHeaders.set(
-        "Cache-Control",
-        "no-store, no-cache, must-revalidate"
-      );
 
       return new Response(upstreamResponse.body, {
         status: upstreamResponse.status,
