@@ -97,9 +97,9 @@ function doGet(e) {
 
 // ============================================================
 // INPUT REALISASI BULANAN
-// Tahap 1: menyimpan transaksi pada sheet terpisah.
-// Belum mengubah perhitungan Dashboard/Monitoring agar tidak
-// terjadi double-count selama masa migrasi dari DATA_APLIKASI.
+// Transaksi disimpan pada sheet REALISASI P3HPL.
+// Transaksi berstatus AKTIF dibaca oleh monitoring API dan
+// digabungkan parser ke Realisasi Final tanpa mengubah DATA_APLIKASI.
 // ============================================================
 
 function ensureRealisasiSchema_(sheet) {
