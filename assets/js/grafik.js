@@ -51,6 +51,13 @@ let chartPersentase = null;
 let grafikRpdBulanan = Array(12).fill(0);
 let grafikRpdTotal = 0;
 
+// Cache RPD khusus halaman Grafik.
+// Grafik boleh menampilkan cache terlebih dahulu, lalu menyegarkan RPD
+// di belakang layar agar perpindahan menu tidak menunggu request API.
+const GRAFIK_RPD_CACHE_KEY = "p3hpl_grafik_rpd_cache_v1";
+const GRAFIK_RPD_CACHE_TTL = 2 * 60 * 1000;
+let grafikRpdRefreshPromise = null;
+
 function hitungRpdBulananGrafik(rows, tersedia = true) {
     const fields = [
         ["jan_m1","jan_m2","jan_m3","jan_m4"],
@@ -86,23 +93,92 @@ function hitungRpdBulananGrafik(rows, tersedia = true) {
     };
 }
 
-async function ambilRpdBulananGrafik() {
-    const kosong = { bulanan: Array(12).fill(0), total: 0, tersedia: false };
+async function ambilRpdBulananGrafik(forceRefresh = false) {
+    const kosong = {
+        bulanan: Array(12).fill(0),
+        total: 0,
+        tersedia: false
+    };
+
+    function bacaCacheRpd() {
+        try {
+            const raw = localStorage.getItem(GRAFIK_RPD_CACHE_KEY);
+            if (!raw) return null;
+
+            const cached = JSON.parse(raw);
+            if (!cached || !Array.isArray(cached.bulanan)) return null;
+
+            return {
+                bulanan: cached.bulanan.slice(0, 12),
+                total: Number(cached.total) || 0,
+                timestamp: Number(cached.timestamp) || 0,
+                tersedia: true
+            };
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function simpanCacheRpd(data) {
+        try {
+            localStorage.setItem(
+                GRAFIK_RPD_CACHE_KEY,
+                JSON.stringify({
+                    timestamp: Date.now(),
+                    bulanan: data.bulanan,
+                    total: data.total
+                })
+            );
+        } catch (error) {
+            console.warn("Cache RPD Grafik tidak dapat disimpan:", error);
+        }
+    }
+
+    const cached = bacaCacheRpd();
+    const cacheFresh =
+        cached &&
+        Date.now() - cached.timestamp < GRAFIK_RPD_CACHE_TTL;
+
+    // Jika cache tersedia, langsung gunakan.
+    // Ini membuat Grafik tidak menunggu API RPD.
+    if (!forceRefresh && cached) {
+        if (cacheFresh) {
+            // Refresh dilakukan di belakang layar, bukan menghambat render.
+            if (!grafikRpdRefreshPromise) {
+                grafikRpdRefreshPromise = ambilRpdBulananGrafik(true)
+                    .catch(function () { return cached; })
+                    .finally(function () {
+                        grafikRpdRefreshPromise = null;
+                    });
+            }
+            return cached;
+        }
+
+        // Cache lama tetap lebih baik daripada halaman kosong.
+        if (!grafikRpdRefreshPromise) {
+            grafikRpdRefreshPromise = ambilRpdBulananGrafik(true)
+                .catch(function () { return cached; })
+                .finally(function () {
+                    grafikRpdRefreshPromise = null;
+                });
+        }
+        return cached;
+    }
 
     try {
         const rawUser = sessionStorage.getItem("p3hpl_rpd_user_v1");
         const user = rawUser ? JSON.parse(rawUser) : null;
         const token = String(user?.id_token || "").trim();
 
+        // Jika belum login, gunakan data RPD tersimpan dari modul RPD.
         if (!token) {
-            // Grafik dan halaman RPD dapat berada pada tab berbeda.
-            // sessionStorage tidak dibagi antar-tab, sehingga gunakan
-            // cache RPD lokal yang memang sudah dipelihara oleh modul RPD.
             try {
                 const rawCache = localStorage.getItem("p3hpl_rpd_saved_v4");
                 const cachedRows = rawCache ? JSON.parse(rawCache) : [];
                 if (Array.isArray(cachedRows) && cachedRows.length) {
-                    return hitungRpdBulananGrafik(cachedRows, true);
+                    const data = hitungRpdBulananGrafik(cachedRows, true);
+                    simpanCacheRpd(data);
+                    return data;
                 }
             } catch (error) {
                 console.warn("Cache RPD lokal tidak dapat dibaca:", error);
@@ -112,15 +188,22 @@ async function ambilRpdBulananGrafik() {
 
         const apiUrl =
             typeof RPD_CONFIG !== "undefined"
-                ? String(RPD_CONFIG.RPD_PROXY_URL || RPD_CONFIG.RPD_API_URL || "").trim()
+                ? String(
+                    RPD_CONFIG.RPD_PROXY_URL ||
+                    RPD_CONFIG.RPD_API_URL ||
+                    ""
+                ).trim()
                 : "";
 
-        if (!apiUrl) return kosong;
+        if (!apiUrl) return cached || kosong;
 
         const response = await fetch(apiUrl, {
             method: "POST",
             headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify({ action: "list", id_token: token }),
+            body: JSON.stringify({
+                action: "list",
+                id_token: token
+            }),
             redirect: "follow",
             credentials: "omit",
             cache: "no-store"
@@ -128,6 +211,7 @@ async function ambilRpdBulananGrafik() {
 
         const textResponse = await response.text();
         let result;
+
         try {
             result = JSON.parse(textResponse);
         } catch (error) {
@@ -135,31 +219,20 @@ async function ambilRpdBulananGrafik() {
         }
 
         if (!response.ok || result?.ok === false) {
-            throw new Error(result?.message || "Data RPD tidak dapat dibaca.");
+            throw new Error(
+                result?.message || "Data RPD tidak dapat dibaca."
+            );
         }
 
         const rows = Array.isArray(result.rpd) ? result.rpd : [];
-        return hitungRpdBulananGrafik(rows, true);
+        const data = hitungRpdBulananGrafik(rows, true);
 
-        /* legacy parsing retained below for reference only */
-        const fields = [
-            ["jan_m1","jan_m2","jan_m3","jan_m4"],
-            ["feb_m1","feb_m2","feb_m3","feb_m4"],
-            ["mar_m1","mar_m2","mar_m3","mar_m4"],
-            ["apr_m1","apr_m2","apr_m3","apr_m4"],
-            ["mei_m1","mei_m2","mei_m3","mei_m4"],
-            ["jun_m1","jun_m2","jun_m3","jun_m4"],
-            ["jul_m1","jul_m2","jul_m3","jul_m4"],
-            ["agu_m1","agu_m2","agu_m3","agu_m4"],
-            ["sep_m1","sep_m2","sep_m3","sep_m4"],
-            ["okt_m1","okt_m2","okt_m3","okt_m4"],
-            ["nov_m1","nov_m2","nov_m3","nov_m4"],
-            ["des_m1","des_m2","des_m3","des_m4"]
-        ];
+        simpanCacheRpd(data);
 
+        return data;
     } catch (error) {
         console.warn("RPD grafik tidak dapat dimuat:", error);
-        return kosong;
+        return cached || kosong;
     }
 }
 
@@ -289,8 +362,11 @@ document.addEventListener(
             // AMBIL DATA GOOGLE SHEET
             // =================================================
 
-            grafikRawData =
+            // Jalankan pengambilan RPD bersamaan dengan DATA_APLIKASI.
+            // Keduanya tidak perlu saling menunggu.
+            const rpdPromise = ambilRpdBulananGrafik();
 
+            grafikRawData =
                 await getSheetDataMonitoring();
 
 
@@ -356,7 +432,7 @@ document.addEventListener(
                 bulanan: ambilDataUtamaGrafik(grafikRawData).bulanan
             };
 
-            const rpdGrafik = await ambilRpdBulananGrafik();
+            const rpdGrafik = await rpdPromise;
             grafikRpdBulanan = rpdGrafik.bulanan;
             grafikRpdTotal = rpdGrafik.total;
 
