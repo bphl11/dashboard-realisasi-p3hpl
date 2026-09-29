@@ -9,15 +9,15 @@ let dashboardParsedData = [];
 document.addEventListener("DOMContentLoaded", async function () {
     try {
         console.log("=== LOAD DASHBOARD BARU ===");
-        dashboardRawData = await getSheetData();
+        const store = await window.appStore.get();
 
-        if (!Array.isArray(dashboardRawData)) {
-            throw new Error("Data Google Sheet tidak valid.");
+        dashboardRawData = store.rawData;
+        dashboardParsedData = store.parsedData;
+        const calculation = store.calculation;
+
+        if (!Array.isArray(dashboardRawData) || !Array.isArray(dashboardParsedData)) {
+            throw new Error("Data APP STORE tidak valid.");
         }
-
-        dashboardParsedData = typeof parseDataMonitoring === "function"
-            ? parseDataMonitoring(dashboardRawData)
-            : [];
 
         // Kode Sub Komponen dipakai khusus untuk tata letak Dashboard.
         // Tidak mengubah Calculation Engine maupun nilai anggaran.
@@ -34,10 +34,6 @@ document.addEventListener("DOMContentLoaded", async function () {
         // dengan Grafik, Komponen, Monitoring, dan Laporan. Untuk DATA_APLIKASI,
         // parser sudah menggabungkan INPUT_REALISASI ke Realisasi Final per record.
         // Dengan demikian setiap transaksi INPUT_REALISASI hanya masuk satu kali.
-        const calculation = typeof hitungCalculationEngine === "function"
-            ? hitungCalculationEngine(dashboardRawData, dashboardParsedData)
-            : null;
-
         const total = calculation && calculation.tanpaBlokir
             ? calculation.tanpaBlokir
             : ringkasDashboard(normalData);
