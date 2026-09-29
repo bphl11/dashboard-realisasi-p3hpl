@@ -827,13 +827,19 @@ function pasangEventFilterLaporan() {
 
     if (cari) {
 
+        let cariLaporanTimer = null;
+
         cari.addEventListener(
 
             "input",
 
             function () {
 
-                jalankanFilterLaporan();
+                clearTimeout(cariLaporanTimer);
+
+                cariLaporanTimer = setTimeout(function () {
+                    jalankanFilterLaporan();
+                }, 150);
 
             }
 
@@ -1683,7 +1689,11 @@ function renderTabelLaporan(
 
     // ========================================================
     // TAMPILKAN DATA
+    // DocumentFragment mengurangi update DOM berulang.
+    // Data dan urutan baris tetap sama.
     // ========================================================
+
+    const fragment = document.createDocumentFragment();
 
     data.forEach(
 
@@ -1843,15 +1853,13 @@ function renderTabelLaporan(
             `;
 
 
-            tbody.appendChild(
-
-                tr
-
-            );
+            fragment.appendChild(tr);
 
         }
 
     );
+
+    tbody.appendChild(fragment);
 
 }
 
