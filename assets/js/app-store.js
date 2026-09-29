@@ -310,3 +310,30 @@ window.invalidateAppStore = appStoreInvalidate;
 // Mutation Realisasi menggunakan patch langsung jika snapshot sudah ada.
 // Jika belum ada snapshot, tidak memaksa download ulang pada saat Save.
 window.patchAppStoreRealisasi = appStorePatchRealisasi;
+
+
+// ============================================================
+// BFCache / PAGESHOW
+//
+// Setiap menu adalah dokumen HTML terpisah. Browser dapat menyimpan
+// halaman lama di Back/Forward Cache (BFCache). Jika pengguna kembali
+// ke Dashboard/Monitoring/Grafik/Laporan, DOM lama dapat dipulihkan
+// tanpa menjalankan DOMContentLoaded lagi.
+//
+// APP_STORE sudah dipatch saat Save/Edit/Delete, tetapi dokumen yang
+// dipulihkan dari BFCache belum otomatis merender snapshot terbaru.
+// Untuk kasus tersebut, muat ulang dokumen sekali agar halaman menjalankan
+// loader normal dan membaca APP_STORE terbaru.
+//
+// Tidak membuat cache baru dan tidak melakukan polling.
+// ============================================================
+
+window.addEventListener("pageshow", function (event) {
+    if (!event.persisted) return;
+
+    console.log(
+        "APP STORE: halaman dipulihkan dari BFCache. Memuat ulang agar snapshot Realisasi terbaru tampil."
+    );
+
+    window.location.reload();
+});
