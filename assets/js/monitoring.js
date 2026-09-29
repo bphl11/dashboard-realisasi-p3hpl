@@ -745,7 +745,11 @@ function renderMonitoring(data) {
 
     // ========================================================
     // TAMPILKAN DATA
+    // DocumentFragment mengurangi update DOM berulang.
+    // Data dan urutan baris tetap sama.
     // ========================================================
+
+    const fragment = document.createDocumentFragment();
 
     data.forEach(
         function (item) {
@@ -827,13 +831,13 @@ function renderMonitoring(data) {
             `;
 
 
-            tbody.appendChild(
-                tr
-            );
+            fragment.appendChild(tr);
 
         }
     );
 
+
+    tbody.appendChild(fragment);
 
     // ========================================================
     // AKTIFKAN DATATABLE
@@ -901,6 +905,12 @@ function aktifkanDataTableMonitoring() {
 
                 autoWidth:
                     false,
+
+                deferRender:
+                    true,
+
+                searchDelay:
+                    150,
 
                 language: {
 
