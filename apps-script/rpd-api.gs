@@ -390,6 +390,7 @@ function listRealisasiMonitoring_() {
     .filter(item => String(item.status || "AKTIF").toUpperCase() === "AKTIF")
     .filter(item => item.id_anggaran && item.tahun && item.bulan && Number(item.nominal_realisasi) > 0)
     .map(item => ({
+      id_realisasi: String(item.id_realisasi || ""),
       id_anggaran: String(item.id_anggaran),
       tahun: String(item.tahun),
       bulan: String(item.bulan),
