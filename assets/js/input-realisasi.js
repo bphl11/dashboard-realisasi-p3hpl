@@ -306,7 +306,15 @@ async function submitInputRealisasi(event) {
         resetFormInputRealisasi();
         setInputRealisasiEditMode(false);
 
-        if (typeof invalidateApiCache === "function") invalidateApiCache();
+        if (typeof invalidateApiCache === "function") {
+            invalidateApiCache({ onlyRealisasi: true });
+        }
+        if (typeof updateInputRealisasiLocalCache === "function") {
+            updateInputRealisasiLocalCache(wasEditing ? "update" : "save", result);
+        }
+        if (typeof window.invalidateAppStore === "function") {
+            window.invalidateAppStore();
+        }
 
         setStatusInputRealisasi(
             wasEditing ? "Realisasi berhasil diperbarui." : "Realisasi bulan " + bulan + " berhasil disimpan.",
@@ -354,7 +362,13 @@ async function deleteInputRealisasi(id) {
 
         renderListInputRealisasi();
         renderMasterInfoInputRealisasi();
-        if (typeof invalidateApiCache === "function") invalidateApiCache();
+
+        if (typeof invalidateApiCache === "function") {
+            invalidateApiCache({ onlyRealisasi: true });
+        }
+        if (typeof window.invalidateAppStore === "function") {
+            window.invalidateAppStore();
+        }
 
         setStatusInputRealisasi("Realisasi berhasil dihapus. Data dapat diinput ulang.", "success");
     } catch (error) {
