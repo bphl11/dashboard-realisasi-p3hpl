@@ -47,6 +47,47 @@ const RPD_HEADERS = [
 
 const USER_HEADERS = ["EMAIL","NAMA","ROLE","AKTIF"];
 
+// ============================================================
+// SERVER PERFORMANCE CACHE
+//
+// Hanya untuk resource mahal di sisi Apps Script:
+// master DATA_APLIKASI yang dipakai modul Realisasi.
+// Jika cache kosong/kedaluwarsa, sistem selalu kembali ke sumber asli.
+// ============================================================
+
+const REALISASI_MASTER_CACHE_KEY = "p3hpl_realisasi_master_v1";
+const REALISASI_MASTER_CACHE_TTL = 60;
+
+function getScriptJsonCache_(key) {
+  try {
+    const raw = CacheService.getScriptCache().get(key);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (error) {
+    return null;
+  }
+}
+
+function putScriptJsonCache_(key, value, ttlSeconds) {
+  try {
+    const raw = JSON.stringify(value);
+    // CacheService membatasi satu item maksimal 100 KB.
+    // Jika master lebih besar, aplikasi otomatis kembali ke sumber asli.
+    if (raw.length > 95000) return false;
+    CacheService.getScriptCache().put(key, raw, ttlSeconds);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+function removeScriptCache_(key) {
+  try {
+    CacheService.getScriptCache().remove(key);
+  } catch (error) {}
+}
+
+
 function doPost(e) {
   try {
     const request = JSON.parse(e?.postData?.contents || "{}");
@@ -159,6 +200,11 @@ function realisasiMasterKey_(row) {
 }
 
 function buildRealisasiMasterFromDataAplikasi_() {
+  const cachedMaster = getScriptJsonCache_(REALISASI_MASTER_CACHE_KEY);
+  if (Array.isArray(cachedMaster) && cachedMaster.length) {
+    return cachedMaster;
+  }
+
   if (!SOURCE_CSV_URL) throw new Error("SOURCE_CSV_URL belum diisi.");
 
   const response = UrlFetchApp.fetch(SOURCE_CSV_URL, {
@@ -295,7 +341,13 @@ function buildRealisasiMasterFromDataAplikasi_() {
     }
   }
 
-  return Object.values(byId);
+  const master = Object.values(byId);
+  putScriptJsonCache_(
+    REALISASI_MASTER_CACHE_KEY,
+    master,
+    REALISASI_MASTER_CACHE_TTL
+  );
+  return master;
 }
 
 
@@ -354,9 +406,14 @@ function realisasiRecordFromRow_(row, index) {
 }
 
 function readRealisasi_(sheet) {
-  ensureRealisasiSchema_(sheet);
-  const values = sheet.getDataRange().getValues();
-  if (values.length < 2) return [];
+  const lastRow = sheet.getLastRow();
+  const lastColumn = sheet.getLastColumn();
+
+  if (lastRow < 2 || lastColumn < 1) return [];
+
+  const values = sheet
+    .getRange(1, 1, lastRow, lastColumn)
+    .getValues();
 
   const index = realisasiHeaderIndex_(values[0]);
 
