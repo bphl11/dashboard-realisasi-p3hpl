@@ -311,7 +311,24 @@ async function submitInputRealisasi(event) {
         if (typeof updateInputRealisasiLocalCache === "function") {
             updateInputRealisasiLocalCache(wasEditing ? "update" : "save", result);
         }
-        if (typeof window.invalidateAppStore === "function") {
+
+        // Patch APP STORE yang sudah ada secara lokal. DATA_APLIKASI tidak
+        // diunduh ulang dan parser/rumus tetap sama.
+        let patchedAppStore = false;
+        if (typeof window.patchAppStoreRealisasi === "function") {
+            try {
+                patchedAppStore = window.patchAppStoreRealisasi(
+                    wasEditing ? "update" : "save",
+                    result
+                );
+            } catch (patchError) {
+                console.warn("Patch APP STORE gagal:", patchError);
+            }
+        }
+
+        // Jika belum ada APP STORE, jangan membuat snapshot parsial.
+        // Halaman berikutnya akan melakukan load normal.
+        if (!patchedAppStore && typeof window.invalidateAppStore === "function") {
             window.invalidateAppStore();
         }
 
@@ -366,7 +383,17 @@ async function deleteInputRealisasi(id) {
         if (typeof updateInputRealisasiLocalCache === "function") {
             updateInputRealisasiLocalCache("delete", result);
         }
-        if (typeof window.invalidateAppStore === "function") {
+
+        let patchedAppStore = false;
+        if (typeof window.patchAppStoreRealisasi === "function") {
+            try {
+                patchedAppStore = window.patchAppStoreRealisasi("delete", result);
+            } catch (patchError) {
+                console.warn("Patch APP STORE gagal:", patchError);
+            }
+        }
+
+        if (!patchedAppStore && typeof window.invalidateAppStore === "function") {
             window.invalidateAppStore();
         }
 
