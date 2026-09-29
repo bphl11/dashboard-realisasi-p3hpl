@@ -858,6 +858,9 @@ function buatGrafikBulanan(
                         true,
 
 
+            animation: {
+                duration: 0
+            },
                     maintainAspectRatio:
                         false,
 
@@ -1020,6 +1023,9 @@ function buatGrafikKumulatif(
         },
         options: {
             responsive: true,
+            animation: {
+                duration: 0
+            },
             maintainAspectRatio: false,
             interaction: {
                 mode: "index",
@@ -1247,6 +1253,9 @@ function buatGrafikStatusAnggaran(
                         true,
 
 
+            animation: {
+                duration: 0
+            },
                     maintainAspectRatio:
                         false,
 
@@ -1539,6 +1548,9 @@ function buatGrafikPerbandingan(
                         true,
 
 
+            animation: {
+                duration: 0
+            },
                     maintainAspectRatio:
                         false,
 
@@ -1742,6 +1754,9 @@ function buatGrafikPersentase(
                         true,
 
 
+            animation: {
+                duration: 0
+            },
                     maintainAspectRatio:
                         false,
 
