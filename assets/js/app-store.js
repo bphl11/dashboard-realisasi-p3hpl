@@ -51,8 +51,12 @@ function appStoreReadCache() {
                     ? bacaCacheInputRealisasi()
                     : null;
 
-            if (Array.isArray(inputCache)) {
-                attachInputRealisasiToRawData(cached.rawData, inputCache);
+            const inputRows = Array.isArray(inputCache)
+                ? inputCache
+                : (Array.isArray(cached.inputRealisasi) ? cached.inputRealisasi : []);
+
+            if (Array.isArray(inputRows)) {
+                attachInputRealisasiToRawData(cached.rawData, inputRows);
             }
         }
 
