@@ -437,6 +437,19 @@ function updateInputRealisasiLocalCache(action, result) {
     updateCacheInputRealisasiMutasi(action, result);
 }
 
+// Mengganti snapshot transaksi lokal dengan hasil bootstrap/list yang
+// sudah terbukti berasal dari server. Ini menjaga cache transaksi tetap
+// lengkap ketika halaman Input Realisasi menjadi sumber data terbaru.
+function replaceInputRealisasiLocalCache(rows) {
+    if (!Array.isArray(rows)) return;
+
+    const normalizedRows = rows
+        .map(normalisasiRowInputRealisasi)
+        .filter(Boolean);
+
+    simpanCacheInputRealisasi(normalizedRows);
+}
+
 // ============================================================
 // GET DATA UNTUK DASHBOARD
 // ============================================================
