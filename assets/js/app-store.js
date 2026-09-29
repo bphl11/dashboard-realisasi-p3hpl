@@ -43,6 +43,19 @@ function appStoreReadCache() {
             return null;
         }
 
+        // Pulihkan metadata transaksi ke rawData. JSON.stringify()
+        // tidak membawa property non-enumerable __inputRealisasi.
+        if (typeof attachInputRealisasiToRawData === "function") {
+            const inputCache =
+                typeof bacaCacheInputRealisasi === "function"
+                    ? bacaCacheInputRealisasi()
+                    : null;
+
+            if (Array.isArray(inputCache)) {
+                attachInputRealisasiToRawData(cached.rawData, inputCache);
+            }
+        }
+
         appStoreMemory = cached;
         return cached;
     } catch (error) {
@@ -59,11 +72,18 @@ function appStoreWriteCache(state) {
         return;
     }
 
+    const inputRealisasi =
+        state.rawData &&
+        Array.isArray(state.rawData.__inputRealisasi)
+            ? state.rawData.__inputRealisasi
+            : [];
+
     appStoreMemory = {
         timestamp: Date.now(),
         rawData: state.rawData,
         parsedData: state.parsedData,
-        calculation: state.calculation
+        calculation: state.calculation,
+        inputRealisasi: inputRealisasi
     };
 
     try {
