@@ -160,69 +160,64 @@ function hapusCacheInputRealisasi() {
 
 // Memperbarui cache lokal segera setelah INSERT/UPDATE/DELETE.
 // Tidak perlu download DATA_APLIKASI ulang.
-function updateCacheInputRealisasiMutasi(action, result) {
-    const current = bacaCacheInputRealisasi();
-    if (!Array.isArray(current)) return;
+function normalisasiRowInputRealisasi(row) {
+    if (!row) return null;
 
+    return {
+        id_realisasi: String(row.id_realisasi || ""),
+        id_anggaran: String(row.id_anggaran || ""),
+        tahun: String(row.tahun || ""),
+        bulan: String(row.bulan || row.bulan_realisasi || ""),
+        nominal_realisasi: Number(row.nominal_realisasi) || 0,
+        kode_sub_komponen: String(row.kode_sub_komponen || ""),
+        sub_komponen: String(row.sub_komponen || ""),
+        akun: String(row.akun || ""),
+        item_akun: String(row.item_akun || ""),
+        detil_akun: String(row.detil_akun || ""),
+        rincian_item: String(row.rincian_item || ""),
+        pagu_detil: Number(row.pagu_detil) || 0
+    };
+}
+
+// Memperbarui snapshot transaksi lokal segera setelah INSERT/UPDATE/DELETE.
+// Payload hasil mutation dianggap sebagai data terbaru; tidak perlu
+// menghapus snapshot terlebih dahulu.
+function updateCacheInputRealisasiMutasi(action, result) {
     const normalizedAction = String(action || "").toLowerCase();
-    const row = result?.data;
+    const row = normalisasiRowInputRealisasi(result?.data);
     const id = String(
         result?.id_realisasi ||
         row?.id_realisasi ||
         ""
     ).trim();
 
+    let current = bacaCacheInputRealisasi();
+
+    // Jika snapshot belum ada, jangan membuat snapshot parsial dari mutation.
+    // Halaman berikutnya akan mengambil monitoring terbaru dari API.
+    if (!Array.isArray(current)) return;
+
     let next = current.slice();
 
     if (
-        (normalizedAction === "save" || normalizedAction === "insert") &&
+        (normalizedAction === "save" || normalizedAction === "insert" ||
+         normalizedAction === "update" || normalizedAction === "edit") &&
         row?.id_realisasi
     ) {
-        next = next.filter(item => item.id_realisasi !== row.id_realisasi);
-        next.push({
-            id_anggaran: String(row.id_anggaran || ""),
-            tahun: String(row.tahun || ""),
-            bulan: String(row.bulan || row.bulan_realisasi || ""),
-            nominal_realisasi: Number(row.nominal_realisasi) || 0,
-            kode_sub_komponen: String(row.kode_sub_komponen || ""),
-            sub_komponen: String(row.sub_komponen || ""),
-            akun: String(row.akun || ""),
-            item_akun: String(row.item_akun || ""),
-            detil_akun: String(row.detil_akun || ""),
-            rincian_item: String(row.rincian_item || ""),
-            pagu_detil: Number(row.pagu_detil) || 0
-        });
-    }
-
-    if (
-        (normalizedAction === "update" || normalizedAction === "edit") &&
-        row?.id_realisasi
-    ) {
-        next = next.filter(item => item.id_realisasi !== row.id_realisasi);
-        next.push({
-            id_anggaran: String(row.id_anggaran || ""),
-            tahun: String(row.tahun || ""),
-            bulan: String(row.bulan || row.bulan_realisasi || ""),
-            nominal_realisasi: Number(row.nominal_realisasi) || 0,
-            kode_sub_komponen: String(row.kode_sub_komponen || ""),
-            sub_komponen: String(row.sub_komponen || ""),
-            akun: String(row.akun || ""),
-            item_akun: String(row.item_akun || ""),
-            detil_akun: String(row.detil_akun || ""),
-            rincian_item: String(row.rincian_item || ""),
-            pagu_detil: Number(row.pagu_detil) || 0
-        });
-    }
-
-    if (normalizedAction === "delete" && id) {
-        // Monitoring cache tidak membawa id_realisasi.
-        // Jika cache berasal dari monitoring, paksa refresh transaksi
-        // pada request berikutnya. DATA_APLIKASI tetap dipertahankan.
-        hapusCacheInputRealisasi();
+        next = next.filter(item =>
+            String(item.id_realisasi || "") !== row.id_realisasi
+        );
+        next.push(row);
+        simpanCacheInputRealisasi(next);
         return;
     }
 
-    simpanCacheInputRealisasi(next);
+    if (normalizedAction === "delete" && id) {
+        next = next.filter(item =>
+            String(item.id_realisasi || "") !== id
+        );
+        simpanCacheInputRealisasi(next);
+    }
 }
 
 async function fetchInputRealisasiMonitoring(forceRefresh = false) {
