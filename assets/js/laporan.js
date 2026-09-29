@@ -202,7 +202,11 @@ async function loadLaporan() {
             throw new Error("Data APP STORE Laporan tidak valid.");
         }
 
-        console.log("Laporan: menggunakan APP STORE:", dataLaporan.length, "baris.");
+        console.log(
+            "Laporan: menggunakan APP STORE:",
+            dataLaporan.length,
+            "baris."
+        );
 
         dataLaporanFiltered = [...dataLaporan];
 
@@ -212,21 +216,15 @@ async function loadLaporan() {
 
         jalankanFilterLaporan();
 
-    }
+    } catch (error) {
 
         console.error(
-
             "ERROR LOAD LAPORAN:",
-
             error
-
         );
 
-
         tampilkanErrorLaporan(
-
             error.message
-
         );
 
     }
