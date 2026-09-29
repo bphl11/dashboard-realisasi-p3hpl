@@ -208,14 +208,139 @@ function renderListInputRealisasi() {
         : '<tr><td colspan="8" class="text-center text-muted py-4">Belum ada Input Realisasi.</td></tr>';
 }
 
+// ============================================================
+// BOOTSTRAP CEPAT INPUT REALISASI
+//
+// Prioritas:
+// 1. Tampilkan snapshot APP_STORE + cache transaksi yang sudah ada.
+// 2. Bootstrap RPD berjalan di belakang layar untuk sinkronisasi server.
+// 3. Jika RPD lambat/404 sementara, halaman tidak kembali kosong.
+// ============================================================
+
+function buildInputRealisasiMasterFromAppStore(store, inputRows) {
+    if (!store || !Array.isArray(store.parsedData)) return [];
+
+    const transaksiById = new Map();
+
+    (Array.isArray(inputRows) ? inputRows : []).forEach(row => {
+        if (String(row?.status || "AKTIF").toUpperCase() !== "AKTIF") return;
+
+        const id = String(row?.id_anggaran || "").trim();
+        if (!id) return;
+
+        const key = String(row?.tahun || "") + "::" + id;
+        transaksiById.set(
+            key,
+            (transaksiById.get(key) || 0) +
+            (Number(row?.nominal_realisasi) || 0)
+        );
+    });
+
+    const byId = new Map();
+
+    store.parsedData.forEach(item => {
+        if (!item || item.statusPagu === "Diblokir") return;
+
+        const id = String(item.idAnggaran || "").trim();
+        if (!id) return;
+
+        const tahun = String(item.tahun || "");
+        const key = tahun + "::" + id;
+        const inputTotal = transaksiById.get(key) || 0;
+
+        if (!byId.has(key)) {
+            byId.set(key, {
+                id_anggaran: id,
+                tahun,
+                kodeSubKomponen: item.kodeSubKomponen || "",
+                subKomponen: item.subKomponen || "",
+                akun: item.akun || "",
+                itemAkun: item.itemAkun || "",
+                detilAkun: item.detilAkun || "",
+                rincianItem: item.rincianItem || "",
+                pagu: Number(item.pagu) || 0,
+                realisasi: 0
+            });
+        }
+
+        // parsedData sudah memasukkan INPUT_REALISASI ke item.realisasi.
+        // Kurangi transaksi input sekali per ID agar yang tersisa adalah
+        // Realisasi DATA_APLIKASI sebagai baseRealisasi.
+        const target = byId.get(key);
+        target.realisasi += Number(item.realisasi) || 0;
+    });
+
+    byId.forEach((master, key) => {
+        master.realisasi = Math.max(
+            master.realisasi - (transaksiById.get(key) || 0),
+            0
+        );
+    });
+
+    return Array.from(byId.values());
+}
+
+function renderInputRealisasiSnapshotLocal() {
+    const store =
+        typeof window.appStore?.peek === "function"
+            ? window.appStore.peek()
+            : null;
+
+    const cachedRows =
+        typeof bacaCacheInputRealisasi === "function"
+            ? bacaCacheInputRealisasi()
+            : null;
+
+    if (Array.isArray(cachedRows)) {
+        realisasiRows = cachedRows;
+    }
+
+    if (store && Array.isArray(store.parsedData)) {
+        realisasiMaster = buildInputRealisasiMasterFromAppStore(
+            store,
+            realisasiRows
+        );
+    }
+
+    if (realisasiMaster.length) {
+        populateSubKomponenInputRealisasi();
+    }
+
+    renderListInputRealisasi();
+
+    const storedUser = getUserInputRealisasi();
+    const loginUser = document.getElementById("realisasiLoginUser");
+    if (loginUser) {
+        loginUser.textContent =
+            storedUser?.name || storedUser?.email || "Operator";
+    }
+
+    return Boolean(
+        realisasiMaster.length ||
+        realisasiRows.length
+    );
+}
+
 async function loadInputRealisasiData() {
     clearStatusInputRealisasi();
 
     const user = getUserInputRealisasi();
     if (!user?.email) return;
 
+    // Jangan membuat pengguna menunggu RPD hanya untuk melihat halaman.
+    // APP_STORE/cache lokal ditampilkan terlebih dahulu.
+    const hasLocalSnapshot = renderInputRealisasiSnapshotLocal();
+
+    if (hasLocalSnapshot) {
+        setStatusInputRealisasi(
+            "Data terakhir ditampilkan. Menyinkronkan data RPD...",
+            "info"
+        );
+    }
+
     try {
         const result = await realisasiBootstrap();
+
         realisasiMaster = Array.isArray(result.master) ? result.master : [];
         realisasiRows = Array.isArray(result.realisasi) ? result.realisasi : [];
 
@@ -229,16 +354,33 @@ async function loadInputRealisasiData() {
 
         populateSubKomponenInputRealisasi();
         renderListInputRealisasi();
-        document.getElementById("realisasiLoginUser").textContent =
-            result.user?.name || result.user?.email || "Operator";
+
+        const loginUser = document.getElementById("realisasiLoginUser");
+        if (loginUser) {
+            loginUser.textContent =
+                result.user?.name || result.user?.email || user.email || "Operator";
+        }
 
         setStatusInputRealisasi(
-            "Data master berhasil dimuat. Transaksi aktif akan masuk ke Realisasi Final Dashboard, Grafik, Monitoring, dan Laporan.",
-            "info"
+            "Data master berhasil disinkronkan.",
+            "success"
         );
     } catch (error) {
-        console.error(error);
-        setStatusInputRealisasi(error.message || "Gagal memuat data Input Realisasi.", "danger");
+        console.error("Bootstrap RPD gagal, snapshot lokal tetap dipakai:", error);
+
+        // Jangan mengosongkan halaman ketika proxy RPD sedang lambat/gagal.
+        // Snapshot lokal tetap valid untuk tampilan sementara.
+        if (hasLocalSnapshot) {
+            setStatusInputRealisasi(
+                "RPD sementara belum merespons. Data terakhir tetap ditampilkan; coba Muat Ulang untuk sinkronisasi.",
+                "warning"
+            );
+        } else {
+            setStatusInputRealisasi(
+                error.message || "Gagal memuat data Input Realisasi.",
+                "danger"
+            );
+        }
     }
 }
 
