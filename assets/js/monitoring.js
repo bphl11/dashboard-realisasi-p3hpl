@@ -98,154 +98,26 @@ document.addEventListener(
 // ============================================================
 
 async function loadMonitoring() {
-
     try {
 
-        console.log(
-            "Monitoring: mengambil data Google Sheet..."
-        );
+        const store = await window.appStore.get();
 
+        rawMonitoringData = store.rawData;
+        dataMonitoring = store.parsedData;
 
-        let rawData = [];
-
-
-        // ====================================================
-        // PRIORITAS:
-        // getSheetDataMonitoring()
-        // ====================================================
-
-        if (
-            typeof getSheetDataMonitoring ===
-            "function"
-        ) {
-
-            rawData =
-                await getSheetDataMonitoring();
-
+        if (!Array.isArray(rawMonitoringData) || !Array.isArray(dataMonitoring)) {
+            throw new Error("Data APP STORE Monitoring tidak valid.");
         }
 
+        console.log("Monitoring: menggunakan APP STORE:", dataMonitoring.length, "baris.");
 
-        // ====================================================
-        // FALLBACK:
-        // FETCH LANGSUNG
-        // ====================================================
-
-        else {
-
-            console.warn(
-                "getSheetDataMonitoring tidak ditemukan. Menggunakan fetch langsung."
-            );
-
-
-            if (
-                typeof CONFIG ===
-                "undefined"
-            ) {
-
-                throw new Error(
-                    "CONFIG tidak ditemukan"
-                );
-
-            }
-
-
-            const response =
-                await fetch(
-                    CONFIG.SHEET_URL
-                );
-
-
-            if (!response.ok) {
-
-                throw new Error(
-                    "Gagal mengambil Google Sheet. HTTP " +
-                    response.status
-                );
-
-            }
-
-
-            const csv =
-                await response.text();
-
-
-            if (
-                typeof csvToArray !==
-                "function"
-            ) {
-
-                throw new Error(
-                    "csvToArray tidak ditemukan"
-                );
-
-            }
-
-
-            rawData =
-                csvToArray(csv);
-
-        }
-
-
-        console.log(
-    "Monitoring: jumlah baris mentah:",
-    rawData.length
-);
-
-rawMonitoringData = rawData;
-
-// ====================================================
-// PARSE DATA
-// ====================================================
-
-dataMonitoring =
-    parseDataMonitoring(
-        rawData
-    );
-// ============================================
-// VALIDATOR
-// ============================================
-
-// Audit UI hanya dijalankan pada audit.html.
-if (document.getElementById("summary") && typeof auditParser === "function") {
-    auditParser(rawData);
-}
-
-        console.log(
-            "Monitoring: jumlah data hasil parser:",
-            dataMonitoring.length
-        );
-
-
-        // ====================================================
-        // SALIN DATA UNTUK FILTER
-        // ====================================================
-
-        dataMonitoringFiltered =
-            [...dataMonitoring];
-
-
-        // ====================================================
-        // ISI FILTER
-        // ====================================================
+        dataMonitoringFiltered = [...dataMonitoring];
 
         isiFilterMonitoring();
 
-        // ====================================================
-// UPDATE RINGKASAN
-// ====================================================
+        updateRingkasanMonitoring();
 
-updateRingkasanMonitoring();
-
-
-        // ====================================================
-        // TAMPILKAN TABEL
-        // ====================================================
-
-        renderMonitoring(
-            dataMonitoringFiltered
-        );
-
+        renderMonitoring(dataMonitoringFiltered);
 
     } catch (error) {
 
@@ -261,6 +133,7 @@ updateRingkasanMonitoring();
 
     }
 
+}
 }
 
 
@@ -785,8 +658,9 @@ function updateRingkasanMonitoring() {
     const status = document.getElementById("filterStatus")?.value || "";
     const adaFilter = Boolean(komponen || subKomponen || akun || status);
     let ringkasan;
-    if (!adaFilter && typeof hitungCalculationEngine === "function") {
-        ringkasan = hitungCalculationEngine(rawMonitoringData, dataMonitoring).total;
+    if (!adaFilter && window.appStore) {
+        const store = window.appStore.peek();
+        ringkasan = store?.calculation?.total || hitungCalculationEngine(rawMonitoringData, dataMonitoring).total;
     } else {
         ringkasan = hitungRingkasanData(dataMonitoringFiltered, rawMonitoringData, { adaFilter, komponen, subKomponen, akun, status });
     }
