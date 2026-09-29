@@ -94,7 +94,7 @@ export default {
         {
           ok: true,
           service: "RPD P3HPL Cloudflare Proxy",
-          version: "1.1.0",
+          version: "1.2.0",
           upstream: safeUrl(UPSTREAM_URL),
           redirect_detection: true
         },
@@ -256,8 +256,61 @@ export default {
         );
       }
 
+      // ========================================================
+      // DIAGNOSTIK RESPONSE UPSTREAM
+      // ========================================================
+      // Jangan meneruskan HTML error mentah dari upstream.
+      // Untuk 404 dan 5xx, kembalikan JSON diagnostik agar browser
+      // dapat membedakan error upstream dari error route Worker.
+      const upstreamStatus = upstreamResponse.status;
+
+      const isUpstreamDiagnosticStatus =
+        upstreamStatus === 404 ||
+        [500, 501, 502, 503, 504].includes(upstreamStatus);
+
+      if (isUpstreamDiagnosticStatus) {
+        const upstreamContentType =
+          upstreamResponse.headers.get("Content-Type") || "";
+
+        let upstreamBodyPreview = "";
+
+        try {
+          const upstreamText = await upstreamResponse.text();
+
+          // Simpan hanya potongan pendek untuk diagnosis.
+          // Tidak meneruskan seluruh response upstream.
+          upstreamBodyPreview = upstreamText
+            .replace(/\\s+/g, " ")
+            .trim()
+            .slice(0, 800);
+        } catch (readError) {
+          upstreamBodyPreview =
+            "Gagal membaca body response upstream: " +
+            String(readError?.message || readError);
+        }
+
+        return json(
+          {
+            ok: false,
+            source: "upstream",
+            message:
+              upstreamStatus === 404
+                ? "Google Apps Script / upstream mengembalikan HTTP 404."
+                : "Google Apps Script / upstream mengembalikan HTTP " +
+                  upstreamStatus + ".",
+            upstream_status: upstreamStatus,
+            upstream_content_type: upstreamContentType,
+            last_url: safeUrl(currentUrl),
+            redirect_chain: redirectChain,
+            upstream_body_preview: upstreamBodyPreview
+          },
+          upstreamStatus,
+          origin
+        );
+      }
+
       return new Response(upstreamResponse.body, {
-        status: upstreamResponse.status,
+        status: upstreamStatus,
         statusText: upstreamResponse.statusText,
         headers: responseHeaders(upstreamResponse, origin)
       });
