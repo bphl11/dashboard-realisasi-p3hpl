@@ -193,128 +193,26 @@ async function loadLaporan() {
 
     try {
 
-        console.log(
-            "Laporan: mengambil data Google Sheet..."
-        );
+        const store = await window.appStore.get();
 
+        rawDataLaporan = store.rawData;
+        dataLaporan = store.parsedData;
 
-        // ====================================================
-        // CEK API
-        // ====================================================
-
-        if (
-            typeof getSheetDataMonitoring !==
-            "function"
-        ) {
-
-            throw new Error(
-
-                "Fungsi getSheetDataMonitoring() tidak ditemukan."
-
-            );
-
+        if (!Array.isArray(rawDataLaporan) || !Array.isArray(dataLaporan)) {
+            throw new Error("Data APP STORE Laporan tidak valid.");
         }
 
+        console.log("Laporan: menggunakan APP STORE:", dataLaporan.length, "baris.");
 
-        // ====================================================
-        // SIMPAN DATA MENTAH
-        // ====================================================
-
-        rawDataLaporan =
-
-            await getSheetDataMonitoring();
-
-
-        if (
-            !Array.isArray(
-                rawDataLaporan
-            )
-        ) {
-
-            throw new Error(
-
-                "Data Google Sheet bukan Array."
-
-            );
-
-        }
-
-
-        console.log(
-
-            "Laporan: jumlah baris mentah:",
-
-            rawDataLaporan.length
-
-        );
-
-
-        // ====================================================
-        // PARSE DATA
-        // ====================================================
-
-        dataLaporan =
-
-            parseDataMonitoring(
-
-                rawDataLaporan
-
-            );
-
-
-        if (
-            !Array.isArray(
-                dataLaporan
-            )
-        ) {
-
-            throw new Error(
-
-                "Hasil parseDataMonitoring() bukan Array."
-
-            );
-
-        }
-
-
-        console.log(
-
-            "Laporan: jumlah data hasil parser:",
-
-            dataLaporan.length
-
-        );
-
-
-        // ====================================================
-        // DATA AWAL
-        // ====================================================
-
-        dataLaporanFiltered =
-
-            [...dataLaporan];
-
-
-        // ====================================================
-        // ISI FILTER
-        // ====================================================
+        dataLaporanFiltered = [...dataLaporan];
 
         isiFilterKomponenLaporan();
-
         isiFilterSubKomponenLaporan();
-
         isiFilterAkunLaporan();
-
-
-        // ====================================================
-        // TAMPILKAN
-        // ====================================================
 
         jalankanFilterLaporan();
 
     }
-
-    catch (error) {
 
         console.error(
 
