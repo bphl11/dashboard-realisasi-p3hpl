@@ -569,8 +569,13 @@ document.addEventListener("DOMContentLoaded", function () {
     window.addEventListener("load", function () {
         navigator.serviceWorker.register("./sw.js", {
             scope: "./"
-        }).then(function () {
+        }).then(function (registration) {
             console.log("P3HPL Service Worker aktif.");
+            // Paksa pengecekan versi Service Worker baru supaya browser
+            // tidak menunggu siklus update bawaan browser.
+            if (registration && typeof registration.update === "function") {
+                registration.update().catch(function () {});
+            }
         }).catch(function (error) {
             console.warn("Service Worker P3HPL tidak aktif:", error);
         });
@@ -609,7 +614,7 @@ document.addEventListener("DOMContentLoaded", function () {
             if (!response || !response.ok) return;
 
             if ("caches" in window) {
-                return caches.open("p3hpl-static-v1").then(function (cache) {
+                return caches.open("p3hpl-static-v2").then(function (cache) {
                     return cache.put(target.href, response.clone());
                 });
             }
