@@ -103,16 +103,49 @@ async function rpdApiRequest(action, payload = {}) {
         ...payload
     });
 
-    const response = await fetch(apiBaseUrl, {
-        method: "POST",
-        headers: {
-            "Content-Type": "text/plain;charset=utf-8"
-        },
-        body,
-        redirect: "follow",
-        credentials: "omit",
-        cache: "no-store"
-    });
+    // Proxy/Worker kadang memberi 404/502/503/504 sesaat ketika
+    // GitHub Pages baru berpindah menu. Coba ulang singkat sebelum
+    // menganggap RPD benar-benar gagal.
+    const maxAttempts = 3;
+    let lastError = null;
 
-    return await parseResponse(response);
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            const response = await fetch(apiBaseUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "text/plain;charset=utf-8"
+                },
+                body,
+                redirect: "follow",
+                credentials: "omit",
+                cache: "no-store"
+            });
+
+            if (
+                response.ok ||
+                ![404, 502, 503, 504].includes(response.status) ||
+                attempt === maxAttempts
+            ) {
+                return await parseResponse(response);
+            }
+
+            // Backoff pendek: 350ms lalu 900ms.
+            await new Promise(resolve =>
+                setTimeout(resolve, attempt === 1 ? 350 : 900)
+            );
+        } catch (error) {
+            lastError = error;
+
+            if (attempt === maxAttempts) {
+                throw error;
+            }
+
+            await new Promise(resolve =>
+                setTimeout(resolve, attempt === 1 ? 350 : 900)
+            );
+        }
+    }
+
+    throw lastError || new Error("Permintaan RPD gagal.");
 }
