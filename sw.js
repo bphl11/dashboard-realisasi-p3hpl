@@ -1,4 +1,4 @@
-const CACHE_NAME = "p3hpl-static-v1";
+const CACHE_NAME = "p3hpl-static-v2";
 
 const NAVIGATION_PAGES = [
   "index.html",
@@ -77,8 +77,10 @@ self.addEventListener("fetch", function (event) {
     return;
   }
 
-  // JS/CSS/images lokal: cache-first.
-  // Jika belum ada, ambil jaringan lalu simpan.
+  // Resource aplikasi lokal menggunakan NETWORK-FIRST.
+  // Ini penting agar perubahan JS/CSS langsung diterima tanpa
+  // pengguna harus menekan Ctrl+F5. Jika jaringan gagal,
+  // resource lama dari cache tetap menjadi fallback.
   const destination = request.destination;
 
   if (
@@ -88,17 +90,22 @@ self.addEventListener("fetch", function (event) {
     destination === "font"
   ) {
     event.respondWith(
-      caches.open(CACHE_NAME).then(function (cache) {
-        return cache.match(request).then(function (cached) {
-          if (cached) return cached;
-
-          return fetch(request).then(function (response) {
-            if (response && response.ok) {
-              cache.put(request, response.clone());
-            }
-            return response;
+      caches.open(CACHE_NAME).then(async function (cache) {
+        try {
+          const response = await fetch(request, {
+            cache: "no-cache"
           });
-        });
+
+          if (response && response.ok) {
+            await cache.put(request, response.clone());
+          }
+
+          return response;
+        } catch (error) {
+          const cached = await cache.match(request);
+          if (cached) return cached;
+          throw error;
+        }
       })
     );
   }
