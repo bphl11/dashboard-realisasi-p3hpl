@@ -362,61 +362,24 @@ document.addEventListener(
             // AMBIL DATA GOOGLE SHEET
             // =================================================
 
-            // Jalankan pengambilan RPD bersamaan dengan DATA_APLIKASI.
-            // Keduanya tidak perlu saling menunggu.
+            // APP STORE menyimpan raw + parsed + calculation.
+            // Grafik tidak perlu download dan parse ulang saat
+            // pengguna berpindah menu.
+            const storePromise = window.appStore.get();
+
+            // RPD tetap berjalan paralel sebagai data pembanding.
             const rpdPromise = ambilRpdBulananGrafik();
 
-            grafikRawData =
-                await getSheetDataMonitoring();
+            const store = await storePromise;
 
-
-            if (
-                !Array.isArray(
-                    grafikRawData
-                )
-            ) {
-
-                throw new Error(
-
-                    "Data Google Sheet tidak valid."
-
-                );
-
-            }
-
+            grafikRawData = store.rawData;
+            grafikParsedData = store.parsedData;
 
             console.log(
-
-                "JUMLAH BARIS RAW:",
-
-                grafikRawData.length
-
+                "GRAFIK: menggunakan APP STORE:",
+                grafikParsedData.length,
+                "baris"
             );
-
-
-            // =================================================
-            // PARSE DATA DETAIL
-            //
-            // Menggunakan parser yang sama dengan Laporan.
-            // =================================================
-
-            grafikParsedData =
-
-                parseDataMonitoring(
-
-                    grafikRawData
-
-                );
-
-
-            console.log(
-
-                "JUMLAH DATA PARSER:",
-
-                grafikParsedData.length
-
-            );
-
 
             // =================================================
             // AMBIL TOTAL UTAMA
@@ -425,7 +388,7 @@ document.addEventListener(
             // khusus karena membutuhkan Januari - Desember.
             // =================================================
 
-            const calculation = hitungCalculationEngine(grafikRawData, grafikParsedData);
+            const calculation = store.calculation;
 
             const totalData = {
                 ...calculation.total,
