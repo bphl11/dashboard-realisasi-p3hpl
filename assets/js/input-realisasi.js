@@ -306,9 +306,8 @@ async function submitInputRealisasi(event) {
         resetFormInputRealisasi();
         setInputRealisasiEditMode(false);
 
-        if (typeof invalidateApiCache === "function") {
-            invalidateApiCache({ onlyRealisasi: true });
-        }
+        // Simpan mutation ke snapshot Realisasi terlebih dahulu.
+        // Jangan menghapus cache transaksi sebelum snapshot diperbarui.
         if (typeof updateInputRealisasiLocalCache === "function") {
             updateInputRealisasiLocalCache(wasEditing ? "update" : "save", result);
         }
@@ -363,8 +362,9 @@ async function deleteInputRealisasi(id) {
         renderListInputRealisasi();
         renderMasterInfoInputRealisasi();
 
-        if (typeof invalidateApiCache === "function") {
-            invalidateApiCache({ onlyRealisasi: true });
+        // Hapus dari snapshot lokal berdasarkan ID hasil mutation.
+        if (typeof updateInputRealisasiLocalCache === "function") {
+            updateInputRealisasiLocalCache("delete", result);
         }
         if (typeof window.invalidateAppStore === "function") {
             window.invalidateAppStore();
