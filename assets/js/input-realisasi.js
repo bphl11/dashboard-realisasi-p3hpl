@@ -219,6 +219,14 @@ async function loadInputRealisasiData() {
         realisasiMaster = Array.isArray(result.master) ? result.master : [];
         realisasiRows = Array.isArray(result.realisasi) ? result.realisasi : [];
 
+        // Bootstrap adalah snapshot transaksi lengkap dari server.
+        // Simpan ke cache transaksi yang sama agar Dashboard/Grafik/
+        // Monitoring/Laporan tidak kembali ke snapshot lama saat menu
+        // dibuka ulang.
+        if (typeof replaceInputRealisasiLocalCache === "function") {
+            replaceInputRealisasiLocalCache(realisasiRows);
+        }
+
         populateSubKomponenInputRealisasi();
         renderListInputRealisasi();
         document.getElementById("realisasiLoginUser").textContent =
