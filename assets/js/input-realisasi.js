@@ -339,15 +339,22 @@ async function loadInputRealisasiData() {
     }
 
     try {
-        const result = await realisasiBootstrap();
+        // Jika APP_STORE sudah tersedia, master anggaran tidak perlu
+        // dibangun ulang dari DATA_APLIKASI oleh Apps Script.
+        // Cukup ambil transaksi REALISASI terbaru dari sheet.
+        const result = hasLocalSnapshot
+            ? await realisasiList()
+            : await realisasiBootstrap();
 
-        realisasiMaster = Array.isArray(result.master) ? result.master : [];
-        realisasiRows = Array.isArray(result.realisasi) ? result.realisasi : [];
+        if (Array.isArray(result.master)) {
+            realisasiMaster = result.master;
+        }
 
-        // Bootstrap adalah snapshot transaksi lengkap dari server.
-        // Simpan ke cache transaksi yang sama agar Dashboard/Grafik/
-        // Monitoring/Laporan tidak kembali ke snapshot lama saat menu
-        // dibuka ulang.
+        realisasiRows = Array.isArray(result.realisasi)
+            ? result.realisasi
+            : [];
+
+        // Bootstrap/list adalah snapshot transaksi lengkap dari server.
         if (typeof replaceInputRealisasiLocalCache === "function") {
             replaceInputRealisasiLocalCache(realisasiRows);
         }
@@ -362,7 +369,7 @@ async function loadInputRealisasiData() {
         }
 
         setStatusInputRealisasi(
-            "Data master berhasil disinkronkan.",
+            "Data master dan transaksi berhasil disinkronkan.",
             "success"
         );
     } catch (error) {
