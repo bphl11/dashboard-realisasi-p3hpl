@@ -115,6 +115,116 @@ function appStoreInvalidate() {
     }
 }
 
+// ============================================================
+// PATCH REALISASI KE APP STORE
+//
+// Setelah Save/Edit/Delete, jangan buang snapshot lalu mengunduh ulang
+// DATA_APLIKASI. Jika APP STORE sudah tersedia, cukup ubah metadata
+// INPUT_REALISASI, parse ulang snapshot lokal, lalu hitung ulang.
+// Parser dan Calculation Engine tetap dipakai apa adanya.
+// ============================================================
+
+function normalisasiAppStoreRealisasiRow(row) {
+    if (!row) return null;
+
+    return {
+        id_realisasi: String(row.id_realisasi || ""),
+        id_anggaran: String(row.id_anggaran || ""),
+        tahun: String(row.tahun || ""),
+        bulan: String(row.bulan || row.bulan_realisasi || ""),
+        nominal_realisasi: Number(row.nominal_realisasi) || 0,
+        kode_sub_komponen: String(row.kode_sub_komponen || ""),
+        sub_komponen: String(row.sub_komponen || ""),
+        akun: String(row.akun || ""),
+        item_akun: String(row.item_akun || ""),
+        detil_akun: String(row.detil_akun || ""),
+        rincian_item: String(row.rincian_item || ""),
+        pagu_detil: Number(row.pagu_detil) || 0,
+        keterangan: String(row.keterangan || ""),
+        status: String(row.status || "AKTIF"),
+        created_at: row.created_at || "",
+        created_by: String(row.created_by || ""),
+        updated_at: row.updated_at || "",
+        updated_by: String(row.updated_by || "")
+    };
+}
+
+function appStorePatchRealisasi(action, result) {
+    const state = appStoreReadCache();
+
+    // Tidak membuat APP STORE parsial. Jika belum ada snapshot, halaman
+    // berikutnya akan melakukan load normal dari sumber data.
+    if (!state) return false;
+
+    const normalizedAction = String(action || "").toLowerCase();
+    const resultRow = normalisasiAppStoreRealisasiRow(result?.data);
+    const resultId = String(
+        result?.id_realisasi ||
+        resultRow?.id_realisasi ||
+        ""
+    ).trim();
+
+    let currentRows = [];
+
+    if (Array.isArray(state.inputRealisasi)) {
+        currentRows = state.inputRealisasi.slice();
+    } else if (Array.isArray(state.rawData?.__inputRealisasi)) {
+        currentRows = state.rawData.__inputRealisasi.slice();
+    } else if (typeof bacaCacheInputRealisasi === "function") {
+        const cachedRows = bacaCacheInputRealisasi();
+        currentRows = Array.isArray(cachedRows) ? cachedRows.slice() : [];
+    }
+
+    if (
+        (normalizedAction === "save" ||
+         normalizedAction === "insert" ||
+         normalizedAction === "update" ||
+         normalizedAction === "edit") &&
+        resultRow?.id_realisasi
+    ) {
+        currentRows = currentRows.filter(item =>
+            String(item?.id_realisasi || "") !== resultRow.id_realisasi
+        );
+        currentRows.push(resultRow);
+    } else if (normalizedAction === "delete" && resultId) {
+        currentRows = currentRows.filter(item =>
+            String(item?.id_realisasi || "") !== resultId
+        );
+    } else {
+        return false;
+    }
+
+    // Raw master DATA_APLIKASI tetap sama. Hanya metadata transaksi yang
+    // diperbarui, lalu parser dan calculation engine menghitung snapshot baru.
+    attachInputRealisasiToRawData(state.rawData, currentRows);
+
+    const parsedData =
+        typeof parseDataMonitoring === "function"
+            ? parseDataMonitoring(state.rawData)
+            : [];
+
+    if (!Array.isArray(parsedData)) {
+        throw new Error("Patch APP STORE menghasilkan parser tidak valid.");
+    }
+
+    const calculation =
+        typeof hitungCalculationEngine === "function"
+            ? hitungCalculationEngine(state.rawData, parsedData)
+            : null;
+
+    if (!calculation) {
+        throw new Error("Calculation Engine tidak tersedia untuk patch APP STORE.");
+    }
+
+    appStoreWriteCache({
+        rawData: state.rawData,
+        parsedData,
+        calculation
+    });
+
+    return true;
+}
+
 async function appStoreLoad(forceRefresh = false) {
     if (!forceRefresh) {
         const cached = appStoreReadCache();
@@ -187,10 +297,16 @@ window.appStore = {
 
     peek: function () {
         return appStoreReadCache();
+    },
+
+    patchRealisasi: function (action, result) {
+        return appStorePatchRealisasi(action, result);
     }
 };
 
-// Dipanggil setelah Save/Edit/Delete Realisasi.
-// DATA_APLIKASI dan cache API tidak dihapus; hanya hasil turunan yang
-// perlu dihitung ulang pada permintaan berikutnya.
+// Dipanggil sebagai fallback jika APP STORE belum tersedia.
 window.invalidateAppStore = appStoreInvalidate;
+
+// Mutation Realisasi menggunakan patch langsung jika snapshot sudah ada.
+// Jika belum ada snapshot, tidak memaksa download ulang pada saat Save.
+window.patchAppStoreRealisasi = appStorePatchRealisasi;
