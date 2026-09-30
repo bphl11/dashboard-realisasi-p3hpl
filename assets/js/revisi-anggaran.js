@@ -29,7 +29,7 @@ function buildRows(raw) {
         const row = Array.isArray(raw[i]) ? raw[i] : [];
         if (!row.some(value => norm(value) !== "")) continue;
 
-        const kode = hv(row, context.map, ["Kode", "Kode Akun", "Akun Belanja"]);
+        const kode = hv(row, context.map, ["Kode"]);\n        const kodeAkun = hv(row, context.map, ["Kode Akun", "KodeAkun", "Kode Rekening", "Kode Rekening Belanja"]);
         const komponen = hv(row, context.map, ["Komponen", "Nama Komponen"]);
         const subKomponen = hv(row, context.map, ["Sub Komponen", "Subkomponen", "Nama Sub Komponen"]);
         const akun = hv(row, context.map, ["Akun Belanja", "Akun"]);
@@ -153,7 +153,7 @@ function render() {
         afterBody.innerHTML = '<tr><td colspan="7" class="empty-cell">Tidak ada data sesuai filter.</td></tr>';
     } else {
         beforeBody.innerHTML = revisiFilteredRows.map(row =>
-            '<tr><td>' + esc(row.kode) + '</td><td>' + esc(row.uraian) + '</td><td>' +
+            '<tr><td>' + esc(row.kode) + '</td><td>' + esc(row.akun) + '</td><td>' + esc(row.uraian) + '</td><td>' +
             esc(row.volume) + '</td><td>' + esc(row.satuan) + '</td><td class="text-end">' +
             rupiah(row.harga) + '</td><td class="text-end">' + rupiah(row.jumlah) + '</td></tr>'
         ).join("");
@@ -164,7 +164,7 @@ function render() {
             const deleted = isDeleted(row);
 
             return '<tr class="' + (deleted ? "deleted" : changed ? "changed" : "") + '">' +
-                '<td>' + esc(effective.kode) + '</td><td>' + esc(effective.uraian) + '</td>' +
+                '<td>' + esc(effective.kode) + '</td><td>' + esc(effective.akun) + '</td><td><input class="edit-input uraian-input" data-row="' + row.rowIndex + '" data-field="uraian" value="' + esc(effective.uraian) + '" ' + (deleted ? "disabled" : "") + '></td>' +
                 '<td><input class="edit-input" type="number" min="0" step="0.01" data-row="' + row.rowIndex +
                 '" data-field="volume" value="' + esc(effective.volume) + '" ' + (deleted ? "disabled" : "") + '></td>' +
                 '<td><input class="edit-input" data-row="' + row.rowIndex + '" data-field="satuan" value="' +
@@ -237,9 +237,9 @@ document.addEventListener("input", event => {
         satuan: effectiveRow(row).satuan,
         harga: effectiveRow(row).harga
     };
-    change[input.dataset.field] = input.dataset.field === "satuan" ? input.value : num(input.value);
+    change[input.dataset.field] = input.dataset.field === "uraian" || input.dataset.field === "satuan" ? input.value : num(input.value);
 
-    if (change.volume === row.volume && change.satuan === row.satuan && change.harga === row.harga) {
+    if (change.uraian === row.uraian && change.volume === row.volume && change.satuan === row.satuan && change.harga === row.harga) {
         delete revisiDraft.changes[String(row.rowIndex)];
     } else {
         revisiDraft.changes[String(row.rowIndex)] = change;
@@ -267,7 +267,7 @@ document.addEventListener("click", event => {
     }
 });
 
-["filterTahun", "filterKomponen", "filterSubKomponen"].forEach(id => {
+["filterTahun", "filterKomponen", "filterSubKomponen", "filterAkun"].forEach(id => {
     document.getElementById(id).addEventListener("change", () => {
         refreshFilters();
         render();
