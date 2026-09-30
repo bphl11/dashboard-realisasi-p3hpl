@@ -153,7 +153,7 @@ function render() {
         afterBody.innerHTML = '<tr><td colspan="7" class="empty-cell">Tidak ada data sesuai filter.</td></tr>';
     } else {
         beforeBody.innerHTML = revisiFilteredRows.map(row =>
-            '<tr><td>' + esc(row.kode) + '</td><td>' + esc(row.akun) + '</td><td>' + esc(row.uraian) + '</td><td>' +
+            '<tr><td>' + esc(row.kode) + '</td><td>' + esc(row.akunLabel) + '</td><td>' + esc(row.uraian) + '</td><td>' +
             esc(row.volume) + '</td><td>' + esc(row.satuan) + '</td><td class="text-end">' +
             rupiah(row.harga) + '</td><td class="text-end">' + rupiah(row.jumlah) + '</td></tr>'
         ).join("");
@@ -164,7 +164,7 @@ function render() {
             const deleted = isDeleted(row);
 
             return '<tr class="' + (deleted ? "deleted" : changed ? "changed" : "") + '">' +
-                '<td>' + esc(effective.kode) + '</td><td>' + esc(effective.akun) + '</td><td><input class="edit-input uraian-input" data-row="' + row.rowIndex + '" data-field="uraian" value="' + esc(effective.uraian) + '" ' + (deleted ? "disabled" : "") + '></td>' +
+                '<td>' + esc(effective.kode) + '</td><td>' + esc(effective.akunLabel) + '</td><td><input class="edit-input uraian-input" data-row="' + row.rowIndex + '" data-field="uraian" value="' + esc(effective.uraian) + '" ' + (deleted ? "disabled" : "") + '></td>' +
                 '<td><input class="edit-input" type="number" min="0" step="0.01" data-row="' + row.rowIndex +
                 '" data-field="volume" value="' + esc(effective.volume) + '" ' + (deleted ? "disabled" : "") + '></td>' +
                 '<td><input class="edit-input" data-row="' + row.rowIndex + '" data-field="satuan" value="' +
