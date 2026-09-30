@@ -1,12 +1,320 @@
-const REVISI_DRAFT_KEY="p3hpl_revisi_anggaran_draft_v1";let revisiStore=null,revisiRows=[],revisiFilteredRows=[];let revisiDraft={version:1,status:"DRAFT",changes:{},deletions:[],additions:[],updatedAt:null};
-const rupiah=v=>"Rp"+(Number(v)||0).toLocaleString("id-ID");const num=v=>{const n=Number(String(v??"").replace(/[^0-9.-]/g,""));return Number.isFinite(n)?n:0};const esc=v=>String(v??"").replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[s]));const norm=v=>String(v??"").trim();
-function hi(map,aliases){return typeof indeksHeaderDataAplikasi==="function"?indeksHeaderDataAplikasi(map,aliases):-1}function hv(row,map,a){const i=hi(map,a);return i>=0?String(row[i]??"").trim():""}function hn(row,map,a){return typeof angkaDataAplikasi==="function"?angkaDataAplikasi(hv(row,map,a)):num(hv(row,map,a))}
-function buildRows(raw){const c=typeof konteksDataAplikasi==="function"?konteksDataAplikasi(raw):null;if(!c)return[];const out=[];for(let i=c.headerIndex+1;i<raw.length;i++){const row=Array.isArray(raw[i])?raw[i]:[];if(!row.some(v=>norm(v)!==""))continue;const kode=hv(row,c.map,["Kode","Kode Akun","Akun Belanja"]),kegiatan=hv(row,c.map,["Kegiatan"]),output=hv(row,c.map,["Output"]),subOutput=hv(row,c.map,["Sub Output","Suboutput","Nama Sub Output","Nama Suboutput"]),komponen=hv(row,c.map,["Komponen","Nama Komponen"]),subKomponen=hv(row,c.map,["Sub Komponen","Subkomponen","Nama Sub Komponen"]),akun=hv(row,c.map,["Akun Belanja","Akun"]),itemAkun=hv(row,c.map,["Item Akun","Item"]),detil=hv(row,c.map,["Detil Akun","Detail Akun","Detil"]),rincian=hv(row,c.map,["Rincian Item","Rincian"]);const uraian=rincian||detil||itemAkun||subKomponen||komponen||subOutput||output||kegiatan||kode;out.push({rowIndex:i,kode,kegiatan,output,subOutput,komponen,subKomponen,akun,itemAkun,detil,rincian,uraian,volume:hn(row,c.map,["Volume","Vol"]),satuan:hv(row,c.map,["Satuan","Sat"]),harga:hn(row,c.map,["Harga Satuan","Harga"]),jumlah:hn(row,c.map,["Jumlah","Pagu"]),tahun:hv(row,c.map,["Tahun","Tahun Anggaran"])});}return out}
-function loadDraft(){try{const r=localStorage.getItem(REVISI_DRAFT_KEY);if(r){const p=JSON.parse(r);if(p&&p.version===1)revisiDraft={...revisiDraft,...p,changes:p.changes||{},deletions:Array.isArray(p.deletions)?p.deletions:[],additions:Array.isArray(p.additions)?p.additions:[]}}}catch(e){console.warn("Draft revisi tidak dapat dibaca:",e)}}function saveDraft(){revisiDraft.updatedAt=new Date().toISOString();try{localStorage.setItem(REVISI_DRAFT_KEY,JSON.stringify(revisiDraft));setStatus("Draft tersimpan di browser.","ok")}catch(e){setStatus("Draft gagal disimpan: "+e.message,"danger")}}function clearDraft(){revisiDraft={version:1,status:"DRAFT",changes:{},deletions:[],additions:[],updatedAt:null};try{localStorage.removeItem(REVISI_DRAFT_KEY)}catch(e){}render();setStatus("Draft dikosongkan. DATA_APLIKASI tidak berubah.","ok")}
-function uniq(a){return[...new Set(a.filter(v=>norm(v)!==""))].sort((a,b)=>a.localeCompare(b,"id"))}function fill(id,vals,ph,current){const e=document.getElementById(id),old=current??e.value;e.innerHTML='<option value="">'+esc(ph)+'</option>'+vals.map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join("");if(vals.includes(old))e.value=old}function filters(){return{tahun:filterTahun.value,program:filterProgram.value,komponen:filterKomponen.value,subKomponen:filterSubKomponen.value}}function refreshFilters(){const f=filters();fill("filterTahun",uniq(revisiRows.map(r=>r.tahun)),"-- Semua Tahun --",f.tahun);const t=revisiRows.filter(r=>!filterTahun.value||r.tahun===filterTahun.value);fill("filterProgram",uniq(t.map(r=>r.kegiatan||r.output||r.subOutput)),"-- Semua Program/Kegiatan --",f.program);const p=t.filter(r=>!filterProgram.value||(r.kegiatan||r.output||r.subOutput)===filterProgram.value);fill("filterKomponen",uniq(p.map(r=>r.komponen)),"-- Semua Komponen --",f.komponen);const k=p.filter(r=>!filterKomponen.value||r.komponen===filterKomponen.value);fill("filterSubKomponen",uniq(k.map(r=>r.subKomponen)),"-- Semua Sub Komponen --",f.subKomponen)}function filtered(){const f=filters();return revisiRows.filter(r=>(!f.tahun||r.tahun===f.tahun)&&(!f.program||(r.kegiatan||r.output||r.subOutput)===f.program)&&(!f.komponen||r.komponen===f.komponen)&&(!f.subKomponen||r.subKomponen===f.subKomponen))}
-function eff(r){const c=revisiDraft.changes[String(r.rowIndex)];return c?{...r,...c,jumlah:num(c.volume)*num(c.harga)}:{...r}}function deleted(r){return revisiDraft.deletions.includes(r.rowIndex)}function render(){revisiFilteredRows=filtered();const b=document.getElementById("beforeBody"),a=document.getElementById("afterBody");if(!revisiFilteredRows.length){b.innerHTML='<tr><td colspan="6" class="empty-cell">Tidak ada data sesuai filter.</td></tr>';a.innerHTML='<tr><td colspan="7" class="empty-cell">Tidak ada data sesuai filter.</td></tr>'}else{b.innerHTML=revisiFilteredRows.map(r=>'<tr class="'+(deleted(r)?"deleted":"")+'"><td>'+esc(r.kode)+'</td><td>'+esc(r.uraian)+'</td><td>'+esc(r.volume)+'</td><td>'+esc(r.satuan)+'</td><td class="text-end">'+rupiah(r.harga)+'</td><td class="text-end">'+rupiah(r.jumlah)+'</td></tr>').join("");a.innerHTML=revisiFilteredRows.map(r=>{const e=eff(r),ch=!!revisiDraft.changes[String(r.rowIndex)],del=deleted(r);return '<tr class="'+(del?"deleted":ch?"changed":"")+'"><td>'+esc(e.kode)+'</td><td>'+esc(e.uraian)+'</td><td><input class="edit-input" type="number" min="0" step="0.01" data-row="'+r.rowIndex+'" data-field="volume" value="'+esc(e.volume)+'" '+(del?"disabled":"")+'></td><td><input class="edit-input" data-row="'+r.rowIndex+'" data-field="satuan" value="'+esc(e.satuan)+'" '+(del?"disabled":"")+'></td><td><input class="edit-input money" type="number" min="0" data-row="'+r.rowIndex+'" data-field="harga" value="'+esc(e.harga)+'" '+(del?"disabled":"")+'></td><td class="text-end fw-bold">'+rupiah(e.jumlah)+'</td><td class="action-cell"><button class="btn-icon delete" data-action="delete" data-row="'+r.rowIndex+'"><i class="bi '+(del?"bi-arrow-counterclockwise":"bi-trash")+'"></i></button></td></tr>'}).join("")}const adds=revisiDraft.additions.filter(x=>!x.deleted);if(adds.length)a.innerHTML+=adds.map(x=>'<tr class="added"><td>'+esc(x.kode)+'</td><td>'+esc(x.uraian)+'</td><td>'+esc(x.volume)+'</td><td>'+esc(x.satuan)+'</td><td class="text-end">'+rupiah(x.harga)+'</td><td class="text-end fw-bold">'+rupiah(x.volume*x.harga)+'</td><td class="action-cell"><button class="btn-icon delete" data-action="delete-add" data-id="'+esc(x.id)+'"><i class="bi bi-trash"></i></button></td></tr>').join("");}const before=revisiFilteredRows.reduce((s,r)=>s+(deleted(r)?0:num(r.jumlah)),0),after=revisiFilteredRows.reduce((s,r)=>s+(deleted(r)?0:num(eff(r).jumlah)),0)+revisiDraft.additions.filter(x=>!x.deleted).reduce((s,x)=>s+num(x.volume)*num(x.harga),0),diff=after-before;summaryBefore.textContent=rupiah(before);summaryAfter.textContent=rupiah(after);summaryDiff.textContent=(diff>=0?"+":"-")+rupiah(Math.abs(diff));summaryDiff.className=diff>0?"text-danger":diff<0?"text-success":"";beforeCount.textContent=revisiFilteredRows.length+" item";afterCount.textContent=(revisiFilteredRows.length+revisiDraft.additions.filter(x=>!x.deleted).length)+" item"}
-function setStatus(m,t){const e=document.getElementById("revisiDataStatus");e.textContent=m;e.className="status-pill "+(t==="ok"?"status-ok":t==="danger"?"status-danger":t==="warning"?"status-warning":"status-loading")}
-async function init(){loadDraft();setStatus("Memuat APP_STORE...","loading");try{revisiStore=await window.appStore.get();if(!revisiStore?.rawData)throw new Error("APP_STORE belum tersedia.");revisiRows=buildRows(revisiStore.rawData);refreshFilters();render();setStatus("DATA_APLIKASI siap · Draft lokal aktif","ok")}catch(e){console.error(e);setStatus(e.message||"Gagal memuat data.","danger")}}
-document.addEventListener("input",e=>{const x=e.target;if(!x.matches(".edit-input"))return;const r=revisiRows.find(v=>v.rowIndex===Number(x.dataset.row));if(!r)return;const c={volume:eff(r).volume,satuan:eff(r).satuan,harga:eff(r).harga};c[x.dataset.field]=x.dataset.field==="satuan"?x.value:num(x.value);if(c.volume===r.volume&&c.satuan===r.satuan&&c.harga===r.harga)delete revisiDraft.changes[String(r.rowIndex)];else revisiDraft.changes[String(r.rowIndex)]=c;render()});
-document.addEventListener("click",e=>{const b=e.target.closest("[data-action]");if(!b)return;if(b.dataset.action==="delete"){const n=Number(b.dataset.row),i=revisiDraft.deletions.indexOf(n);i>=0?revisiDraft.deletions.splice(i,1):revisiDraft.deletions.push(n);render()}if(b.dataset.action==="delete-add"){revisiDraft.additions=revisiDraft.additions.map(x=>x.id===b.dataset.id?{...x,deleted:true}:x);render()}});
-[filterTahun,filterProgram,filterKomponen,filterSubKomponen].forEach(e=>e.addEventListener("change",()=>{refreshFilters();render()}));btnSimpanDraft.addEventListener("click",saveDraft);btnResetDraft.addEventListener("click",()=>{if(confirm("Hapus seluruh perubahan draft? DATA_APLIKASI tetap aman."))clearDraft()});addVol.addEventListener("input",()=>addJumlah.value=rupiah(num(addVol.value)*num(addHarga.value)));addHarga.addEventListener("input",()=>addJumlah.value=rupiah(num(addVol.value)*num(addHarga.value)));btnTambahItem.addEventListener("click",()=>{addKode.value="";addUraian.value="";addVol.value=1;addSat.value="";addHarga.value=0;addJumlah.value="Rp0";bootstrap.Modal.getOrCreateInstance(modalTambahItem).show()});btnTambahkanItem.addEventListener("click",()=>{const x={id:"ADD-"+Date.now(),kode:norm(addKode.value),uraian:norm(addUraian.value),volume:num(addVol.value),satuan:norm(addSat.value),harga:num(addHarga.value)};if(!x.uraian){alert("Uraian wajib diisi.");return}if(x.volume<=0){alert("Volume harus lebih besar dari 0.");return}revisiDraft.additions.push(x);bootstrap.Modal.getOrCreateInstance(modalTambahItem).hide();render();setStatus("Item ditambahkan ke draft. Belum mengubah DATA_APLIKASI.","warning")});document.addEventListener("DOMContentLoaded",init);window.addEventListener("pageshow",e=>{if(e.persisted)location.reload()});
+const REVISI_DRAFT_KEY = "p3hpl_revisi_anggaran_draft_v1";
+let revisiStore = null;
+let revisiRows = [];
+let revisiFilteredRows = [];
+let revisiDraft = { version: 1, status: "DRAFT", changes: {}, deletions: [], additions: [], updatedAt: null };
+
+const rupiah = value => "Rp" + (Number(value) || 0).toLocaleString("id-ID");
+const num = value => { const n = Number(String(value ?? "").replace(/[^0-9.-]/g, "")); return Number.isFinite(n) ? n : 0; };
+const esc = value => String(value ?? "").replace(/[&<>"']/g, s => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;" }[s]));
+const norm = value => String(value ?? "").trim();
+
+function hi(map, aliases) {
+    return typeof indeksHeaderDataAplikasi === "function" ? indeksHeaderDataAplikasi(map, aliases) : -1;
+}
+function hv(row, map, aliases) {
+    const index = hi(map, aliases);
+    return index >= 0 ? String(row[index] ?? "").trim() : "";
+}
+function hn(row, map, aliases) {
+    return typeof angkaDataAplikasi === "function" ? angkaDataAplikasi(hv(row, map, aliases)) : num(hv(row, map, aliases));
+}
+
+function buildRows(raw) {
+    const context = typeof konteksDataAplikasi === "function" ? konteksDataAplikasi(raw) : null;
+    if (!context) return [];
+
+    const rows = [];
+    for (let i = context.headerIndex + 1; i < raw.length; i++) {
+        const row = Array.isArray(raw[i]) ? raw[i] : [];
+        if (!row.some(value => norm(value) !== "")) continue;
+
+        const kode = hv(row, context.map, ["Kode", "Kode Akun", "Akun Belanja"]);
+        const komponen = hv(row, context.map, ["Komponen", "Nama Komponen"]);
+        const subKomponen = hv(row, context.map, ["Sub Komponen", "Subkomponen", "Nama Sub Komponen"]);
+        const akun = hv(row, context.map, ["Akun Belanja", "Akun"]);
+        const itemAkun = hv(row, context.map, ["Item Akun", "Item"]);
+        const detil = hv(row, context.map, ["Detil Akun", "Detail Akun", "Detil"]);
+        const rincian = hv(row, context.map, ["Rincian Item", "Rincian"]);
+        const uraian = rincian || detil || itemAkun || akun || subKomponen || komponen || kode;
+
+        rows.push({
+            rowIndex: i,
+            kode,
+            komponen,
+            subKomponen,
+            akun,
+            itemAkun,
+            detil,
+            rincian,
+            uraian,
+            volume: hn(row, context.map, ["Volume", "Vol"]),
+            satuan: hv(row, context.map, ["Satuan", "Sat"]),
+            harga: hn(row, context.map, ["Harga Satuan", "Harga"]),
+            jumlah: hn(row, context.map, ["Jumlah", "Pagu"]),
+            tahun: hv(row, context.map, ["Tahun", "Tahun Anggaran"])
+        });
+    }
+    return rows;
+}
+
+function loadDraft() {
+    try {
+        const raw = localStorage.getItem(REVISI_DRAFT_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.version === 1) {
+            revisiDraft = {
+                ...revisiDraft,
+                ...parsed,
+                changes: parsed.changes || {},
+                deletions: Array.isArray(parsed.deletions) ? parsed.deletions : [],
+                additions: Array.isArray(parsed.additions) ? parsed.additions : []
+            };
+        }
+    } catch (error) {
+        console.warn("Draft revisi tidak dapat dibaca:", error);
+    }
+}
+
+function saveDraft() {
+    revisiDraft.updatedAt = new Date().toISOString();
+    try {
+        localStorage.setItem(REVISI_DRAFT_KEY, JSON.stringify(revisiDraft));
+        setStatus("Draft tersimpan di browser.", "ok");
+    } catch (error) {
+        setStatus("Draft gagal disimpan: " + error.message, "danger");
+    }
+}
+
+function clearDraft() {
+    revisiDraft = { version:1, status:"DRAFT", changes:{}, deletions:[], additions:[], updatedAt:null };
+    localStorage.removeItem(REVISI_DRAFT_KEY);
+    render();
+    setStatus("Draft dikosongkan. DATA_APLIKASI tidak berubah.", "ok");
+}
+
+function uniq(values) {
+    return [...new Set(values.filter(value => norm(value) !== ""))].sort((a,b) => a.localeCompare(b, "id"));
+}
+
+function fillSelect(id, values, placeholder, current) {
+    const element = document.getElementById(id);
+    const old = current ?? element.value;
+    element.innerHTML = '<option value="">' + esc(placeholder) + "</option>" +
+        values.map(value => '<option value="' + esc(value) + '">' + esc(value) + "</option>").join("");
+    if (values.includes(old)) element.value = old;
+}
+
+function filters() {
+    return {
+        tahun: document.getElementById("filterTahun").value,
+        komponen: document.getElementById("filterKomponen").value,
+        subKomponen: document.getElementById("filterSubKomponen").value
+    };
+}
+
+function refreshFilters() {
+    const f = filters();
+    fillSelect("filterTahun", uniq(revisiRows.map(row => row.tahun)), "-- Semua Tahun --", f.tahun);
+
+    const byYear = revisiRows.filter(row => !filterTahun.value || row.tahun === filterTahun.value);
+    fillSelect("filterKomponen", uniq(byYear.map(row => row.komponen)), "-- Semua Komponen --", f.komponen);
+
+    const byComponent = byYear.filter(row => !filterKomponen.value || row.komponen === filterKomponen.value);
+    fillSelect("filterSubKomponen", uniq(byComponent.map(row => row.subKomponen)), "-- Semua Sub Komponen --", f.subKomponen);
+}
+
+function filteredRows() {
+    const f = filters();
+    return revisiRows.filter(row =>
+        (!f.tahun || row.tahun === f.tahun) &&
+        (!f.komponen || row.komponen === f.komponen) &&
+        (!f.subKomponen || row.subKomponen === f.subKomponen)
+    );
+}
+
+function effectiveRow(row) {
+    const change = revisiDraft.changes[String(row.rowIndex)];
+    return change ? { ...row, ...change, jumlah: num(change.volume) * num(change.harga) } : { ...row };
+}
+
+function isDeleted(row) {
+    return revisiDraft.deletions.includes(row.rowIndex);
+}
+
+function render() {
+    revisiFilteredRows = filteredRows();
+    const beforeBody = document.getElementById("beforeBody");
+    const afterBody = document.getElementById("afterBody");
+
+    if (!revisiFilteredRows.length) {
+        beforeBody.innerHTML = '<tr><td colspan="6" class="empty-cell">Tidak ada data sesuai filter.</td></tr>';
+        afterBody.innerHTML = '<tr><td colspan="7" class="empty-cell">Tidak ada data sesuai filter.</td></tr>';
+    } else {
+        beforeBody.innerHTML = revisiFilteredRows.map(row =>
+            '<tr><td>' + esc(row.kode) + '</td><td>' + esc(row.uraian) + '</td><td>' +
+            esc(row.volume) + '</td><td>' + esc(row.satuan) + '</td><td class="text-end">' +
+            rupiah(row.harga) + '</td><td class="text-end">' + rupiah(row.jumlah) + '</td></tr>'
+        ).join("");
+
+        afterBody.innerHTML = revisiFilteredRows.map(row => {
+            const effective = effectiveRow(row);
+            const changed = Boolean(revisiDraft.changes[String(row.rowIndex)]);
+            const deleted = isDeleted(row);
+
+            return '<tr class="' + (deleted ? "deleted" : changed ? "changed" : "") + '">' +
+                '<td>' + esc(effective.kode) + '</td><td>' + esc(effective.uraian) + '</td>' +
+                '<td><input class="edit-input" type="number" min="0" step="0.01" data-row="' + row.rowIndex +
+                '" data-field="volume" value="' + esc(effective.volume) + '" ' + (deleted ? "disabled" : "") + '></td>' +
+                '<td><input class="edit-input" data-row="' + row.rowIndex + '" data-field="satuan" value="' +
+                esc(effective.satuan) + '" ' + (deleted ? "disabled" : "") + '></td>' +
+                '<td><input class="edit-input money" type="number" min="0" data-row="' + row.rowIndex +
+                '" data-field="harga" value="' + esc(effective.harga) + '" ' + (deleted ? "disabled" : "") + '></td>' +
+                '<td class="text-end fw-bold">' + rupiah(effective.jumlah) + '</td>' +
+                '<td class="action-cell"><button class="btn-icon delete" data-action="delete" data-row="' +
+                row.rowIndex + '"><i class="bi ' + (deleted ? "bi-arrow-counterclockwise" : "bi-trash") + '"></i></button></td></tr>';
+        }).join("");
+    }
+
+    const additions = revisiDraft.additions.filter(item => !item.deleted);
+    if (additions.length) {
+        afterBody.innerHTML += additions.map(item =>
+            '<tr class="added"><td>' + esc(item.kode) + '</td><td>' + esc(item.uraian) + '</td><td>' +
+            esc(item.volume) + '</td><td>' + esc(item.satuan) + '</td><td class="text-end">' +
+            rupiah(item.harga) + '</td><td class="text-end fw-bold">' + rupiah(item.volume * item.harga) +
+            '</td><td class="action-cell"><button class="btn-icon delete" data-action="delete-add" data-id="' +
+            esc(item.id) + '"><i class="bi bi-trash"></i></button></td></tr>'
+        ).join("");
+    }
+
+    const before = revisiFilteredRows.reduce((sum, row) => sum + (isDeleted(row) ? 0 : num(row.jumlah)), 0);
+    const after = revisiFilteredRows.reduce((sum, row) => sum + (isDeleted(row) ? 0 : num(effectiveRow(row).jumlah)), 0) +
+        additions.reduce((sum, item) => sum + num(item.volume) * num(item.harga), 0);
+    const diff = after - before;
+
+    document.getElementById("summaryBefore").textContent = rupiah(before);
+    document.getElementById("summaryAfter").textContent = rupiah(after);
+    document.getElementById("summaryDiff").textContent = (diff >= 0 ? "+" : "-") + rupiah(Math.abs(diff));
+    document.getElementById("summaryDiff").className = diff > 0 ? "text-danger" : diff < 0 ? "text-success" : "";
+    document.getElementById("beforeCount").textContent = revisiFilteredRows.length + " item";
+    document.getElementById("afterCount").textContent = (revisiFilteredRows.length + additions.length) + " item";
+}
+
+function setStatus(message, type) {
+    const element = document.getElementById("revisiDataStatus");
+    element.textContent = message;
+    element.className = "status-pill " + (type === "ok" ? "status-ok" : type === "danger" ? "status-danger" : type === "warning" ? "status-warning" : "status-loading");
+}
+
+async function init() {
+    loadDraft();
+    setStatus("Memuat APP_STORE...", "loading");
+
+    try {
+        revisiStore = await window.appStore.get();
+        if (!revisiStore?.rawData) throw new Error("APP_STORE belum tersedia.");
+
+        revisiRows = buildRows(revisiStore.rawData);
+        refreshFilters();
+        render();
+        setStatus("DATA_APLIKASI siap · Draft lokal aktif", "ok");
+    } catch (error) {
+        console.error(error);
+        setStatus(error.message || "Gagal memuat data.", "danger");
+    }
+}
+
+document.addEventListener("input", event => {
+    const input = event.target;
+    if (!input.matches(".edit-input")) return;
+
+    const row = revisiRows.find(item => item.rowIndex === Number(input.dataset.row));
+    if (!row) return;
+
+    const change = {
+        volume: effectiveRow(row).volume,
+        satuan: effectiveRow(row).satuan,
+        harga: effectiveRow(row).harga
+    };
+    change[input.dataset.field] = input.dataset.field === "satuan" ? input.value : num(input.value);
+
+    if (change.volume === row.volume && change.satuan === row.satuan && change.harga === row.harga) {
+        delete revisiDraft.changes[String(row.rowIndex)];
+    } else {
+        revisiDraft.changes[String(row.rowIndex)] = change;
+    }
+    render();
+});
+
+document.addEventListener("click", event => {
+    const button = event.target.closest("[data-action]");
+    if (!button) return;
+
+    if (button.dataset.action === "delete") {
+        const rowIndex = Number(button.dataset.row);
+        const index = revisiDraft.deletions.indexOf(rowIndex);
+        if (index >= 0) revisiDraft.deletions.splice(index, 1);
+        else revisiDraft.deletions.push(rowIndex);
+        render();
+    }
+
+    if (button.dataset.action === "delete-add") {
+        revisiDraft.additions = revisiDraft.additions.map(item =>
+            item.id === button.dataset.id ? { ...item, deleted: true } : item
+        );
+        render();
+    }
+});
+
+["filterTahun", "filterKomponen", "filterSubKomponen"].forEach(id => {
+    document.getElementById(id).addEventListener("change", () => {
+        refreshFilters();
+        render();
+    });
+});
+
+document.getElementById("btnSimpanDraft").addEventListener("click", saveDraft);
+document.getElementById("btnResetDraft").addEventListener("click", () => {
+    if (confirm("Hapus seluruh perubahan draft? DATA_APLIKASI tetap aman.")) clearDraft();
+});
+
+document.getElementById("addVol").addEventListener("input", updateAddJumlah);
+document.getElementById("addHarga").addEventListener("input", updateAddJumlah);
+
+function updateAddJumlah() {
+    document.getElementById("addJumlah").value =
+        rupiah(num(document.getElementById("addVol").value) * num(document.getElementById("addHarga").value));
+}
+
+document.getElementById("btnTambahItem").addEventListener("click", () => {
+    addKode.value = "";
+    addUraian.value = "";
+    addVol.value = 1;
+    addSat.value = "";
+    addHarga.value = 0;
+    updateAddJumlah();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById("modalTambahItem")).show();
+});
+
+document.getElementById("btnTambahkanItem").addEventListener("click", () => {
+    const item = {
+        id: "ADD-" + Date.now(),
+        kode: norm(addKode.value),
+        uraian: norm(addUraian.value),
+        volume: num(addVol.value),
+        satuan: norm(addSat.value),
+        harga: num(addHarga.value)
+    };
+
+    if (!item.uraian) return alert("Uraian wajib diisi.");
+    if (item.volume <= 0) return alert("Volume harus lebih besar dari 0.");
+
+    revisiDraft.additions.push(item);
+    bootstrap.Modal.getOrCreateInstance(document.getElementById("modalTambahItem")).hide();
+    render();
+    setStatus("Item ditambahkan ke draft. Belum mengubah DATA_APLIKASI.", "warning");
+});
+
+document.addEventListener("DOMContentLoaded", init);
+window.addEventListener("pageshow", event => { if (event.persisted) location.reload(); });
