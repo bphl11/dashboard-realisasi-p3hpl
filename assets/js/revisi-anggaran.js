@@ -169,6 +169,77 @@ function revisionSnapshotFingerprint(rows) {
     return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
+function testRevisionServer() {
+    if (!revisiDraft.validation || revisiDraft.validation.ok !== true) {
+        setStatus("Revisi belum lolos validasi. Jalankan Validasi terlebih dahulu.", "warning");
+        return;
+    }
+
+    const user = typeof rpdGetStoredUser === "function" ? rpdGetStoredUser() : null;
+    if (!user || !user.id_token) {
+        setStatus("Sesi login tidak ditemukan. Silakan login kembali.", "danger");
+        return;
+    }
+
+    syncMetadataToDraft();
+    normalizeDraftAdditionsContext();
+
+    const button = document.getElementById("btnUjiServerRevisi");
+    if (button) {
+        button.disabled = true;
+        button.innerHTML = '<i class="bi bi-hourglass-split"></i> Menguji...';
+    }
+
+    (async function () {
+        try {
+            const fingerprint = revisionSnapshotFingerprint(revisiRows);
+            const result = await rpdApiRequest("apply_revisi", {
+                id_token: user.id_token,
+                expected_snapshot_hash: fingerprint,
+                draft: revisiDraft,
+                dry_run: true
+            });
+
+            if (!result || result.ok !== true) {
+                throw new Error(result?.message || "Server menolak UJI SERVER.");
+            }
+
+            const before = num(result.before);
+            const after = num(result.after);
+            const diff = num(result.diff);
+            const componentDetails = Array.isArray(result.components) ? result.components : [];
+            const componentText = componentDetails.length
+                ? componentDetails.map(item =>
+                    (item.label || item.key || "Komponen") +
+                    ": " + rupiah(item.before) + " → " + rupiah(item.after)
+                  ).join(" | ")
+                : "Komponen: pemeriksaan server berhasil.";
+
+            setStatus(
+                "UJI SERVER BERHASIL · Total sebelum: " + rupiah(before) +
+                " · Total sesudah: " + rupiah(after) +
+                " · Selisih: " + rupiah(diff) +
+                " · " + componentText +
+                " · DATA_APLIKASI: TIDAK DIUBAH",
+                "ok"
+            );
+
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = '<i class="bi bi-shield-check"></i> UJI SERVER';
+                button.title = "Uji server berhasil. Tidak ada perubahan ke DATA_APLIKASI.";
+            }
+        } catch (error) {
+            console.error("UJI SERVER gagal:", error);
+            setStatus("UJI SERVER GAGAL: " + (error.message || error), "danger");
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = '<i class="bi bi-shield-check"></i> UJI SERVER';
+            }
+        }
+    })();
+}
+
 function applyRevisionDraft() {
     if (!revisiDraft.validation || revisiDraft.validation.ok !== true) {
         setStatus("Revisi belum lolos validasi.", "warning");
@@ -850,6 +921,7 @@ function renderValidationState() {
     const status = document.getElementById("revisiValidationStatus");
     const v = revisiDraft.validation;
     const applyButton = document.getElementById("btnTerapkanRevisi");
+    const testButton = document.getElementById("btnUjiServerRevisi");
     const summaryStatus = document.querySelector(".revisi-summary .draft-text");
 
     if (!box || !status) return;
@@ -861,6 +933,10 @@ function renderValidationState() {
         if (applyButton) {
             applyButton.disabled = true;
             applyButton.title = "Aktif setelah validasi berhasil.";
+        }
+        if (testButton) {
+            testButton.disabled = true;
+            testButton.title = "Aktif setelah validasi berhasil.";
         }
         if (summaryStatus) summaryStatus.textContent = "DRAFT";
         return;
@@ -882,6 +958,12 @@ function renderValidationState() {
         applyButton.disabled = !v.ok;
         applyButton.title = v.ok
             ? "Validasi berhasil. Siap diterapkan setelah konfirmasi."
+            : "Aktif setelah validasi berhasil.";
+    }
+    if (testButton) {
+        testButton.disabled = !v.ok;
+        testButton.title = v.ok
+            ? "Uji server tanpa mengubah DATA_APLIKASI."
             : "Aktif setelah validasi berhasil.";
     }
 
@@ -1319,6 +1401,7 @@ function printRevision() {
 document.getElementById("btnCetakRevisi").addEventListener("click", printRevision);
 document.getElementById("btnDownloadExcelRevisi").addEventListener("click", exportRevisionExcel);
 document.getElementById("btnValidasiRevisi").addEventListener("click", validateDraft);
+document.getElementById("btnUjiServerRevisi").addEventListener("click", testRevisionServer);
 document.getElementById("btnTerapkanRevisi").addEventListener("click", applyRevisionDraft);
 ["revisiNomor","revisiTanggal","revisiPembuat","revisiAlasan"].forEach(id=>document.getElementById(id).addEventListener("input",()=>{revisiDraft.validation=null;renderValidationState();}));
 document.getElementById("btnSimpanDraft").addEventListener("click", saveDraft);
