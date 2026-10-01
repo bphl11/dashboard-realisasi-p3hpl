@@ -25,6 +25,9 @@ function buildRows(raw) {
     if (!context) return [];
 
     const rows = [];
+    let currentAkunCode = "";
+    let currentAkunName = "";
+
     for (let i = context.headerIndex + 1; i < raw.length; i++) {
         const row = Array.isArray(raw[i]) ? raw[i] : [];
         if (!row.some(value => norm(value) !== "")) continue;
@@ -34,19 +37,27 @@ function buildRows(raw) {
         const komponen = hv(row, context.map, ["Komponen", "Nama Komponen"]);
         const subKomponen = hv(row, context.map, ["Sub Komponen", "Subkomponen", "Nama Sub Komponen"]);
         const akun = hv(row, context.map, ["Akun Belanja", "Akun"]);
+
+        if (kodeAkun || akun) {
+            if (kodeAkun) currentAkunCode = kodeAkun;
+            if (akun) currentAkunName = akun;
+        }
+
+        const inheritedCode = kodeAkun || currentAkunCode || kode;
+        const inheritedAkun = akun || currentAkunName;
         const itemAkun = hv(row, context.map, ["Item Akun", "Item"]);
         const detil = hv(row, context.map, ["Detil Akun", "Detail Akun", "Detil"]);
         const rincian = hv(row, context.map, ["Rincian Item", "Rincian"]);
-        const uraian = rincian || detil || itemAkun || akun || subKomponen || komponen || kode;
+        const uraian = rincian || detil || itemAkun || inheritedAkun || subKomponen || komponen || inheritedCode;
 
         rows.push({
             rowIndex: i,
-            kode: kodeAkun || kode,
-            kodeAkun,
+            kode: inheritedCode,
+            kodeAkun: currentAkunCode,
             komponen,
             subKomponen,
-            akun,
-            akunLabel: kodeAkun ? (kodeAkun + " " + akun) : akun,
+            akun: inheritedAkun,
+            akunLabel: currentAkunCode ? (currentAkunCode + " " + inheritedAkun) : inheritedAkun,
             itemAkun,
             detil,
             rincian,
@@ -60,7 +71,6 @@ function buildRows(raw) {
     }
     return rows;
 }
-
 function loadDraft() {
     try {
         const raw = localStorage.getItem(REVISI_DRAFT_KEY);
@@ -113,7 +123,8 @@ function filters() {
     return {
         tahun: document.getElementById("filterTahun").value,
         komponen: document.getElementById("filterKomponen").value,
-        subKomponen: document.getElementById("filterSubKomponen").value
+        subKomponen: document.getElementById("filterSubKomponen").value,
+        akun: document.getElementById("filterAkun").value
     };
 }
 
@@ -126,6 +137,9 @@ function refreshFilters() {
 
     const byComponent = byYear.filter(row => !filterKomponen.value || row.komponen === filterKomponen.value);
     fillSelect("filterSubKomponen", uniq(byComponent.map(row => row.subKomponen)), "-- Semua Sub Komponen --", f.subKomponen);
+
+    const bySubKomponen = byComponent.filter(row => !filterSubKomponen.value || row.subKomponen === filterSubKomponen.value);
+    fillSelect("filterAkun", uniq(bySubKomponen.map(row => row.akunLabel)), "-- Semua Akun Belanja --", f.akun);
 }
 
 function filteredRows() {
@@ -133,7 +147,8 @@ function filteredRows() {
     return revisiRows.filter(row =>
         (!f.tahun || row.tahun === f.tahun) &&
         (!f.komponen || row.komponen === f.komponen) &&
-        (!f.subKomponen || row.subKomponen === f.subKomponen)
+        (!f.subKomponen || row.subKomponen === f.subKomponen) &&
+        (!f.akun || row.akunLabel === f.akun)
     );
 }
 
@@ -152,8 +167,8 @@ function render() {
     const afterBody = document.getElementById("afterBody");
 
     if (!revisiFilteredRows.length) {
-        beforeBody.innerHTML = '<tr><td colspan="8" class="empty-cell">Tidak ada data sesuai filter.</td></tr>';
-        afterBody.innerHTML = '<tr><td colspan="7" class="empty-cell">Tidak ada data sesuai filter.</td></tr>';
+        beforeBody.innerHTML = '<tr><td colspan="7" class="empty-cell">Tidak ada data sesuai filter.</td></tr>';
+        afterBody.innerHTML = '<tr><td colspan="8" class="empty-cell">Tidak ada data sesuai filter.</td></tr>';
     } else {
         beforeBody.innerHTML = revisiFilteredRows.map(row =>
             '<tr><td>' + esc(row.kode) + '</td><td>' + esc(row.akunLabel) + '</td><td>' + esc(row.uraian) + '</td><td>' +
