@@ -103,6 +103,7 @@ function doPost(e) {
     if (action === "realisasi_save") return jsonOutput(saveRealisasi_(request.id_token, request.row));
     if (action === "realisasi_update") return jsonOutput(updateRealisasi_(request.id_token, request.row));
     if (action === "realisasi_delete") return jsonOutput(deleteRealisasi_(request.id_token, request.row));
+    if (action === "apply_revisi") return jsonOutput(applyRevisi_(request));
 
     return jsonOutput({ ok: false, message: "Action API tidak dikenal." });
   } catch (error) {
