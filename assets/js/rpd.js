@@ -89,10 +89,16 @@ function rpdMergeSavedRows(rows) {
         // Kompatibilitas dengan API lama:
         // API lama hanya mengembalikan TW1-TW4 sehingga tidak boleh
         // menimpa posisi minggu 1-4 yang baru saja diinput pengguna.
-        const incomingHasWeekly = RPD_WEEK_FIELDS.some(field => {
-            return item?.[field] !== undefined ||
-                   item?.[field.toUpperCase()] !== undefined;
-        });
+        // API lama mengembalikan hanya TW1-TW4. rpdNormalizeSavedRow()
+        // dapat memetakan subtotal lama ke slot minggu 4 sebagai kompatibilitas.
+        // Mapping kompatibilitas tersebut BUKAN input mingguan baru dan tidak
+        // boleh menimpa posisi minggu yang sudah disimpan pada cache lokal.
+        const incomingLegacyQuarterMapped = item?._legacyQuarterMapped === true;
+        const incomingHasWeekly = !incomingLegacyQuarterMapped &&
+            RPD_WEEK_FIELDS.some(field => {
+                return item?.[field] !== undefined ||
+                       item?.[field.toUpperCase()] !== undefined;
+            });
         const existingHasWeekly = existing &&
             RPD_WEEK_FIELDS.some(field => rpdNumber(existing?.[field]) !== 0);
 
@@ -206,7 +212,8 @@ function rpdNormalizeSavedRow(row) {
     // posisi yang diharapkan pengguna: TW IV -> Oktober Minggu 4.
     // Ini hanya dijalankan bila TIDAK ADA satu pun field 48-minggu.
     // Record baru yang sudah memiliki field mingguan tidak disentuh.
-    if (!RPD_WEEK_FIELDS.some(key => normalized[key] !== 0)) {
+    const hasWeeklyInput = RPD_WEEK_FIELDS.some(key => normalized[key] !== 0);
+    if (!hasWeeklyInput) {
         const legacyQuarterMap = [
             ["tw1", "mar_m4"],
             ["tw2", "jun_m4"],
@@ -217,6 +224,11 @@ function rpdNormalizeSavedRow(row) {
             const value = rpdNumber(normalized[quarter]);
             if (value > 0) normalized[weekField] = value;
         });
+        // Penanda internal agar merge tidak menganggap hasil mapping
+        // kompatibilitas ini sebagai input minggu yang benar-benar dikirim API.
+        normalized._legacyQuarterMapped = true;
+    } else {
+        normalized._legacyQuarterMapped = false;
     }
 
     const q=rpdQuarterTotals(normalized);
