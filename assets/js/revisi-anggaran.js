@@ -399,6 +399,7 @@ async function init() {
 
         revisiRows = buildRows(revisiStore.rawData);
         refreshFilters();
+        normalizeDraftAdditionsContext();
         render();
         setStatus("DATA_APLIKASI siap · Draft lokal aktif", "ok");
     } catch (error) {
@@ -493,16 +494,86 @@ function draftGroupKey(item) {
     // Validasi pagu hanya sampai level KOMPONEN.
     // Perubahan antar akun belanja maupun antar sub komponen di dalam
     // komponen yang sama diperbolehkan selama total komponen tetap.
-    return norm(item.komponen) || "(Tanpa Komponen)";
+    const code = norm(item.kodeKomponen);
+    const name = norm(item.komponen);
+    return [code, name].filter(Boolean).join(" | ") || "(Tanpa Komponen)";
 }
 
 function draftGroupLabel(item) {
-    return norm(item.komponen) || "(Tanpa Komponen)";
+    const code = norm(item.kodeKomponen);
+    const name = norm(item.komponen);
+    if (code && name) return code + " — " + name;
+    return name || code || "(Tanpa Komponen)";
+}
+
+function additionContextCandidates(item) {
+    const code = norm(item.kodeAkun || item.kode);
+    const akun = norm(item.akunLabel || item.akun);
+
+    return revisiRows.filter(row => {
+        const sameCode = !code || norm(row.kodeAkun || row.kode) === code;
+        const sameAkun = !akun || norm(row.akunLabel || row.akun) === akun;
+        return sameCode && sameAkun;
+    });
+}
+
+function resolveAdditionContext(item) {
+    const result = { ...item };
+    const f = filters();
+
+    // Prioritaskan konteks filter saat item ditambahkan.
+    if (!norm(result.tahun) && f.tahun) result.tahun = f.tahun;
+    if (!norm(result.komponen) && f.komponen) result.komponen = f.komponen;
+    if (!norm(result.subKomponen) && f.subKomponen) result.subKomponen = f.subKomponen;
+
+    const candidates = additionContextCandidates(result);
+
+    const contextual = candidates.filter(row =>
+        (!result.tahun || norm(row.tahun) === norm(result.tahun)) &&
+        (!result.komponen || norm(row.komponen) === norm(result.komponen)) &&
+        (!result.subKomponen || norm(row.subKomponen) === norm(result.subKomponen))
+    );
+
+    const source = contextual[0] || (candidates.length === 1 ? candidates[0] : null);
+
+    if (source) {
+        result.tahun = norm(result.tahun || source.tahun);
+        result.komponen = norm(result.komponen || source.komponen);
+        result.kodeKomponen = norm(result.kodeKomponen || source.kodeKomponen);
+        result.subKomponen = norm(result.subKomponen || source.subKomponen);
+        result.kodeSubKomponen = norm(result.kodeSubKomponen || source.kodeSubKomponen);
+        result.kodeAkun = norm(result.kodeAkun || source.kodeAkun || source.kode);
+        result.kode = norm(result.kode || result.kodeAkun);
+        result.akun = norm(result.akun || source.akun);
+        result.akunLabel = norm(result.akunLabel || source.akunLabel || source.akun);
+    }
+
+    return result;
+}
+
+function normalizeDraftAdditionsContext() {
+    if (!Array.isArray(revisiDraft.additions) || !revisiDraft.additions.length) return;
+
+    let changed = false;
+    revisiDraft.additions = revisiDraft.additions.map(item => {
+        const resolved = resolveAdditionContext(item);
+        if (JSON.stringify(resolved) !== JSON.stringify(item)) changed = true;
+        return resolved;
+    });
+
+    if (changed) {
+        try {
+            localStorage.setItem(REVISI_DRAFT_KEY, JSON.stringify(revisiDraft));
+        } catch (error) {
+            console.warn("Konteks item tambahan tidak dapat disimpan:", error);
+        }
+    }
 }
 
 function calculateGlobalDraftTotals() {
     const beforeByGroup = new Map();
     const afterByGroup = new Map();
+    const unresolvedAdditions = [];
 
     draftGlobalRows().forEach(({ row, effective, deleted }) => {
         const key = draftGroupKey(row);
@@ -514,8 +585,16 @@ function calculateGlobalDraftTotals() {
     });
 
     revisiDraft.additions.filter(item => !item.deleted).forEach(item => {
-        const key = draftGroupKey(item);
-        afterByGroup.set(key, (afterByGroup.get(key) || 0) + num(item.volume) * num(item.harga));
+        const resolved = resolveAdditionContext(item);
+        const hasComponent = norm(resolved.komponen) || norm(resolved.kodeKomponen);
+
+        if (!hasComponent) {
+            unresolvedAdditions.push(resolved);
+            return;
+        }
+
+        const key = draftGroupKey(resolved);
+        afterByGroup.set(key, (afterByGroup.get(key) || 0) + num(resolved.volume) * num(resolved.harga));
         if (!beforeByGroup.has(key)) beforeByGroup.set(key, 0);
     });
 
@@ -539,7 +618,8 @@ function calculateGlobalDraftTotals() {
         before,
         after,
         diff: after - before,
-        groups
+        groups,
+        unresolvedAdditions
     };
 }
 
@@ -557,7 +637,19 @@ function validateDraft() {
      * tampil. Tujuannya menjaga agar revisi tidak mengubah pagu total
      * komponen maupun total seluruh anggaran.
      */
+    // Pastikan item tambahan memiliki konteks Komponen/Sub Komponen.
+    // Item baru harus mengikuti lokasi yang dipilih pengguna.
+    normalizeDraftAdditionsContext();
+
     const global = calculateGlobalDraftTotals();
+
+    global.unresolvedAdditions.forEach(item => {
+        errors.push(
+            "ITEM TAMBAHAN BELUM MEMILIKI KOMPONEN: " +
+            (item.uraian || item.akunLabel || item.kode || "Item baru") +
+            ". Pilih Komponen dan Sub Komponen sebelum menambahkan item."
+        );
+    });
 
     const changedCount =
         Object.keys(revisiDraft.changes).length +
@@ -587,13 +679,13 @@ function validateDraft() {
             rupiah(global.after) +
             " (selisih " +
             rupiah(global.diff) +
-            ")."
+            "). Revisi tidak dapat divalidasi."
         );
     }
 
     global.groups.forEach(group => {
         errors.push(
-            "SELISIH PAGU KOMPONEN: " +
+            "SELISIH DITEMUKAN DI KOMPONEN: " +
             group.label +
             " — sebelum " +
             rupiah(group.before) +
@@ -601,7 +693,7 @@ function validateDraft() {
             rupiah(group.after) +
             " (selisih " +
             rupiah(group.diff) +
-            "). Perubahan antar akun belanja/sub komponen di dalam komponen yang sama diperbolehkan, tetapi total komponen harus tetap."
+            "). Perubahan antar akun belanja dan antar sub komponen di dalam komponen ini diperbolehkan selama total Komponen tetap."
         );
     });
 
@@ -1186,7 +1278,10 @@ document.getElementById("btnTambahkanItem").addEventListener("click", () => {
     if (!item.uraian) return alert("Uraian wajib diisi.");
     if (item.volume <= 0) return alert("Volume harus lebih besar dari 0.");
 
-    revisiDraft.additions.push(item);
+    // Simpan identitas hierarki secara eksplisit agar item baru
+    // masuk ke Komponen/Sub Komponen yang dipilih.
+    const resolvedItem = resolveAdditionContext(item);
+    revisiDraft.additions.push(resolvedItem);
 
     // Validasi lama tidak berlaku setelah ada item baru.
     revisiDraft.validation = null;
