@@ -2,7 +2,7 @@ const REVISI_DRAFT_KEY = "p3hpl_revisi_anggaran_draft_v1";
 let revisiStore = null;
 let revisiRows = [];
 let revisiFilteredRows = [];
-let revisiDraft = { version: 2, status: "DRAFT", nomor: "", tanggal: "", pembuat: "", alasan: "", changes: {}, deletions: [], additions: [], updatedAt: null, validation: null, history: Array.isArray(parsed.history) ? parsed.history : [] };
+let revisiDraft = { version: 2, status: "DRAFT", nomor: "", tanggal: "", pembuat: "", alasan: "", changes: {}, deletions: [], additions: [], updatedAt: null, validation: null, history: [] };
 
 const rupiah = value => "Rp" + (Number(value) || 0).toLocaleString("id-ID");
 const num = value => { const n = Number(String(value ?? "").replace(/[^0-9.-]/g, "")); return Number.isFinite(n) ? n : 0; };
