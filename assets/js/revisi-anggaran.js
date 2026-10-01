@@ -41,7 +41,7 @@ function buildRows(raw) {
         // Pada DATA_APLIKASI, kode akun sering berada pada baris header akun
         // (mis. 521211) sedangkan baris detail di bawahnya kosong.
         // Karena itu kode akun harus diwariskan ke seluruh detail di bawahnya.
-        const kodeAkunBaris = kodeAkun || (/^\\d{6}$/.test(kode) ? kode : "");
+        const kodeAkunBaris = kodeAkun || (/^\d{6}$/.test(kode) ? kode : "");
         if (kodeAkunBaris || akun) {
             if (kodeAkunBaris) currentAkunCode = kodeAkunBaris;
             if (akun) currentAkunName = akun;
