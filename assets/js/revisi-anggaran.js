@@ -289,8 +289,32 @@ function revisionSnapshotFingerprint(rows) {
 }
 
 function testRevisionServer() {
+    syncMetadataToDraft();
+
+    const metadataErrors = [];
+    if (!revisiDraft.nomor) metadataErrors.push("Nomor revisi wajib diisi.");
+    if (!revisiDraft.tanggal) metadataErrors.push("Tanggal revisi wajib diisi.");
+    if (!revisiDraft.pembuat) metadataErrors.push("Pembuat revisi wajib diisi.");
+    if (!revisiDraft.alasan) metadataErrors.push("Alasan revisi wajib diisi.");
+
+    if (metadataErrors.length) {
+        revisiDraft.serverTest = null;
+        localStorage.setItem(REVISI_DRAFT_KEY, JSON.stringify(revisiDraft));
+        renderValidationState();
+        setStatus("UJI SERVER GAGAL: " + metadataErrors.join(" "), "warning");
+        return;
+    }
+
     if (!revisiDraft.validation || revisiDraft.validation.ok !== true) {
         setStatus("Revisi belum lolos validasi. Jalankan Validasi terlebih dahulu.", "warning");
+        return;
+    }
+
+    const currentFingerprint = revisionSnapshotFingerprint(revisiRows);
+    if (revisiDraft.validation.snapshotHash !== currentFingerprint) {
+        revisiDraft.serverTest = null;
+        renderValidationState();
+        setStatus("UJI SERVER GAGAL: Data draft berubah sejak validasi. Klik Validasi ulang.", "warning");
         return;
     }
 
@@ -1044,6 +1068,8 @@ function validateDraft() {
 }
 
 function renderValidationState() {
+    syncMetadataToDraft();
+
     const box = document.getElementById("revisiValidationBox");
     const status = document.getElementById("revisiValidationStatus");
     const v = revisiDraft.validation;
@@ -1051,11 +1077,20 @@ function renderValidationState() {
     const testButton = document.getElementById("btnUjiServerRevisi");
     const summaryStatus = document.querySelector(".revisi-summary .draft-text");
 
+    const metadataErrors = [];
+    if (!revisiDraft.nomor) metadataErrors.push("Nomor revisi wajib diisi.");
+    if (!revisiDraft.tanggal) metadataErrors.push("Tanggal revisi wajib diisi.");
+    if (!revisiDraft.pembuat) metadataErrors.push("Pembuat revisi wajib diisi.");
+    if (!revisiDraft.alasan) metadataErrors.push("Alasan revisi wajib diisi.");
+    const metadataReady = metadataErrors.length === 0;
+
     if (!box || !status) return;
 
-    if (!v) {
-        box.textContent = "Validasi: belum dijalankan.";
-        status.textContent = "Belum divalidasi";
+    if (!v || !metadataReady) {
+        box.textContent = !metadataReady
+            ? "Belum siap divalidasi: " + metadataErrors.join(" ")
+            : "Validasi: belum dijalankan.";
+        status.textContent = !metadataReady ? "DRAFT" : "Belum divalidasi";
         status.className = "status-pill status-warning";
         if (applyButton) {
             applyButton.disabled = true;
@@ -1063,7 +1098,9 @@ function renderValidationState() {
         }
         if (testButton) {
             testButton.disabled = true;
-            testButton.title = "Aktif setelah validasi berhasil.";
+            testButton.title = !metadataReady
+                ? "Lengkapi Nomor Revisi, Tanggal, Pembuat, dan Alasan Revisi."
+                : "Aktif setelah validasi berhasil.";
         }
         if (summaryStatus) summaryStatus.textContent = "DRAFT";
         return;
@@ -1083,7 +1120,9 @@ function renderValidationState() {
     // revisiDraft.validation sehingga tombol kembali terkunci.
     if (applyButton) {
         const serverTestReady = Boolean(
-            v.ok &&
+            metadataReady &&
+            v?.ok &&
+            v.snapshotHash === revisionSnapshotFingerprint(revisiRows) &&
             revisiDraft.serverTest?.ok &&
             revisiDraft.serverTest.fingerprint === revisionSnapshotFingerprint(revisiRows)
         );
@@ -1094,12 +1133,21 @@ function renderValidationState() {
     }
     if (testButton) {
         const hasServerSession = Boolean(getRevisiStoredUser()?.id_token);
-        testButton.disabled = !v.ok || !hasServerSession;
-        testButton.title = !v.ok
-            ? "Aktif setelah validasi berhasil."
-            : !hasServerSession
-                ? "Login Google diperlukan untuk UJI SERVER."
-                : "Uji server tanpa mengubah DATA_APLIKASI.";
+        const snapshotStillMatches = Boolean(
+            v?.ok &&
+            v.snapshotHash &&
+            v.snapshotHash === revisionSnapshotFingerprint(revisiRows)
+        );
+        testButton.disabled = !metadataReady || !v?.ok || !hasServerSession || !snapshotStillMatches;
+        testButton.title = !metadataReady
+            ? "Lengkapi Nomor Revisi, Tanggal, Pembuat, dan Alasan Revisi."
+            : !v?.ok
+                ? "Aktif setelah validasi berhasil."
+                : !hasServerSession
+                    ? "Login Google diperlukan untuk UJI SERVER."
+                    : !snapshotStillMatches
+                        ? "Data draft berubah. Validasi ulang sebelum UJI SERVER."
+                        : "Uji server tanpa mengubah DATA_APLIKASI.";
     }
 
     if (summaryStatus) {
