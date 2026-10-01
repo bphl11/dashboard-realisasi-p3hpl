@@ -38,12 +38,16 @@ function buildRows(raw) {
         const subKomponen = hv(row, context.map, ["Sub Komponen", "Subkomponen", "Nama Sub Komponen"]);
         const akun = hv(row, context.map, ["Akun Belanja", "Akun"]);
 
-        if (kodeAkun || akun) {
-            if (kodeAkun) currentAkunCode = kodeAkun;
+        // Pada DATA_APLIKASI, kode akun sering berada pada baris header akun
+        // (mis. 521211) sedangkan baris detail di bawahnya kosong.
+        // Karena itu kode akun harus diwariskan ke seluruh detail di bawahnya.
+        const kodeAkunBaris = kodeAkun || (/^\\d{6}$/.test(kode) ? kode : "");
+        if (kodeAkunBaris || akun) {
+            if (kodeAkunBaris) currentAkunCode = kodeAkunBaris;
             if (akun) currentAkunName = akun;
         }
 
-        const inheritedCode = kodeAkun || currentAkunCode || kode;
+        const inheritedCode = currentAkunCode || kode;
         const inheritedAkun = akun || currentAkunName;
         const itemAkun = hv(row, context.map, ["Item Akun", "Item"]);
         const detil = hv(row, context.map, ["Detil Akun", "Detail Akun", "Detil"]);
