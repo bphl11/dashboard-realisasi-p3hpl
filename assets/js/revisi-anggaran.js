@@ -2,7 +2,7 @@ const REVISI_DRAFT_KEY = "p3hpl_revisi_anggaran_draft_v1";
 let revisiStore = null;
 let revisiRows = [];
 let revisiFilteredRows = [];
-let revisiDraft = { version: 2, status: "DRAFT", nomor: "", tanggal: "", pembuat: "", alasan: "", changes: {}, deletions: [], additions: [], updatedAt: null, validation: null, history: [] };
+let revisiDraft = { version: 2, status: "DRAFT", nomor: "", tanggal: "", pembuat: "", alasan: "", changes: {}, deletions: [], additions: [], updatedAt: null, validation: null, serverTest: null, history: [] };
 
 const rupiah = value => "Rp" + (Number(value) || 0).toLocaleString("id-ID");
 const num = value => {
@@ -31,6 +31,125 @@ const num = value => {
 };
 const esc = value => String(value ?? "").replace(/[&<>"']/g, s => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;" }[s]));
 const norm = value => String(value ?? "").trim();
+const REVISI_AUTH_STORAGE_KEY = "p3hpl_rpd_user_v1";
+
+function getRevisiStoredUser() {
+    try {
+        const raw = sessionStorage.getItem(REVISI_AUTH_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch (error) {
+        console.warn("Sesi Revisi tidak dapat dibaca:", error);
+        return null;
+    }
+}
+
+function setRevisiStoredUser(user) {
+    sessionStorage.setItem(REVISI_AUTH_STORAGE_KEY, JSON.stringify(user));
+}
+
+function clearRevisiStoredUser() {
+    sessionStorage.removeItem(REVISI_AUTH_STORAGE_KEY);
+}
+
+function updateRevisiSessionUI() {
+    const user = getRevisiStoredUser();
+    const status = document.getElementById("revisiSessionStatus");
+    const info = document.getElementById("revisiSessionInfo");
+    const login = document.getElementById("revisiGoogleSignInButton");
+    const logout = document.getElementById("btnRevisiLogout");
+
+    if (user?.id_token) {
+        if (status) {
+            status.textContent = "LOGIN AKTIF";
+            status.className = "status-pill status-ok";
+        }
+        if (info) info.textContent = (user.name || "Operator") + (user.email ? " · " + user.email : "");
+        if (login) login.classList.add("d-none");
+        if (logout) logout.classList.remove("d-none");
+    } else {
+        if (status) {
+            status.textContent = "BELUM LOGIN";
+            status.className = "status-pill status-warning";
+        }
+        if (info) info.textContent = "Login Google diperlukan untuk UJI SERVER.";
+        if (login) login.classList.remove("d-none");
+        if (logout) logout.classList.add("d-none");
+    }
+
+    if (typeof renderValidationState === "function") renderValidationState();
+}
+
+async function handleRevisiCredentialResponse(response) {
+    if (!response?.credential) {
+        setStatus("Google tidak mengembalikan token login.", "danger");
+        return;
+    }
+
+    try {
+        setStatus("Memeriksa login Google untuk UJI SERVER...", "info");
+        const result = await rpdApiRequest("auth", { id_token: response.credential });
+
+        if (!result?.ok || !result?.user?.id_token) {
+            throw new Error(result?.message || "Login Google ditolak server.");
+        }
+
+        setRevisiStoredUser(result.user);
+        updateRevisiSessionUI();
+        setStatus("Login server berhasil. UJI SERVER siap digunakan setelah validasi.", "ok");
+    } catch (error) {
+        clearRevisiStoredUser();
+        updateRevisiSessionUI();
+        setStatus("Login server gagal: " + (error.message || error), "danger");
+    }
+}
+
+function initRevisiGoogleLogin() {
+    const clientId = String(RPD_CONFIG?.GOOGLE_CLIENT_ID || "").trim();
+    if (!clientId) {
+        setStatus("GOOGLE_CLIENT_ID belum dikonfigurasi.", "danger");
+        return;
+    }
+
+    const render = () => {
+        if (!window.google?.accounts?.id) {
+            setStatus("Google Identity Services belum termuat. Refresh halaman lalu coba lagi.", "warning");
+            return;
+        }
+
+        google.accounts.id.initialize({
+            client_id: clientId,
+            callback: handleRevisiCredentialResponse,
+            auto_select: false,
+            cancel_on_tap_outside: true
+        });
+
+        const container = document.getElementById("revisiGoogleSignInButton");
+        if (container) {
+            container.innerHTML = "";
+            google.accounts.id.renderButton(container, {
+                theme: "outline",
+                size: "medium",
+                text: "signin_with",
+                shape: "rectangular",
+                width: 220
+            });
+        }
+    };
+
+    if (window.google?.accounts?.id) render();
+    else window.addEventListener("load", render, { once: true });
+}
+
+function revisiLogout() {
+    clearRevisiStoredUser();
+    if (window.google?.accounts?.id) {
+        try { google.accounts.id.disableAutoSelect(); } catch (error) {}
+    }
+    updateRevisiSessionUI();
+    setStatus("Sesi server dikeluarkan. Draft tetap tersimpan dan DATA_APLIKASI tidak berubah.", "warning");
+}
+
+
 
 function hi(map, aliases) {
     return typeof indeksHeaderDataAplikasi === "function" ? indeksHeaderDataAplikasi(map, aliases) : -1;
@@ -175,7 +294,7 @@ function testRevisionServer() {
         return;
     }
 
-    const user = typeof rpdGetStoredUser === "function" ? rpdGetStoredUser() : null;
+    const user = getRevisiStoredUser() || (typeof rpdGetStoredUser === "function" ? rpdGetStoredUser() : null);
     if (!user || !user.id_token) {
         setStatus("Sesi login tidak ditemukan. Silakan login kembali.", "danger");
         return;
@@ -208,6 +327,9 @@ function testRevisionServer() {
             const after = num(result.after);
             const diff = num(result.diff);
             const componentDetails = Array.isArray(result.components) ? result.components : [];
+            revisiDraft.serverTest = { ok: true, fingerprint, testedAt: new Date().toISOString(), before, after, diff };
+            localStorage.setItem(REVISI_DRAFT_KEY, JSON.stringify(revisiDraft));
+
             const componentText = componentDetails.length
                 ? componentDetails.map(item =>
                     (item.label || item.key || "Komponen") +
@@ -230,6 +352,8 @@ function testRevisionServer() {
                 button.title = "Uji server berhasil. Tidak ada perubahan ke DATA_APLIKASI.";
             }
         } catch (error) {
+            revisiDraft.serverTest = null;
+            localStorage.setItem(REVISI_DRAFT_KEY, JSON.stringify(revisiDraft));
             console.error("UJI SERVER gagal:", error);
             setStatus("UJI SERVER GAGAL: " + (error.message || error), "danger");
             if (button) {
@@ -352,7 +476,7 @@ function saveDraft(event) {
 }
 
 function clearDraft() {
-    revisiDraft = { version:2, status:"DRAFT", nomor:"", tanggal:"", pembuat:"", alasan:"", changes:{}, deletions:[], additions:[], updatedAt:null, validation:null, history:[] };
+    revisiDraft = { version:2, status:"DRAFT", nomor:"", tanggal:"", pembuat:"", alasan:"", changes:{}, deletions:[], additions:[], updatedAt:null, validation:null, serverTest:null, history:[] };
     localStorage.removeItem(REVISI_DRAFT_KEY);
     render();
     setStatus("Draft dikosongkan. DATA_APLIKASI tidak berubah.", "ok");
@@ -594,6 +718,7 @@ document.addEventListener("input", event => {
     // Setiap perubahan item membuat hasil validasi sebelumnya menjadi kedaluwarsa.
     // Jangan tampilkan pesan validasi lama yang sudah tidak sesuai dengan draft terbaru.
     revisiDraft.validation = null;
+    revisiDraft.serverTest = null;
     revisiDraft.status = "DRAFT";
 
     // Jangan render ulang saat setiap karakter diketik.
@@ -879,6 +1004,8 @@ function validateDraft() {
     const validatedAt = new Date().toISOString();
     revisiDraft.snapshotHash = revisionSnapshotFingerprint(revisiRows);
 
+    revisiDraft.serverTest = null;
+
     revisiDraft.validation = {
         ok: errors.length === 0,
         errors,
@@ -955,16 +1082,24 @@ function renderValidationState() {
     // Jika ada perubahan setelah validasi, input handler mengosongkan
     // revisiDraft.validation sehingga tombol kembali terkunci.
     if (applyButton) {
-        applyButton.disabled = !v.ok;
-        applyButton.title = v.ok
-            ? "Validasi berhasil. Siap diterapkan setelah konfirmasi."
-            : "Aktif setelah validasi berhasil.";
+        const serverTestReady = Boolean(
+            v.ok &&
+            revisiDraft.serverTest?.ok &&
+            revisiDraft.serverTest.fingerprint === revisionSnapshotFingerprint(revisiRows)
+        );
+        applyButton.disabled = !serverTestReady;
+        applyButton.title = serverTestReady
+            ? "UJI SERVER berhasil. Siap diterapkan setelah konfirmasi."
+            : "UJI SERVER harus berhasil terlebih dahulu.";
     }
     if (testButton) {
-        testButton.disabled = !v.ok;
-        testButton.title = v.ok
-            ? "Uji server tanpa mengubah DATA_APLIKASI."
-            : "Aktif setelah validasi berhasil.";
+        const hasServerSession = Boolean(getRevisiStoredUser()?.id_token);
+        testButton.disabled = !v.ok || !hasServerSession;
+        testButton.title = !v.ok
+            ? "Aktif setelah validasi berhasil."
+            : !hasServerSession
+                ? "Login Google diperlukan untuk UJI SERVER."
+                : "Uji server tanpa mengubah DATA_APLIKASI.";
     }
 
     if (summaryStatus) {
@@ -1403,7 +1538,7 @@ document.getElementById("btnDownloadExcelRevisi").addEventListener("click", expo
 document.getElementById("btnValidasiRevisi").addEventListener("click", validateDraft);
 document.getElementById("btnUjiServerRevisi").addEventListener("click", testRevisionServer);
 document.getElementById("btnTerapkanRevisi").addEventListener("click", applyRevisionDraft);
-["revisiNomor","revisiTanggal","revisiPembuat","revisiAlasan"].forEach(id=>document.getElementById(id).addEventListener("input",()=>{revisiDraft.validation=null;renderValidationState();}));
+["revisiNomor","revisiTanggal","revisiPembuat","revisiAlasan"].forEach(id=>document.getElementById(id).addEventListener("input",()=>{revisiDraft.validation=null;revisiDraft.serverTest=null;renderValidationState();}));
 document.getElementById("btnSimpanDraft").addEventListener("click", saveDraft);
 document.getElementById("btnResetDraft").addEventListener("click", () => {
     if (confirm("Hapus seluruh perubahan draft? DATA_APLIKASI tetap aman.")) clearDraft();
@@ -1504,5 +1639,10 @@ document.getElementById("btnTambahkanItem").addEventListener("click", () => {
     setStatus("Item ditambahkan ke draft. Belum mengubah DATA_APLIKASI.", "warning");
 });
 
-document.addEventListener("DOMContentLoaded", init);
+document.addEventListener("DOMContentLoaded", () => {
+    init();
+    updateRevisiSessionUI();
+    initRevisiGoogleLogin();
+    document.getElementById("btnRevisiLogout")?.addEventListener("click", revisiLogout);
+});
 window.addEventListener("pageshow", event => { if (event.persisted) location.reload(); });
