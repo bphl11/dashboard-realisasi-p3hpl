@@ -244,7 +244,9 @@ async function ambilRpdBulananGrafik(forceRefresh = false) {
             method: "POST",
             headers: { "Content-Type": "text/plain;charset=utf-8" },
             body: JSON.stringify({
-                action: "list",
+                // Bootstrap mengembalikan RPD + master DATA_APLIKASI.
+                // Grafik membutuhkan keduanya untuk memvalidasi ID RPD.
+                action: "bootstrap",
                 id_token: token
             }),
             redirect: "follow",
