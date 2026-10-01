@@ -136,14 +136,14 @@ function syncMetadataToDraft() {
     revisiDraft.alasan = norm(document.getElementById("revisiAlasan")?.value);
 }
 function calculateBeforeTotal() {
-    return revisiRows.filter(row => !isDeleted(row))
+    return filteredRows().filter(row => !isDeleted(row))
         .reduce((sum, row) => sum + num(row.jumlah), 0);
 }
 
 function calculateAfterTotal() {
-    const existing = revisiRows.filter(row => !isDeleted(row))
+    const existing = filteredRows().filter(row => !isDeleted(row))
         .reduce((sum, row) => sum + num(effectiveRow(row).jumlah), 0);
-    const additions = revisiDraft.additions.filter(x => !x.deleted)
+    const additions = filteredAdditions()
         .reduce((sum, row) => sum + num(row.volume) * num(row.harga), 0);
     return existing + additions;
 }
@@ -225,14 +225,74 @@ function refreshFilters() {
     fillSelect("filterAkun", uniq(bySubKomponen.map(row => row.akunLabel)), "-- Semua Akun Belanja --", f.akun);
 }
 
-function filteredRows() {
+function rowMatchesFilters(row) {
     const f = filters();
-    return revisiRows.filter(row =>
+    return (!f.tahun || row.tahun === f.tahun) &&
+        (!f.komponen || row.komponen === f.komponen) &&
+        (!f.subKomponen || row.subKomponen === f.subKomponen) &&
+        (!f.akun || row.akunLabel === f.akun);
+}
+
+function filteredRows() {
+    return revisiRows.filter(row => rowMatchesFilters(row));
+}
+
+function filteredAdditions() {
+    return revisiDraft.additions.filter(item => !item.deleted && rowMatchesFilters(item));
+}
+
+function additionParentContext() {
+    const f = filters();
+    const source = revisiRows.filter(row =>
         (!f.tahun || row.tahun === f.tahun) &&
         (!f.komponen || row.komponen === f.komponen) &&
         (!f.subKomponen || row.subKomponen === f.subKomponen) &&
         (!f.akun || row.akunLabel === f.akun)
     );
+    return source[0] || {};
+}
+
+function comparisonEntries() {
+    const base = revisiFilteredRows;
+    const additions = filteredAdditions();
+    const entries = [];
+
+    base.forEach(row => {
+        entries.push({ type: "base", row });
+
+        // Item baru ditempatkan setelah seluruh item akun belanja
+        // yang sama pada Sub Komponen yang sedang dipilih.
+        const isLastSameAccount = !base.some(other =>
+            other.rowIndex !== row.rowIndex &&
+            other.rowIndex > row.rowIndex &&
+            norm(other.kodeAkun || other.kode) === norm(row.kodeAkun || row.kode) &&
+            norm(other.akunLabel) === norm(row.akunLabel) &&
+            norm(other.subKomponen) === norm(row.subKomponen) &&
+            norm(other.komponen) === norm(row.komponen) &&
+            norm(other.tahun) === norm(row.tahun)
+        );
+
+        if (isLastSameAccount) {
+            additions
+                .filter(item =>
+                    norm(item.kode) === norm(row.kodeAkun || row.kode) &&
+                    norm(item.akunLabel || item.akun) === norm(row.akunLabel) &&
+                    norm(item.subKomponen) === norm(row.subKomponen) &&
+                    norm(item.komponen) === norm(row.komponen) &&
+                    norm(item.tahun) === norm(row.tahun)
+                )
+                .forEach(item => entries.push({ type: "addition", item }));
+        }
+    });
+
+    // Jika akun baru belum ada di DATA_APLIKASI, letakkan setelah
+    // baris terakhir dari Sub Komponen yang sedang dipilih.
+    const inserted = new Set(entries.filter(x => x.type === "addition").map(x => x.item.id));
+    additions.filter(item => !inserted.has(item.id)).forEach(item => {
+        entries.push({ type: "addition", item });
+    });
+
+    return entries;
 }
 
 function effectiveRow(row) {
@@ -278,17 +338,31 @@ function render() {
         }).join("");
     }
 
-    const additions = revisiDraft.additions.filter(item => !item.deleted);
-    if (additions.length) {
-        afterBody.innerHTML += additions.map(item =>
-            '<tr class="added"><td>' + esc(item.kode) + '</td><td>' + esc(item.akunLabel || item.akun || '') + '</td><td>' + esc(item.uraian) + '</td><td>' +
-            esc(item.volume) + '</td><td>' + esc(item.satuan) + '</td><td class="text-end">' +
-            rupiah(item.harga) + '</td><td class="text-end fw-bold">' + rupiah(item.volume * item.harga) +
-            '</td><td class="action-cell"><button class="btn-icon delete" data-action="delete-add" data-id="' +
-            esc(item.id) + '"><i class="bi bi-trash"></i></button></td></tr>'
-        ).join("");
-    }
+    const entries = comparisonEntries();
+    afterBody.innerHTML = entries.length ? entries.map(entry => {
+        if (entry.type === "addition") {
+            const item = entry.item;
+            return '<tr class="added"><td>' + esc(item.kode) + '</td><td>' + esc(item.akunLabel || item.akun || '') +
+                '</td><td>' + esc(item.uraian) + '</td><td>' + esc(item.volume) + '</td><td>' + esc(item.satuan) +
+                '</td><td class="text-end">' + rupiah(item.harga) + '</td><td class="text-end fw-bold">' +
+                rupiah(num(item.volume) * num(item.harga)) + '</td><td class="action-cell"><button class="btn-icon delete" data-action="delete-add" data-id="' +
+                esc(item.id) + '"><i class="bi bi-trash"></i></button></td></tr>';
+        }
 
+        const row = entry.row;
+        const effective = effectiveRow(row);
+        const changed = Boolean(revisiDraft.changes[String(row.rowIndex)]);
+        const deleted = isDeleted(row);
+        return '<tr class="' + (deleted ? "deleted" : changed ? "changed" : "") + '">' +
+            '<td>' + esc(effective.kode) + '</td><td>' + esc(effective.akunLabel) + '</td><td><input class="edit-input uraian-input" data-row="' + row.rowIndex + '" data-field="uraian" value="' + esc(effective.uraian) + '" ' + (deleted ? "disabled" : "") + '></td>' +
+            '<td><input class="edit-input numeric-input" type="text" inputmode="decimal" data-row="' + row.rowIndex + '" data-field="volume" value="' + esc(effective.volume) + '" ' + (deleted ? "disabled" : "") + '></td>' +
+            '<td><input class="edit-input" data-row="' + row.rowIndex + '" data-field="satuan" value="' + esc(effective.satuan) + '" ' + (deleted ? "disabled" : "") + '></td>' +
+            '<td><input class="edit-input money numeric-input" type="text" inputmode="decimal" data-row="' + row.rowIndex + '" data-field="harga" value="' + esc(effective.harga) + '" ' + (deleted ? "disabled" : "") + '></td>' +
+            '<td class="text-end fw-bold">' + rupiah(effective.jumlah) + '</td>' +
+            '<td class="action-cell"><button class="btn-icon delete" data-action="delete" data-row="' + row.rowIndex + '"><i class="bi ' + (deleted ? "bi-arrow-counterclockwise" : "bi-trash") + '"></i></button></td></tr>';
+    }).join("") : '<tr><td colspan="8" class="empty-cell">Tidak ada data sesuai filter.</td></tr>';
+
+    const additions = filteredAdditions();
     const before = revisiFilteredRows.reduce((sum, row) => sum + (isDeleted(row) ? 0 : num(row.jumlah)), 0);
     const after = revisiFilteredRows.reduce((sum, row) => sum + (isDeleted(row) ? 0 : num(effectiveRow(row).jumlah)), 0) +
         additions.reduce((sum, item) => sum + num(item.volume) * num(item.harga), 0);
@@ -301,7 +375,7 @@ function render() {
     document.getElementById("beforeCount").textContent = revisiFilteredRows.length + " item";
     renderValidationState();
     renderHistory();
-    document.getElementById("afterCount").textContent = (revisiFilteredRows.length + additions.length) + " item";
+    document.getElementById("afterCount").textContent = (revisiFilteredRows.filter(row => !isDeleted(row)).length + additions.length) + " item";
 }
 
 function setStatus(message, type) {
@@ -474,6 +548,24 @@ function renderHistory() {
     const rows=(revisiDraft.history||[]);
     el.innerHTML=rows.length ? rows.map(x=>'<div class="history-item"><strong>'+esc(x.action)+'</strong> · '+esc(x.nomor||"-")+' · '+esc(new Date(x.at).toLocaleString("id-ID"))+'<br><span>'+rupiah(x.before)+' → '+rupiah(x.after)+' (selisih '+rupiah(x.diff)+')</span></div>').join("") : "Belum ada riwayat.";
 }
+function getComparisonExportRows() {
+    return comparisonEntries().map(entry => {
+        if (entry.type === "addition") {
+            const item = entry.item;
+            return {
+                before: ["", "", "", "", "", "", ""],
+                after: [item.kode, item.akunLabel || item.akun || "", item.uraian, item.volume, item.satuan, num(item.harga), num(item.volume) * num(item.harga), "DITAMBAH"]
+            };
+        }
+        const row = entry.row;
+        const effective = effectiveRow(row);
+        return {
+            before: [row.kode, row.akunLabel, row.uraian, row.volume, row.satuan, num(row.harga), num(row.jumlah)],
+            after: [effective.kode, effective.akunLabel, effective.uraian, effective.volume, effective.satuan, num(effective.harga), num(effective.jumlah), isDeleted(row) ? "DIHAPUS" : (revisiDraft.changes[String(row.rowIndex)] ? "DIUBAH" : "TETAP")]
+        };
+    });
+}
+
 function exportRevisionExcel() {
     if (typeof XLSX === "undefined") {
         setStatus("Library Excel belum dimuat. Silakan refresh halaman.", "danger");
@@ -482,28 +574,8 @@ function exportRevisionExcel() {
 
     syncMetadataToDraft();
 
-    const beforeRows = revisiFilteredRows.map(row => [
-        row.kode, row.akunLabel, row.uraian, row.volume, row.satuan, num(row.harga), num(row.jumlah)
-    ]);
-
-    const afterRows = revisiFilteredRows.map(row => {
-        const effective = effectiveRow(row);
-        return [
-            effective.kode, effective.akunLabel, effective.uraian, effective.volume,
-            effective.satuan, num(effective.harga), num(effective.jumlah),
-            isDeleted(row) ? "DIHAPUS" : (revisiDraft.changes[String(row.rowIndex)] ? "DIUBAH" : "TETAP")
-        ];
-    });
-
-    revisiDraft.additions.filter(item => !item.deleted).forEach(item => {
-        afterRows.push([
-            item.kode, item.akunLabel || item.akun || "", item.uraian, item.volume,
-            item.satuan, num(item.harga), num(item.volume) * num(item.harga), "DITAMBAH"
-        ]);
-    });
-
-    const beforeTotal = calculateBeforeTotal();
-    const afterTotal = calculateAfterTotal();
+    const comparison = getComparisonExportRows();
+    const wb = XLSX.utils.book_new();
 
     const summary = [
         ["REVISI ANGGARAN", ""],
@@ -511,54 +583,105 @@ function exportRevisionExcel() {
         ["Tanggal", revisiDraft.tanggal || ""],
         ["Pembuat", revisiDraft.pembuat || ""],
         ["Alasan Revisi", revisiDraft.alasan || ""],
+        ["Tahun Anggaran", filters().tahun || "Semua Tahun"],
+        ["Komponen", filters().komponen || "Semua Komponen"],
+        ["Sub Komponen", filters().subKomponen || "Semua Sub Komponen"],
+        ["Akun Belanja", filters().akun || "Semua Akun Belanja"],
         ["Status", revisiDraft.status || "DRAFT"],
-        ["Jumlah Sebelum", beforeTotal],
-        ["Jumlah Sesudah", afterTotal],
-        ["Selisih", afterTotal - beforeTotal],
-        []
+        ["Jumlah Sebelum", calculateBeforeTotal()],
+        ["Jumlah Sesudah", calculateAfterTotal()],
+        ["Selisih", calculateAfterTotal() - calculateBeforeTotal()]
     ];
 
-    const wb = XLSX.utils.book_new();
     const wsSummary = XLSX.utils.aoa_to_sheet(summary);
-    const wsBefore = XLSX.utils.aoa_to_sheet([
-        ["Kode","Akun Belanja","Uraian","Volume","Satuan","Harga","Jumlah"],
-        ...beforeRows
-    ]);
-    const wsAfter = XLSX.utils.aoa_to_sheet([
-        ["Kode","Akun Belanja","Uraian","Volume","Satuan","Harga","Jumlah","Status"],
-        ...afterRows
+    wsSummary["!cols"] = [{wch:24},{wch:70}];
+
+    const wsData = XLSX.utils.aoa_to_sheet([
+        ["SEBELUM","","","","","","","SESUDAH","","","","","","",""],
+        ["Kode","Akun Belanja","Uraian","Volume","Satuan","Harga","Jumlah","","Kode","Akun Belanja","Uraian","Volume","Satuan","Harga","Jumlah","Status"],
+        ...comparison.map(x => [...x.before, "", ...x.after])
     ]);
 
-    [wsSummary, wsBefore, wsAfter].forEach(ws => {
-        ws["!cols"] = [
-            {wch:18},{wch:38},{wch:55},{wch:12},{wch:14},{wch:18},{wch:20},{wch:14}
-        ];
-    });
+    wsData["!merges"] = [
+        {s:{r:0,c:0},e:{r:0,c:6}},
+        {s:{r:0,c:8},e:{r:0,c:15}}
+    ];
+    wsData["!cols"] = [
+        {wch:12},{wch:32},{wch:52},{wch:10},{wch:12},{wch:16},{wch:18},{wch:3},
+        {wch:12},{wch:32},{wch:52},{wch:10},{wch:12},{wch:16},{wch:18},{wch:14}
+    ];
 
     const headerStyle = {
         fill:{fgColor:{rgb:"1F6B35"}},
         font:{bold:true,color:{rgb:"FFFFFF"}},
-        alignment:{horizontal:"center",vertical:"center"}
+        alignment:{horizontal:"center",vertical:"center",wrapText:true}
     };
-    [wsBefore, wsAfter].forEach(ws => {
-        const range = XLSX.utils.decode_range(ws["!ref"]);
-        for(let c=0;c<=range.e.c;c++){
-            const cell = ws[XLSX.utils.encode_cell({r:0,c})];
-            if(cell) cell.s = headerStyle;
-        }
+    ["A1","I1","A2","B2","C2","D2","E2","F2","G2","I2","J2","K2","L2","M2","N2","O2","P2","Q2"].forEach(addr => {
+        if (wsData[addr]) wsData[addr].s = headerStyle;
     });
 
+    const lastRow = 2 + comparison.length;
+    for (let r = 2; r < lastRow; r++) {
+        if (wsData[XLSX.utils.encode_cell({r,c:8})]?.v === "DITAMBAH") continue;
+    }
+
     XLSX.utils.book_append_sheet(wb, wsSummary, "Ringkasan");
-    XLSX.utils.book_append_sheet(wb, wsBefore, "Sebelum");
-    XLSX.utils.book_append_sheet(wb, wsAfter, "Sesudah");
+    XLSX.utils.book_append_sheet(wb, wsData, "Perbandingan");
 
     const safeNomor = (revisiDraft.nomor || "REV").replace(/[^a-zA-Z0-9_-]/g, "_");
     XLSX.writeFile(wb, "Revisi_Anggaran_" + safeNomor + ".xlsx");
     setStatus("Excel berhasil dibuat.", "ok");
 }
 
+function buildPrintReport() {
+    const entries = comparisonEntries();
+    const title = filters().subKomponen || "Revisi Anggaran";
+    const meta = [
+        ["Nomor Revisi", revisiDraft.nomor || "-"],
+        ["Tanggal", revisiDraft.tanggal || "-"],
+        ["Pembuat", revisiDraft.pembuat || "-"],
+        ["Tahun Anggaran", filters().tahun || "Semua Tahun"],
+        ["Komponen", filters().komponen || "-"],
+        ["Sub Komponen", filters().subKomponen || "-"],
+        ["Akun Belanja", filters().akun || "Semua Akun Belanja"],
+        ["Alasan Revisi", revisiDraft.alasan || "-"]
+    ];
+
+    const rowCells = entries.map(entry => {
+        if (entry.type === "addition") {
+            const x = entry.item;
+            return {
+                before: ["","","","","","",""],
+                after: [x.kode,x.akunLabel || x.akun || "",x.uraian,x.volume,x.satuan,rupiah(x.harga),rupiah(num(x.volume)*num(x.harga))]
+            };
+        }
+        const row = entry.row, e = effectiveRow(row);
+        return {
+            before: [row.kode,row.akunLabel,row.uraian,row.volume,row.satuan,rupiah(row.harga),rupiah(row.jumlah)],
+            after: [e.kode,e.akunLabel,e.uraian,e.volume,e.satuan,rupiah(e.harga),rupiah(e.jumlah)]
+        };
+    });
+
+    const table = side => rowCells.map(x => '<tr>' + x[side].map((v,i) =>
+        '<td class="' + (i >= 5 ? 'money' : '') + '">' + esc(v) + '</td>'
+    ).join("") + '</tr>').join("");
+
+    const print = document.getElementById("printRevisionReport");
+    if (!print) return;
+    print.innerHTML =
+        '<div class="print-title"><h1>REVISI ANGGARAN</h1><p>' + esc(title) + '</p></div>' +
+        '<table class="print-meta">' + meta.map(x => '<tr><th>' + esc(x[0]) + '</th><td>' + esc(x[1]) + '</td></tr>').join("") + '</table>' +
+        '<div class="print-summary"><strong>Jumlah Sebelum: ' + rupiah(calculateBeforeTotal()) + '</strong><strong>Jumlah Sesudah: ' + rupiah(calculateAfterTotal()) + '</strong><strong>Selisih: ' + rupiah(calculateAfterTotal()-calculateBeforeTotal()) + '</strong></div>' +
+        '<div class="print-two-tables">' +
+        '<div><h3>SEBELUM</h3><table><thead><tr><th>Kode</th><th>Akun Belanja</th><th>Uraian</th><th>Vol</th><th>Sat</th><th>Harga</th><th>Jumlah</th></tr></thead><tbody>' + table("before") + '</tbody></table></div>' +
+        '<div><h3>SESUDAH</h3><table><thead><tr><th>Kode</th><th>Akun Belanja</th><th>Uraian</th><th>Vol</th><th>Sat</th><th>Harga</th><th>Jumlah</th></tr></thead><tbody>' + table("after") + '</tbody></table></div>' +
+        '</div>';
+}
+
+
 function printRevision() {
     syncMetadataToDraft();
+    buildPrintReport();
     window.print();
 }
 
@@ -631,11 +754,16 @@ document.getElementById("btnTambahItem").addEventListener("click", () => {
 
 document.getElementById("btnTambahkanItem").addEventListener("click", () => {
     const akunOption = document.getElementById("addAkun")?.selectedOptions[0];
+    const parent = additionParentContext();
     const item = {
         id: "ADD-" + Date.now(),
         kode: norm(akunOption?.dataset.code || addKode.value),
+        kodeAkun: norm(akunOption?.dataset.code || addKode.value),
         akun: norm(akunOption?.dataset.name || ""),
         akunLabel: norm(akunOption?.dataset.name || ""),
+        tahun: norm(parent.tahun || filters().tahun),
+        komponen: norm(parent.komponen || filters().komponen),
+        subKomponen: norm(parent.subKomponen || filters().subKomponen),
         uraian: norm(addUraian.value),
         volume: num(addVol.value),
         satuan: norm(addSat.value),
@@ -647,6 +775,7 @@ document.getElementById("btnTambahkanItem").addEventListener("click", () => {
     if (item.volume <= 0) return alert("Volume harus lebih besar dari 0.");
 
     revisiDraft.additions.push(item);
+    buildPrintReport();
     bootstrap.Modal.getOrCreateInstance(document.getElementById("modalTambahItem")).hide();
     render();
     setStatus("Item ditambahkan ke draft. Belum mengubah DATA_APLIKASI.", "warning");
