@@ -210,6 +210,23 @@ function rpdNormalizeSavedRow(row) {
         tw4:rpdNumber(source.tw4 ?? source.TW4 ?? 0),
         catatan:String(source.catatan ?? source.CATATAN ?? "").trim()
     };
+
+    // Migrasikan cache lokal lama yang masih memakai ID berbasis Pagu
+    // ke ID stabil. Dengan begitu record lama tidak menjadi duplikat
+    // ketika server sudah mengembalikan ID stabil setelah Revisi Anggaran.
+    const stableId = rpdStableId({
+        tahun: source.tahun ?? source.TAHUN,
+        kodeSubKomponen: source.kode_sub_komponen ?? source.KODE_SUB_KOMPONEN,
+        subKomponen: source.sub_komponen ?? source.SUB_KOMPONEN,
+        akun: source.akun ?? source.AKUN,
+        itemAkun: source.item_akun ?? source.ITEM_AKUN,
+        detilAkun: source.detil_akun ?? source.DETIL_AKUN,
+        rincianItem: source.rincian_item ?? source.RINCIAN_ITEM
+    });
+    if (stableId && stableId.replace(/\\|/g, "") !== "") {
+        normalized.id_rpd = stableId;
+    }
+
     RPD_WEEK_FIELDS.forEach(key => { normalized[key]=rpdNumber(source[key] ?? source[key.toUpperCase()] ?? 0); });
     // Data lama hanya memiliki TW1-TW4. Untuk record RPD lama yang
     // sebelumnya diinput pada editor Oktober/Minggu 4, pertahankan
