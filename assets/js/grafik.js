@@ -280,15 +280,38 @@ async function ambilRpdBulananGrafik(forceRefresh = false) {
                 .filter(Boolean)
         );
 
-        const rows = validIds.size
+        const validRows = validIds.size
             ? rowsAll.filter(function (row) {
                 return validIds.has(String(row?.id_rpd || "").trim());
             })
             : rowsAll;
 
+        // Satu ID RPD harus dihitung satu kali. Sheet lama dapat berisi
+        // duplikasi record akibat penyimpanan/versi sebelumnya; halaman RPD
+        // sendiri sudah melakukan merge berdasarkan id_rpd.
+        const rowsById = new Map();
+        validRows.forEach(function (row) {
+            const id = String(row?.id_rpd || "").trim();
+            if (!id) return;
+
+            const existing = rowsById.get(id);
+            if (!existing) {
+                rowsById.set(id, row);
+                return;
+            }
+
+            // Jika ada duplikat, gunakan record dengan updated_at paling baru.
+            const oldTime = new Date(existing.updated_at || 0).getTime();
+            const newTime = new Date(row.updated_at || 0).getTime();
+            if (newTime >= oldTime) rowsById.set(id, row);
+        });
+
+        const rows = Array.from(rowsById.values());
+
         console.log(
             "GRAFIK RPD: record server =", rowsAll.length,
             "record master valid =", validIds.size,
+            "record valid sebelum deduplikasi =", validRows.length,
             "record dihitung =", rows.length
         );
 
