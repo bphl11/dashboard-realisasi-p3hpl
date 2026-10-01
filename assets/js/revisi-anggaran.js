@@ -409,7 +409,47 @@ function updateAddJumlah() {
         rupiah(num(document.getElementById("addVol").value) * num(document.getElementById("addHarga").value));
 }
 
+function populateAddAkun() {
+    const select = document.getElementById("addAkun");
+    if (!select) return;
+
+    const sourceRows = filteredRows();
+    const accounts = [];
+    const seen = new Set();
+
+    sourceRows.forEach(row => {
+        const code = norm(row.kodeAkun);
+        const name = norm(row.akun);
+        if (!code && !name) return;
+
+        const key = code + "|" + name;
+        if (seen.has(key)) return;
+        seen.add(key);
+        accounts.push({ code, name });
+    });
+
+    select.innerHTML = '<option value="">-- Pilih Akun Belanja --</option>' +
+        accounts.map(item =>
+            '<option value="' + esc(item.code + " | " + item.name) +
+            '" data-code="' + esc(item.code) + '" data-name="' + esc(item.name) + '">' +
+            esc(item.code + " " + item.name) +
+            '</option>'
+        ).join("");
+
+    const current = norm(document.getElementById("filterAkun")?.value || "");
+    if (current) {
+        const match = accounts.find(item => item.name === current);
+        if (match) select.value = match.code + " | " + match.name;
+    }
+}
+
+document.getElementById("addAkun").addEventListener("change", event => {
+    const option = event.target.selectedOptions[0];
+    document.getElementById("addKode").value = option?.dataset.code || "";
+});
+
 document.getElementById("btnTambahItem").addEventListener("click", () => {
+    populateAddAkun();
     addKode.value = "";
     addUraian.value = "";
     addVol.value = 1;
@@ -420,17 +460,19 @@ document.getElementById("btnTambahItem").addEventListener("click", () => {
 });
 
 document.getElementById("btnTambahkanItem").addEventListener("click", () => {
+    const akunOption = document.getElementById("addAkun")?.selectedOptions[0];
     const item = {
         id: "ADD-" + Date.now(),
-        kode: norm(addKode.value),
-        akun: norm(document.getElementById("addAkun")?.value || ""),
-        akunLabel: norm(document.getElementById("addAkun")?.value || ""),
+        kode: norm(akunOption?.dataset.code || addKode.value),
+        akun: norm(akunOption?.dataset.name || ""),
+        akunLabel: norm(akunOption?.dataset.name || ""),
         uraian: norm(addUraian.value),
         volume: num(addVol.value),
         satuan: norm(addSat.value),
         harga: num(addHarga.value)
     };
 
+    if (!item.kode || !item.akun) return alert("Akun Belanja wajib dipilih.");
     if (!item.uraian) return alert("Uraian wajib diisi.");
     if (item.volume <= 0) return alert("Volume harus lebih besar dari 0.");
 
