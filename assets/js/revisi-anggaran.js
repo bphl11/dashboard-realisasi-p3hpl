@@ -41,7 +41,22 @@ function buildRows(raw) {
         // Pada DATA_APLIKASI, kode akun sering berada pada baris header akun
         // (mis. 521211) sedangkan baris detail di bawahnya kosong.
         // Karena itu kode akun harus diwariskan ke seluruh detail di bawahnya.
-        const kodeAkunBaris = kodeAkun || (/^\d{6}$/.test(kode) ? kode : "");
+        const itemAkun = hv(row, context.map, ["Item Akun", "Item"]);
+        const detil = hv(row, context.map, ["Detil Akun", "Detail Akun", "Detil"]);
+        const rincian = hv(row, context.map, ["Rincian Item", "Rincian"]);
+
+        // Kode akun pada DATA_APLIKASI dapat berada pada kolom KODE
+        // atau Kode Akun dan kadang tampil bersama teks/format lain.
+        // Ambil enam digit pertama yang membentuk kode rekening.
+        const kandidatKode = [kodeAkun, kode, akun, itemAkun, detil, rincian]
+            .map(value => String(value || "").trim());
+        const kodeAkunBaris = kandidatKode
+            .map(value => {
+                const match = value.match(/(?:^|\\D)(\\d{6})(?:\\D|$)/);
+                return match ? match[1] : "";
+            })
+            .find(Boolean) || "";
+
         if (kodeAkunBaris || akun) {
             if (kodeAkunBaris) currentAkunCode = kodeAkunBaris;
             if (akun) currentAkunName = akun;
@@ -49,9 +64,6 @@ function buildRows(raw) {
 
         const inheritedCode = currentAkunCode || kode;
         const inheritedAkun = akun || currentAkunName;
-        const itemAkun = hv(row, context.map, ["Item Akun", "Item"]);
-        const detil = hv(row, context.map, ["Detil Akun", "Detail Akun", "Detil"]);
-        const rincian = hv(row, context.map, ["Rincian Item", "Rincian"]);
         const uraian = rincian || detil || itemAkun || inheritedAkun || subKomponen || komponen || inheritedCode;
 
         rows.push({
