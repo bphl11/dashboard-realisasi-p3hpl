@@ -752,16 +752,49 @@ function validateDraft() {
 }
 
 function renderValidationState() {
-    const box=document.getElementById("revisiValidationBox");
-    const status=document.getElementById("revisiValidationStatus");
-    const v=revisiDraft.validation;
-    if(!box||!status) return;
-    if(!v){ box.textContent="Validasi: belum dijalankan."; status.textContent="Belum divalidasi"; status.className="status-pill status-warning"; return; }
-    box.textContent=v.ok ? "Validasi berhasil. Total sebelum "+rupiah(v.before)+" → sesudah "+rupiah(v.after)+"; selisih "+rupiah(v.diff)+"." : "Validasi gagal: "+v.errors.join(" ");
-    status.textContent=v.ok ? "TERVALIDASI" : "PERLU PERBAIKAN";
-    status.className="status-pill "+(v.ok ? "status-ok" : "status-danger");
-    const btn=document.getElementById("btnTerapkanRevisi");
-    if(btn) btn.disabled=true;
+    const box = document.getElementById("revisiValidationBox");
+    const status = document.getElementById("revisiValidationStatus");
+    const v = revisiDraft.validation;
+    const applyButton = document.getElementById("btnTerapkanRevisi");
+    const summaryStatus = document.querySelector(".revisi-summary .draft-text");
+
+    if (!box || !status) return;
+
+    if (!v) {
+        box.textContent = "Validasi: belum dijalankan.";
+        status.textContent = "Belum divalidasi";
+        status.className = "status-pill status-warning";
+        if (applyButton) {
+            applyButton.disabled = true;
+            applyButton.title = "Aktif setelah validasi berhasil.";
+        }
+        if (summaryStatus) summaryStatus.textContent = "DRAFT";
+        return;
+    }
+
+    box.textContent = v.ok
+        ? "Validasi berhasil. Total sebelum " + rupiah(v.before) +
+          " → sesudah " + rupiah(v.after) +
+          "; selisih " + rupiah(v.diff) + "."
+        : "Validasi gagal: " + v.errors.join(" ");
+
+    status.textContent = v.ok ? "TERVALIDASI" : "PERLU PERBAIKAN";
+    status.className = "status-pill " + (v.ok ? "status-ok" : "status-danger");
+
+    // Tombol Terapkan Revisi hanya aktif jika validasi terakhir berhasil.
+    // Jika ada perubahan setelah validasi, input handler mengosongkan
+    // revisiDraft.validation sehingga tombol kembali terkunci.
+    if (applyButton) {
+        applyButton.disabled = !v.ok;
+        applyButton.title = v.ok
+            ? "Validasi berhasil. Siap diterapkan setelah konfirmasi."
+            : "Aktif setelah validasi berhasil.";
+    }
+
+    if (summaryStatus) {
+        summaryStatus.textContent = v.ok ? "TERVALIDASI" : "DRAFT";
+        summaryStatus.className = v.ok ? "validated-text" : "draft-text";
+    }
 }
 function renderHistory() {
     const el=document.getElementById("revisiHistoryBody"); if(!el) return;
