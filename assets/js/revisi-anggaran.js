@@ -135,13 +135,27 @@ function syncMetadataToDraft() {
     revisiDraft.pembuat = norm(document.getElementById("revisiPembuat")?.value);
     revisiDraft.alasan = norm(document.getElementById("revisiAlasan")?.value);
 }
-function saveDraft() {
+function saveDraft(event) {
+    if (event) event.preventDefault();
+
     syncMetadataToDraft();
     revisiDraft.updatedAt = new Date().toISOString();
+
     try {
-        localStorage.setItem(REVISI_DRAFT_KEY, JSON.stringify(revisiDraft));
+        const serialized = JSON.stringify(revisiDraft);
+        localStorage.setItem(REVISI_DRAFT_KEY, serialized);
+
+        // Pastikan benar-benar tersimpan, bukan hanya tanpa exception.
+        const verified = localStorage.getItem(REVISI_DRAFT_KEY);
+        if (verified !== serialized) {
+            throw new Error("Penyimpanan browser tidak dapat diverifikasi.");
+        }
+
         setStatus("Draft tersimpan di browser.", "ok");
+        renderValidationState();
+        renderHistory();
     } catch (error) {
+        console.error("Simpan Draft gagal:", error);
         setStatus("Draft gagal disimpan: " + error.message, "danger");
     }
 }
