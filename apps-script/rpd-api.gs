@@ -1043,7 +1043,11 @@ function readRpd_(sheet) {
       const detil = String(row[index.DETIL_AKUN] || "");
       const rincian = String(row[index.RINCIAN_ITEM] || "");
       const paguDetil = parseAmount_(row[index.PAGU_DETIL]);
-      const generatedId = existingId || makeRpdId_(tahun, kodeSub, sub, akun, item, detil, rincian, paguDetil);
+      // Normalisasi ID lama ke identitas RPD stabil. Record lama yang
+      // menyimpan ID berbasis Pagu tetap mempertahankan data mingguan,
+      // tetapi API mengembalikan ID stabil agar frontend dapat
+      // menyambungkannya kembali setelah Revisi Anggaran.
+      const generatedId = makeRpdId_(tahun, kodeSub, sub, akun, item, detil, rincian, paguDetil);
 
       const result = {
         id_rpd: generatedId,
@@ -1223,13 +1227,16 @@ function saveRpd_(idToken, row) {
   for (let i = 1; i < values.length; i++) {
     const currentId = String(values[i][index.ID_RPD] || "").trim();
     const sameId = requestedId && currentId === requestedId;
+    // Identitas RPD tidak memasukkan Pagu. Dengan demikian record lama
+    // tetap ditemukan walaupun Pagu berubah melalui Revisi Anggaran.
     const sameIdentity =
       String(values[i][index.TAHUN] || "") === String(row.tahun || "") &&
+      String(values[i][index.KODE_SUB_KOMPONEN] || "").trim() === String(row.kode_sub_komponen || "").trim() &&
+      String(values[i][index.SUB_KOMPONEN] || "").trim() === String(row.sub_komponen || "").trim() &&
       String(values[i][index.AKUN] || "").trim() === String(row.akun || "").trim() &&
       String(values[i][index.ITEM_AKUN] || "").trim() === String(row.item_akun || "").trim() &&
       String(values[i][index.DETIL_AKUN] || "").trim() === String(row.detil_akun || "").trim() &&
-      String(values[i][index.RINCIAN_ITEM] || "").trim() === String(row.rincian_item || "").trim() &&
-      Number(values[i][index.PAGU_DETIL] || 0) === Number(pagu || 0);
+      String(values[i][index.RINCIAN_ITEM] || "").trim() === String(row.rincian_item || "").trim();
 
     if (sameId || (!currentId && sameIdentity)) {
       targetRow = i + 1;
@@ -1354,7 +1361,10 @@ function writeLog_(action, record, oldData, email) {
 }
 
 function makeRpdId_(tahun, kodeSub, sub, akun, item, detil, rincian, paguDetil) {
-  return [tahun, kodeSub, sub, akun, item, detil, rincian, paguDetil]
+  // Pagu Detil sengaja TIDAK dimasukkan ke ID.
+  // Revisi Anggaran boleh mengubah Pagu tanpa membuat RPD
+  // lama menjadi orphan.
+  return [tahun, kodeSub, sub, akun, item, detil, rincian]
     .map(normalizeKey_)
     .join("|");
 }
