@@ -73,7 +73,7 @@ function buildRows(raw) {
             komponen,
             subKomponen,
             akun: inheritedAkun,
-            akunLabel: currentAkunCode ? (currentAkunCode + " " + inheritedAkun) : inheritedAkun,
+            akunLabel: inheritedAkun,
             itemAkun,
             detil,
             rincian,
