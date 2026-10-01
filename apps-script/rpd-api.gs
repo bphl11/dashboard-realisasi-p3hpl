@@ -1434,3 +1434,458 @@ function parseAmount_(value) {
   text = text.replace(/[.,]/g, "");
   return Number(text) || 0;
 }
+
+
+// ============================================================
+// TERAPKAN REVISI ANGGARAN
+// DATA_APLIKASI berada pada spreadsheet yang sama dengan RPD.
+// Penerapan hanya boleh dilakukan setelah autentikasi, fingerprint
+// cocok, validasi global + per Komponen lolos, dan snapshot dibuat.
+// ============================================================
+
+const REVISI_LOG_HEADERS_ = [
+  "NOMOR_REVISI","TANGGAL_REVISI","PEMBUAT","ALASAN","WAKTU_APPLY",
+  "USER_EMAIL","USER_NAMA","STATUS","TOTAL_SEBELUM","TOTAL_SESUDAH",
+  "SELISIH","JUMLAH_PERUBAHAN","SNAPSHOT_SHEET","DETAIL","ERROR"
+];
+
+function applyRevisi_(request) {
+  const user = authenticate_(request.id_token);
+  const draft = request.draft || {};
+  const nomor = String(draft.nomor || "").trim();
+
+  if (!nomor) throw new Error("Nomor revisi wajib diisi.");
+  if (String(draft.status || "").toUpperCase() !== "TERVALIDASI") {
+    throw new Error("Draft belum berstatus TERVALIDASI.");
+  }
+  if (!draft.validation || draft.validation.ok !== true) {
+    throw new Error("Validasi browser belum berhasil.");
+  }
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+
+  let ss = null;
+  let sheet = null;
+  let snapshot = null;
+
+  try {
+    ss = getSpreadsheet_();
+    sheet = ss.getSheetByName("DATA_APLIKASI");
+    if (!sheet) throw new Error("Sheet DATA_APLIKASI tidak ditemukan.");
+
+    const log = ensureRevisiLogSheet_();
+    if (findSuccessfulRevision_(log, nomor)) {
+      throw new Error("Nomor revisi " + nomor + " sudah pernah diterapkan.");
+    }
+
+    const beforeRows = readRevisionRows_();
+    const expectedHash = String(request.expected_snapshot_hash || draft.snapshotHash || "").trim();
+    const actualHash = revisionFingerprint_(beforeRows);
+
+    if (!expectedHash) {
+      throw new Error("Fingerprint snapshot tidak tersedia. Validasi ulang draft.");
+    }
+    if (actualHash !== expectedHash) {
+      throw new Error(
+        "DATA_APLIKASI berubah sejak draft dibuat. Revisi dibatalkan. " +
+        "Muat ulang data dan validasi ulang sebelum menerapkan."
+      );
+    }
+
+    const validation = validateRevisionServer_(beforeRows, draft);
+    if (!validation.ok) {
+      throw new Error("Validasi server gagal: " + validation.errors.join(" "));
+    }
+
+    // Backup otomatis sebelum penulisan.
+    snapshot = sheet.copyTo(ss);
+    snapshot.setName(makeSnapshotName_(ss, nomor));
+
+    const info = getRevisionHeaderInfo_(sheet);
+    const changes = draft.changes && typeof draft.changes === "object" ? draft.changes : {};
+    const changeIndexes = Object.keys(changes)
+      .map(Number).filter(Number.isInteger).sort((a,b)=>a-b);
+
+    changeIndexes.forEach(rowIndex => {
+      const rowNumber = rowIndex + 1;
+      if (rowNumber <= info.headerRow + 1 || rowNumber > sheet.getLastRow()) {
+        throw new Error("Baris perubahan tidak valid: " + rowIndex);
+      }
+
+      const change = changes[String(rowIndex)] || {};
+      const row = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+      if (change.uraian !== undefined && info.uraian >= 0) {
+        sheet.getRange(rowNumber, info.uraian + 1).setValue(String(change.uraian || "").trim());
+      }
+      if (change.volume !== undefined && info.volume >= 0) {
+        sheet.getRange(rowNumber, info.volume + 1).setValue(toRevisionNumber_(change.volume));
+      }
+      if (change.satuan !== undefined && info.satuan >= 0) {
+        sheet.getRange(rowNumber, info.satuan + 1).setValue(String(change.satuan || "").trim());
+      }
+      if (change.harga !== undefined && info.harga >= 0) {
+        sheet.getRange(rowNumber, info.harga + 1).setValue(toRevisionNumber_(change.harga));
+      }
+
+      if (info.pagu >= 0) {
+        const vol = change.volume !== undefined ? toRevisionNumber_(change.volume) : toRevisionNumber_(row[info.volume]);
+        const harga = change.harga !== undefined ? toRevisionNumber_(change.harga) : toRevisionNumber_(row[info.harga]);
+        sheet.getRange(rowNumber, info.pagu + 1).setValue(vol * harga);
+      }
+    });
+
+    const deletions = [...new Set(
+      (Array.isArray(draft.deletions) ? draft.deletions : [])
+        .map(Number).filter(Number.isInteger)
+    )].sort((a,b)=>b-a);
+
+    deletions.forEach(rowIndex => {
+      const rowNumber = rowIndex + 1;
+      if (rowNumber > info.headerRow + 1 && rowNumber <= sheet.getLastRow()) {
+        sheet.deleteRow(rowNumber);
+      }
+    });
+
+    const additions = (Array.isArray(draft.additions) ? draft.additions : [])
+      .filter(item => !item.deleted);
+
+    additions.forEach(item => {
+      const targetRow = findLastRevisionAccountRow_(sheet, item);
+      if (!targetRow) {
+        throw new Error(
+          "Lokasi Akun Belanja item tambahan tidak ditemukan: " +
+          String(item.kodeAkun || item.kode || "") + " " +
+          String(item.akunLabel || item.akun || "")
+        );
+      }
+
+      const lastCol = sheet.getLastColumn();
+      sheet.insertRowAfter(targetRow);
+      sheet.getRange(targetRow, 1, 1, lastCol)
+        .copyTo(sheet.getRange(targetRow + 1, 1, 1, lastCol), {contentsOnly:false});
+
+      const newRow = targetRow + 1;
+      const vol = toRevisionNumber_(item.volume);
+      const harga = toRevisionNumber_(item.harga);
+
+      if (info.uraian >= 0) sheet.getRange(newRow, info.uraian + 1).setValue(String(item.uraian || "").trim());
+      if (info.volume >= 0) sheet.getRange(newRow, info.volume + 1).setValue(vol);
+      if (info.satuan >= 0) sheet.getRange(newRow, info.satuan + 1).setValue(String(item.satuan || "").trim());
+      if (info.harga >= 0) sheet.getRange(newRow, info.harga + 1).setValue(harga);
+      if (info.pagu >= 0) sheet.getRange(newRow, info.pagu + 1).setValue(vol * harga);
+    });
+
+    SpreadsheetApp.flush();
+
+    const afterRows = readRevisionRows_();
+    const final = calculateRevisionTotals_(afterRows);
+    if (Math.abs(final.total - validation.before) > 0.000001) {
+      throw new Error(
+        "Pemeriksaan akhir gagal: total berubah dari " +
+        formatRevisionRupiah_(validation.before) + " menjadi " +
+        formatRevisionRupiah_(final.total) + "."
+      );
+    }
+
+    appendRevisiLog_(log, [
+      nomor, draft.tanggal || "", draft.pembuat || "", draft.alasan || "",
+      new Date(), user.user.email, user.user.name, "BERHASIL",
+      validation.before, final.total, final.total - validation.before,
+      changeIndexes.length + deletions.length + additions.length,
+      snapshot.getName(),
+      JSON.stringify({changes:changeIndexes.length,deletions:deletions.length,additions:additions.length}),
+      ""
+    ]);
+
+    return {
+      ok:true,
+      message:"Revisi " + nomor + " berhasil diterapkan ke DATA_APLIKASI.",
+      nomor:nomor,
+      before:validation.before,
+      after:final.total,
+      diff:final.total-validation.before,
+      snapshotSheet:snapshot.getName(),
+      user:user.user
+    };
+
+  } catch (error) {
+    if (snapshot && sheet) {
+      try { restoreRevisionSnapshot_(sheet, snapshot); } catch (rollbackError) {
+        console.error("Rollback snapshot gagal: " + rollbackError.message);
+      }
+    }
+
+    if (ss) {
+      try {
+        const log = ensureRevisiLogSheet_();
+        appendRevisiLog_(log, [
+          nomor, draft.tanggal || "", draft.pembuat || "", draft.alasan || "",
+          new Date(), user.user.email, user.user.name, "GAGAL",
+          "", "", "", "", snapshot ? snapshot.getName() : "", "", error.message || ""
+        ]);
+      } catch (logError) {
+        console.error("Log gagal: " + logError.message);
+      }
+    }
+
+    throw error;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function ensureRevisiLogSheet_() {
+  const ss = getSpreadsheet_();
+  let sheet = ss.getSheetByName("REVISI_ANGGARAN_LOG");
+  if (!sheet) sheet = ss.insertSheet("REVISI_ANGGARAN_LOG");
+
+  const last = Math.max(sheet.getLastColumn(), 1);
+  const current = sheet.getRange(1,1,1,last).getValues()[0]
+    .map(v=>String(v || "").trim().toUpperCase());
+
+  const missing = REVISI_LOG_HEADERS_.filter(h=>!current.includes(h));
+  if (missing.length) {
+    sheet.getRange(1,last + 1,1,missing.length).setValues([missing]);
+  }
+  return sheet;
+}
+
+function appendRevisiLog_(sheet,row) {
+  sheet.appendRow(row);
+}
+
+function findSuccessfulRevision_(sheet, nomor) {
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return false;
+  const map = headerIndex_(values[0]);
+  if (map.NOMOR_REVISI === undefined || map.STATUS === undefined) return false;
+
+  for (let i=1;i<values.length;i++) {
+    if (String(values[i][map.NOMOR_REVISI] || "").trim() === nomor &&
+        String(values[i][map.STATUS] || "").trim().toUpperCase() === "BERHASIL") return true;
+  }
+  return false;
+}
+
+function makeSnapshotName_(ss, nomor) {
+  const stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || "Asia/Makassar", "yyyyMMdd_HHmmss");
+  let base = ("BAK_" + nomor + "_" + stamp).replace(/[^A-Za-z0-9_-]/g,"_").slice(0,90);
+  let name = base, n = 1;
+  while (ss.getSheetByName(name)) {
+    name = (base + "_" + n++).slice(0,99);
+  }
+  return name;
+}
+
+function restoreRevisionSnapshot_(target,snapshot) {
+  const rows = snapshot.getMaxRows(), cols = snapshot.getMaxColumns();
+
+  if (target.getMaxRows() < rows) target.insertRowsAfter(target.getMaxRows(), rows-target.getMaxRows());
+  if (target.getMaxColumns() < cols) target.insertColumnsAfter(target.getMaxColumns(), cols-target.getMaxColumns());
+
+  target.clear({contentsOnly:false});
+  snapshot.getRange(1,1,rows,cols).copyTo(target.getRange(1,1,rows,cols),{contentsOnly:false});
+
+  if (target.getMaxRows() > rows) target.deleteRows(rows+1,target.getMaxRows()-rows);
+  if (target.getMaxColumns() > cols) target.deleteColumns(cols+1,target.getMaxColumns()-cols);
+}
+
+function readRevisionRows_() {
+  const sheet = getSpreadsheet_().getSheetByName("DATA_APLIKASI");
+  const values = sheet.getDataRange().getValues();
+  const info = getRevisionHeaderInfo_(sheet);
+  const rows = [];
+
+  let kodeAkun="", akun="", kodeKomponen="", komponen="", kodeSub="", sub="", tahun="";
+
+  for (let i=info.headerRow+1;i<values.length;i++) {
+    const row=values[i];
+    if (!row.some(v=>String(v ?? "").trim() !== "")) continue;
+
+    const v = (idx)=>idx >= 0 ? String(row[idx] ?? "").trim() : "";
+    const kode=v(info.kode), kKom=v(info.kodeKomponen), kSub=v(info.kodeSubKomponen);
+    const a=v(info.akun), item=v(info.itemAkun), det=v(info.detil), uraian=v(info.uraian);
+    const comp=v(info.komponen), subNow=v(info.subKomponen), kAkun=v(info.kodeAkun);
+
+    const accountCode=(kAkun || kode).match(/\d{6}/);
+    if (accountCode) kodeAkun=accountCode[0];
+    if (a) akun=a;
+    if (kKom) kodeKomponen=kKom;
+    if (comp) komponen=comp;
+    if (kSub) kodeSub=kSub;
+    if (subNow) sub=subNow;
+    const t=v(info.tahun); if(t) tahun=t;
+
+    rows.push({
+      rowIndex:i,kode:kodeAkun || kode,kodeAsli:kode,kodeKomponen,
+      kodeSubKomponen:kodeSub,kodeAkun:kodeAkun,komponen,subKomponen:sub,
+      akun:akun,akunLabel:akun,itemAkun:item,detil:det,rincian:uraian,
+      uraian:uraian || det || item || akun || sub || comp,
+      volume:toRevisionNumber_(row[info.volume]),
+      satuan:v(info.satuan),harga:toRevisionNumber_(row[info.harga]),
+      jumlah:toRevisionNumber_(row[info.pagu]),tahun
+    });
+  }
+  return rows;
+}
+
+function revisionFingerprint_(rows) {
+  const canonical=rows.map(row=>[
+    row.rowIndex,row.kode,row.kodeAsli,row.kodeKomponen,row.kodeSubKomponen,
+    row.kodeAkun,row.komponen,row.subKomponen,row.akun,row.akunLabel,
+    row.itemAkun,row.detil,row.rincian,row.uraian,row.volume,row.satuan,
+    row.harga,row.jumlah,row.tahun
+  ]);
+  const textValue=JSON.stringify(canonical);
+  let hash=2166136261;
+  for(let i=0;i<textValue.length;i++){
+    hash ^= textValue.charCodeAt(i);
+    hash = Math.imul(hash,16777619);
+  }
+  return (hash>>>0).toString(16).padStart(8,"0");
+}
+
+function calculateRevisionTotals_(rows) {
+  const groups={};
+  rows.forEach(row=>{
+    const key=(String(row.kodeKomponen||"").trim()+" | "+String(row.komponen||"").trim()).replace(/^ \| | \| $/g,"") || "(Tanpa Komponen)";
+    groups[key]=(groups[key]||0)+toRevisionNumber_(row.jumlah);
+  });
+  return {
+    total:rows.reduce((s,row)=>s+toRevisionNumber_(row.jumlah),0),
+    groups:groups
+  };
+}
+
+function validateRevisionServer_(rows,draft) {
+  const errors=[];
+  const byIndex={}; rows.forEach(r=>byIndex[r.rowIndex]=r);
+  const after=rows.map(r=>Object.assign({},r));
+  const changes=draft.changes && typeof draft.changes==="object" ? draft.changes : {};
+
+  Object.keys(changes).forEach(key=>{
+    const idx=Number(key), base=byIndex[idx], target=after.find(r=>r.rowIndex===idx);
+    if(!base){ errors.push("Baris "+key+" tidak ditemukan pada DATA_APLIKASI."); return; }
+    const ch=changes[key]||{};
+    if(ch.volume!==undefined) target.volume=toRevisionNumber_(ch.volume);
+    if(ch.harga!==undefined) target.harga=toRevisionNumber_(ch.harga);
+    if(ch.satuan!==undefined) target.satuan=String(ch.satuan||"").trim();
+    if(ch.uraian!==undefined){target.uraian=String(ch.uraian||"").trim();target.rincian=target.uraian;}
+    target.jumlah=target.volume*target.harga;
+    if(target.volume<0 || target.harga<0) errors.push("Nilai negatif pada baris "+idx+".");
+  });
+
+  const deletions=[...new Set((Array.isArray(draft.deletions)?draft.deletions:[]).map(Number).filter(Number.isInteger))];
+  deletions.forEach(idx=>{if(!byIndex[idx]) errors.push("Baris penghapusan "+idx+" tidak ditemukan.");});
+
+  const deleted=new Set(deletions);
+  const filtered=after.filter(r=>!deleted.has(r.rowIndex));
+
+  (Array.isArray(draft.additions)?draft.additions:[]).filter(x=>!x.deleted).forEach(item=>{
+    const comp=String(item.komponen||"").trim(), sub=String(item.subKomponen||"").trim();
+    const code=String(item.kodeAkun||item.kode||"").trim(), account=String(item.akunLabel||item.akun||"").trim();
+    const vol=toRevisionNumber_(item.volume), price=toRevisionNumber_(item.harga);
+
+    if(!comp) errors.push("Item tambahan tanpa Komponen.");
+    if(!sub) errors.push("Item tambahan tanpa Sub Komponen.");
+    if(!code || !account) errors.push("Item tambahan tanpa Akun Belanja.");
+    if(!String(item.uraian||"").trim()) errors.push("Item tambahan tanpa Uraian.");
+    if(vol<=0) errors.push("Volume item tambahan harus > 0.");
+    if(price<0) errors.push("Harga item tambahan tidak boleh negatif.");
+
+    const accountExists=rows.some(r =>
+      String(r.tahun||"").trim()===String(item.tahun||"").trim() &&
+      String(r.komponen||"").trim()===comp &&
+      String(r.subKomponen||"").trim()===sub &&
+      String(r.kodeAkun||r.kode||"").trim()===code &&
+      String(r.akun||r.akunLabel||"").trim()===account
+    );
+    if(!accountExists) errors.push("Akun tujuan item tambahan tidak ditemukan: "+code+" "+account);
+
+    filtered.push(Object.assign({},item,{rowIndex:"ADD",kode:code,kodeAkun:code,akun:account,akunLabel:account,volume:vol,harga:price,jumlah:vol*price}));
+  });
+
+  const before=calculateRevisionTotals_(rows), after=calculateRevisionTotals_(filtered);
+  if(Math.abs(after.total-before.total)>0.000001)
+    errors.push("TOTAL PAGU BERUBAH: "+formatRevisionRupiah_(before.total)+" → "+formatRevisionRupiah_(after.total)+".");
+
+  const keys=new Set(Object.keys(before.groups).concat(Object.keys(after.groups)));
+  keys.forEach(k=>{
+    const b=before.groups[k]||0,a=after.groups[k]||0;
+    if(Math.abs(a-b)>0.000001)
+      errors.push("SELISIH PAGU KOMPONEN: "+k+" — "+formatRevisionRupiah_(b)+" → "+formatRevisionRupiah_(a)+".");
+  });
+
+  return {ok:errors.length===0,errors:errors,before:before.total,after:after.total,diff:after.total-before.total};
+}
+
+function getRevisionHeaderInfo_(sheet) {
+  const values=sheet.getDataRange().getValues();
+  for(let i=0;i<Math.min(values.length,10);i++){
+    const map=headerIndex_(values[i]);
+    if(map.PAGU!==undefined && (map["RINCIAN ITEM"]!==undefined || map.RINCIAN!==undefined)){
+      return {
+        headerRow:i,
+        kode:revisionHeader_(map,["KODE"]),
+        kodeKomponen:revisionHeader_(map,["KODE KOMPONEN","KODEKOMPONEN"]),
+        komponen:revisionHeader_(map,["KOMPONEN","NAMA KOMPONEN"]),
+        kodeSubKomponen:revisionHeader_(map,["KODE SUB KOMPONEN","KODE SUBKOMPONEN"]),
+        subKomponen:revisionHeader_(map,["SUB KOMPONEN","SUBKOMPONEN","NAMA SUB KOMPONEN"]),
+        kodeAkun:revisionHeader_(map,["KODE AKUN","KODEAKUN","KODE REKENING","KODE REKENING BELANJA"]),
+        akun:revisionHeader_(map,["AKUN BELANJA","AKUN"]),
+        itemAkun:revisionHeader_(map,["ITEM AKUN","ITEM"]),
+        detil:revisionHeader_(map,["DETIL AKUN","DETAIL AKUN","DETIL"]),
+        uraian:revisionHeader_(map,["RINCIAN ITEM","RINCIAN","DETIL AKUN","DETAIL AKUN","ITEM AKUN","ITEM"]),
+        volume:revisionHeader_(map,["VOLUME","VOL"]),
+        satuan:revisionHeader_(map,["SATUAN","SAT"]),
+        harga:revisionHeader_(map,["HARGA SATUAN","HARGA"]),
+        pagu:revisionHeader_(map,["PAGU","JUMLAH"]),
+        tahun:revisionHeader_(map,["TAHUN","TAHUN ANGGARAN"])
+      };
+    }
+  }
+  throw new Error("Header DATA_APLIKASI tidak ditemukan.");
+}
+
+function revisionHeader_(map,aliases){
+  for(const alias of aliases){
+    const key=String(alias).toUpperCase().replace(/[._-]/g," ").replace(/\s+/g," ");
+    if(map[key]!==undefined) return map[key];
+  }
+  return -1;
+}
+
+function toRevisionNumber_(value){
+  if(typeof value==="number") return Number.isFinite(value)?value:0;
+  const raw=String(value==null?"":value).trim();
+  if(!raw) return 0;
+  let n=raw;
+  if(raw.indexOf(",")>=0 && raw.indexOf(".")>=0){
+    n=raw.lastIndexOf(",")>raw.lastIndexOf(".") ? raw.replace(/\./g,"").replace(",",".") : raw.replace(/,/g,"");
+  }else if(raw.indexOf(",")>=0){ n=raw.replace(",","."); }
+  else { n=raw.replace(/,/g,""); }
+  const out=Number(String(n).replace(/[^0-9.-]/g,""));
+  return Number.isFinite(out)?out:0;
+}
+
+function formatRevisionRupiah_(v){
+  return "Rp"+(Number(v)||0).toLocaleString("id-ID");
+}
+
+function findLastRevisionAccountRow_(sheet,item){
+  const rows=readRevisionRows_();
+  const year=String(item.tahun||"").trim(), comp=String(item.komponen||"").trim();
+  const sub=String(item.subKomponen||"").trim(), code=String(item.kodeAkun||item.kode||"").trim();
+  const account=String(item.akunLabel||item.akun||"").trim();
+  const matches=rows.filter(r=>
+    (!year || String(r.tahun||"").trim()===year) &&
+    String(r.komponen||"").trim()===comp &&
+    String(r.subKomponen||"").trim()===sub &&
+    String(r.kodeAkun||r.kode||"").trim()===code &&
+    String(r.akun||r.akunLabel||"").trim()===account
+  );
+  return matches.length ? Math.max(...matches.map(r=>r.rowIndex+1)) : 0;
+}
+
