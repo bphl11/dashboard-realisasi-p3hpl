@@ -311,7 +311,8 @@ function testRevisionServer() {
     }
 
     const currentFingerprint = revisionSnapshotFingerprint(revisiRows);
-    if (revisiDraft.validation.snapshotHash !== currentFingerprint) {
+    const validatedFingerprint = revisiDraft.snapshotHash || revisiDraft.validation.snapshotHash;
+    if (!validatedFingerprint || validatedFingerprint !== currentFingerprint) {
         revisiDraft.serverTest = null;
         renderValidationState();
         setStatus("UJI SERVER GAGAL: Data draft berubah sejak validasi. Klik Validasi ulang.", "warning");
