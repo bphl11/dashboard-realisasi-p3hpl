@@ -152,7 +152,7 @@ function render() {
     const afterBody = document.getElementById("afterBody");
 
     if (!revisiFilteredRows.length) {
-        beforeBody.innerHTML = '<tr><td colspan="6" class="empty-cell">Tidak ada data sesuai filter.</td></tr>';
+        beforeBody.innerHTML = '<tr><td colspan="8" class="empty-cell">Tidak ada data sesuai filter.</td></tr>';
         afterBody.innerHTML = '<tr><td colspan="7" class="empty-cell">Tidak ada data sesuai filter.</td></tr>';
     } else {
         beforeBody.innerHTML = revisiFilteredRows.map(row =>
@@ -183,7 +183,7 @@ function render() {
     const additions = revisiDraft.additions.filter(item => !item.deleted);
     if (additions.length) {
         afterBody.innerHTML += additions.map(item =>
-            '<tr class="added"><td>' + esc(item.kode) + '</td><td>' + esc(item.uraian) + '</td><td>' +
+            '<tr class="added"><td>' + esc(item.kode) + '</td><td>' + esc(item.akunLabel || item.akun || '') + '</td><td>' + esc(item.uraian) + '</td><td>' +
             esc(item.volume) + '</td><td>' + esc(item.satuan) + '</td><td class="text-end">' +
             rupiah(item.harga) + '</td><td class="text-end fw-bold">' + rupiah(item.volume * item.harga) +
             '</td><td class="action-cell"><button class="btn-icon delete" data-action="delete-add" data-id="' +
@@ -304,6 +304,8 @@ document.getElementById("btnTambahkanItem").addEventListener("click", () => {
     const item = {
         id: "ADD-" + Date.now(),
         kode: norm(addKode.value),
+        akun: norm(document.getElementById("addAkun")?.value || ""),
+        akunLabel: norm(document.getElementById("addAkun")?.value || ""),
         uraian: norm(addUraian.value),
         volume: num(addVol.value),
         satuan: norm(addSat.value),
