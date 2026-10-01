@@ -355,6 +355,9 @@ function testRevisionServer() {
             revisiDraft.serverTest = { ok: true, fingerprint, testedAt: new Date().toISOString(), before, after, diff };
             localStorage.setItem(REVISI_DRAFT_KEY, JSON.stringify(revisiDraft));
 
+            // Refresh UI state so Terapkan Revisi becomes enabled after server test succeeds.
+            renderValidationState();
+
             const componentText = componentDetails.length
                 ? componentDetails.map(item =>
                     (item.label || item.key || "Komponen") +
