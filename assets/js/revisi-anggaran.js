@@ -398,7 +398,7 @@ function applyRevisionDraft() {
         return;
     }
 
-    const user = typeof rpdGetStoredUser === "function" ? rpdGetStoredUser() : null;
+    const user = getRevisiStoredUser() || (typeof rpdGetStoredUser === "function" ? rpdGetStoredUser() : null);
     if (!user || !user.id_token) {
         setStatus("Sesi login tidak ditemukan. Silakan login kembali.", "danger");
         return;
