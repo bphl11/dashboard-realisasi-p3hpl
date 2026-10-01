@@ -562,7 +562,9 @@ function printRevision() {
     window.print();
 }
 
-document.getElementById("btnCetakRevisi").addEventListener("click", printRevision);\ndocument.getElementById("btnDownloadExcelRevisi").addEventListener("click", exportRevisionExcel);\ndocument.getElementById("btnValidasiRevisi").addEventListener("click", validateDraft);
+document.getElementById("btnCetakRevisi").addEventListener("click", printRevision);
+document.getElementById("btnDownloadExcelRevisi").addEventListener("click", exportRevisionExcel);
+document.getElementById("btnValidasiRevisi").addEventListener("click", validateDraft);
 ["revisiNomor","revisiTanggal","revisiPembuat","revisiAlasan"].forEach(id=>document.getElementById(id).addEventListener("input",()=>{revisiDraft.validation=null;renderValidationState();}));
 document.getElementById("btnSimpanDraft").addEventListener("click", saveDraft);
 document.getElementById("btnResetDraft").addEventListener("click", () => {
