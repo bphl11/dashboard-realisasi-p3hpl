@@ -474,7 +474,95 @@ function renderHistory() {
     const rows=(revisiDraft.history||[]);
     el.innerHTML=rows.length ? rows.map(x=>'<div class="history-item"><strong>'+esc(x.action)+'</strong> · '+esc(x.nomor||"-")+' · '+esc(new Date(x.at).toLocaleString("id-ID"))+'<br><span>'+rupiah(x.before)+' → '+rupiah(x.after)+' (selisih '+rupiah(x.diff)+')</span></div>').join("") : "Belum ada riwayat.";
 }
-document.getElementById("btnValidasiRevisi").addEventListener("click", validateDraft);
+function exportRevisionExcel() {
+    if (typeof XLSX === "undefined") {
+        setStatus("Library Excel belum dimuat. Silakan refresh halaman.", "danger");
+        return;
+    }
+
+    syncMetadataToDraft();
+
+    const beforeRows = revisiFilteredRows.map(row => [
+        row.kode, row.akunLabel, row.uraian, row.volume, row.satuan, num(row.harga), num(row.jumlah)
+    ]);
+
+    const afterRows = revisiFilteredRows.map(row => {
+        const effective = effectiveRow(row);
+        return [
+            effective.kode, effective.akunLabel, effective.uraian, effective.volume,
+            effective.satuan, num(effective.harga), num(effective.jumlah),
+            isDeleted(row) ? "DIHAPUS" : (revisiDraft.changes[String(row.rowIndex)] ? "DIUBAH" : "TETAP")
+        ];
+    });
+
+    revisiDraft.additions.filter(item => !item.deleted).forEach(item => {
+        afterRows.push([
+            item.kode, item.akunLabel || item.akun || "", item.uraian, item.volume,
+            item.satuan, num(item.harga), num(item.volume) * num(item.harga), "DITAMBAH"
+        ]);
+    });
+
+    const beforeTotal = calculateBeforeTotal();
+    const afterTotal = calculateAfterTotal();
+
+    const summary = [
+        ["REVISI ANGGARAN", ""],
+        ["Nomor Revisi", revisiDraft.nomor || ""],
+        ["Tanggal", revisiDraft.tanggal || ""],
+        ["Pembuat", revisiDraft.pembuat || ""],
+        ["Alasan Revisi", revisiDraft.alasan || ""],
+        ["Status", revisiDraft.status || "DRAFT"],
+        ["Jumlah Sebelum", beforeTotal],
+        ["Jumlah Sesudah", afterTotal],
+        ["Selisih", afterTotal - beforeTotal],
+        []
+    ];
+
+    const wb = XLSX.utils.book_new();
+    const wsSummary = XLSX.utils.aoa_to_sheet(summary);
+    const wsBefore = XLSX.utils.aoa_to_sheet([
+        ["Kode","Akun Belanja","Uraian","Volume","Satuan","Harga","Jumlah"],
+        ...beforeRows
+    ]);
+    const wsAfter = XLSX.utils.aoa_to_sheet([
+        ["Kode","Akun Belanja","Uraian","Volume","Satuan","Harga","Jumlah","Status"],
+        ...afterRows
+    ]);
+
+    [wsSummary, wsBefore, wsAfter].forEach(ws => {
+        ws["!cols"] = [
+            {wch:18},{wch:38},{wch:55},{wch:12},{wch:14},{wch:18},{wch:20},{wch:14}
+        ];
+    });
+
+    const headerStyle = {
+        fill:{fgColor:{rgb:"1F6B35"}},
+        font:{bold:true,color:{rgb:"FFFFFF"}},
+        alignment:{horizontal:"center",vertical:"center"}
+    };
+    [wsBefore, wsAfter].forEach(ws => {
+        const range = XLSX.utils.decode_range(ws["!ref"]);
+        for(let c=0;c<=range.e.c;c++){
+            const cell = ws[XLSX.utils.encode_cell({r:0,c})];
+            if(cell) cell.s = headerStyle;
+        }
+    });
+
+    XLSX.utils.book_append_sheet(wb, wsSummary, "Ringkasan");
+    XLSX.utils.book_append_sheet(wb, wsBefore, "Sebelum");
+    XLSX.utils.book_append_sheet(wb, wsAfter, "Sesudah");
+
+    const safeNomor = (revisiDraft.nomor || "REV").replace(/[^a-zA-Z0-9_-]/g, "_");
+    XLSX.writeFile(wb, "Revisi_Anggaran_" + safeNomor + ".xlsx");
+    setStatus("Excel berhasil dibuat.", "ok");
+}
+
+function printRevision() {
+    syncMetadataToDraft();
+    window.print();
+}
+
+document.getElementById("btnCetakRevisi").addEventListener("click", printRevision);\ndocument.getElementById("btnDownloadExcelRevisi").addEventListener("click", exportRevisionExcel);\ndocument.getElementById("btnValidasiRevisi").addEventListener("click", validateDraft);
 ["revisiNomor","revisiTanggal","revisiPembuat","revisiAlasan"].forEach(id=>document.getElementById(id).addEventListener("input",()=>{revisiDraft.validation=null;renderValidationState();}));
 document.getElementById("btnSimpanDraft").addEventListener("click", saveDraft);
 document.getElementById("btnResetDraft").addEventListener("click", () => {
