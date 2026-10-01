@@ -153,6 +153,98 @@ function calculateAfterTotal() {
     return existing + additions;
 }
 
+function revisionSnapshotFingerprint(rows) {
+    const canonical = (Array.isArray(rows) ? rows : []).map(row => [
+        row.rowIndex,row.kode,row.kodeAsli,row.kodeKomponen,row.kodeSubKomponen,
+        row.kodeAkun,row.komponen,row.subKomponen,row.akun,row.akunLabel,
+        row.itemAkun,row.detil,row.rincian,row.uraian,row.volume,row.satuan,
+        row.harga,row.jumlah,row.tahun
+    ]);
+    const textValue = JSON.stringify(canonical);
+    let hash = 2166136261;
+    for (let i = 0; i < textValue.length; i++) {
+        hash ^= textValue.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function applyRevisionDraft() {
+    if (!revisiDraft.validation || revisiDraft.validation.ok !== true) {
+        setStatus("Revisi belum lolos validasi.", "warning");
+        return;
+    }
+
+    const user = typeof rpdGetStoredUser === "function" ? rpdGetStoredUser() : null;
+    if (!user || !user.id_token) {
+        setStatus("Sesi login tidak ditemukan. Silakan login kembali.", "danger");
+        return;
+    }
+
+    if (!confirm("Terapkan revisi " + (revisiDraft.nomor || "-") + " ke DATA_APLIKASI?\n\nSistem akan membuat snapshot otomatis sebelum menulis. Pastikan backup manual juga sudah tersedia.")) {
+        return;
+    }
+
+    const button = document.getElementById("btnTerapkanRevisi");
+    if (button) {
+        button.disabled = true;
+        button.innerHTML = '<i class="bi bi-hourglass-split"></i> Menerapkan...';
+    }
+
+    (async function () {
+        try {
+            const fingerprint = revisionSnapshotFingerprint(revisiRows);
+            revisiDraft.snapshotHash = fingerprint;
+
+            const result = await rpdApiRequest("apply_revisi", {
+                id_token: user.id_token,
+                expected_snapshot_hash: fingerprint,
+                draft: revisiDraft
+            });
+
+            if (!result || result.ok !== true) {
+                throw new Error(result?.message || "Server menolak penerapan revisi.");
+            }
+
+            revisiDraft.status = "DITERAPKAN";
+            revisiDraft.appliedAt = new Date().toISOString();
+            revisiDraft.validation = null;
+            revisiDraft.history = [{
+                at: revisiDraft.appliedAt,
+                action: "REVISI DITERAPKAN",
+                nomor: revisiDraft.nomor,
+                before: result.before,
+                after: result.after,
+                diff: result.diff,
+                errors: []
+            }, ...(revisiDraft.history || [])].slice(0, 20);
+
+            localStorage.removeItem(REVISI_DRAFT_KEY);
+            setStatus("Revisi " + revisiDraft.nomor + " berhasil diterapkan. Snapshot: " + result.snapshotSheet, "ok");
+
+            if (typeof window.invalidateAppStore === "function") {
+                window.invalidateAppStore();
+            }
+            if (window.appStore && typeof window.appStore.refresh === "function") {
+                await window.appStore.refresh();
+            }
+
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '<i class="bi bi-check-circle"></i> Sudah Diterapkan';
+                button.title = "Revisi sudah diterapkan.";
+            }
+        } catch (error) {
+            console.error("Terapkan Revisi gagal:", error);
+            setStatus("Terapkan Revisi gagal: " + error.message, "danger");
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = '<i class="bi bi-cloud-arrow-up"></i> Terapkan Revisi';
+            }
+        }
+    })();
+}
+
 function saveDraft(event) {
     if (event) event.preventDefault();
 
@@ -714,6 +806,8 @@ function validateDraft() {
     });
 
     const validatedAt = new Date().toISOString();
+    revisiDraft.snapshotHash = revisionSnapshotFingerprint(revisiRows);
+
     revisiDraft.validation = {
         ok: errors.length === 0,
         errors,
@@ -1225,6 +1319,7 @@ function printRevision() {
 document.getElementById("btnCetakRevisi").addEventListener("click", printRevision);
 document.getElementById("btnDownloadExcelRevisi").addEventListener("click", exportRevisionExcel);
 document.getElementById("btnValidasiRevisi").addEventListener("click", validateDraft);
+document.getElementById("btnTerapkanRevisi").addEventListener("click", applyRevisionDraft);
 ["revisiNomor","revisiTanggal","revisiPembuat","revisiAlasan"].forEach(id=>document.getElementById(id).addEventListener("input",()=>{revisiDraft.validation=null;renderValidationState();}));
 document.getElementById("btnSimpanDraft").addEventListener("click", saveDraft);
 document.getElementById("btnResetDraft").addEventListener("click", () => {
