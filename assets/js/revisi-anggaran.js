@@ -1122,7 +1122,7 @@ function renderValidationState() {
         const serverTestReady = Boolean(
             metadataReady &&
             v?.ok &&
-            v.snapshotHash === revisionSnapshotFingerprint(revisiRows) &&
+            (revisiDraft.snapshotHash || v?.snapshotHash) === revisionSnapshotFingerprint(revisiRows) &&
             revisiDraft.serverTest?.ok &&
             revisiDraft.serverTest.fingerprint === revisionSnapshotFingerprint(revisiRows)
         );
@@ -1133,10 +1133,12 @@ function renderValidationState() {
     }
     if (testButton) {
         const hasServerSession = Boolean(getRevisiStoredUser()?.id_token);
+        const currentFingerprint = revisionSnapshotFingerprint(revisiRows);
+        const validatedFingerprint = revisiDraft.snapshotHash || v?.snapshotHash;
         const snapshotStillMatches = Boolean(
             v?.ok &&
-            v.snapshotHash &&
-            v.snapshotHash === revisionSnapshotFingerprint(revisiRows)
+            validatedFingerprint &&
+            validatedFingerprint === currentFingerprint
         );
         testButton.disabled = !metadataReady || !v?.ok || !hasServerSession || !snapshotStillMatches;
         testButton.title = !metadataReady
