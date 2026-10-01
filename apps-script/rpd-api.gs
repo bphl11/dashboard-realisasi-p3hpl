@@ -1238,7 +1238,7 @@ function saveRpd_(idToken, row) {
       String(values[i][index.DETIL_AKUN] || "").trim() === String(row.detil_akun || "").trim() &&
       String(values[i][index.RINCIAN_ITEM] || "").trim() === String(row.rincian_item || "").trim();
 
-    if (sameId || (!currentId && sameIdentity)) {
+    if (sameId || sameIdentity) {
       targetRow = i + 1;
       oldData = values[i].slice();
       break;
