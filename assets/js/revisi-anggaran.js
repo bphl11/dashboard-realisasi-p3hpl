@@ -473,17 +473,21 @@ function validateDraft() {
     if (!revisiDraft.pembuat) errors.push("Pembuat revisi belum diisi.");
     if (!revisiDraft.alasan) errors.push("Alasan revisi belum diisi.");
 
-    const activeRows = revisiRows.filter(row => !isDeleted(row));
+    // Validasi harus menggunakan ruang lingkup yang sama dengan
+    // ringkasan yang sedang tampil (Tahun/Komponen/Sub Komponen/Akun).
+    // Sebelumnya validasi memakai seluruh revisiRows sehingga angka validasi
+    // bisa berbeda dengan kartu "Jumlah Sebelum/Sesudah".
+    const activeRows = filteredRows().filter(row => !isDeleted(row));
     const effectiveRows = activeRows.map(effectiveRow);
-    const additions = revisiDraft.additions.filter(x => !x.deleted);
+    const additions = filteredAdditions();
 
     const before = activeRows.reduce((s, r) => s + num(r.jumlah), 0);
     const afterExisting = effectiveRows.reduce((s, r) => s + num(r.jumlah), 0);
     const afterAdditions = additions.reduce((s, x) => s + num(x.volume) * num(x.harga), 0);
     const after = afterExisting + afterAdditions;
 
-    const changed = Object.keys(revisiDraft.changes).length +
-        revisiDraft.deletions.length +
+    const changed = activeRows.filter(row => Boolean(revisiDraft.changes[String(row.rowIndex)])).length +
+        activeRows.filter(row => revisiDraft.deletions.includes(row.rowIndex)).length +
         additions.length;
 
     if (!changed) errors.push("Belum ada perubahan anggaran.");
