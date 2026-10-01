@@ -5,7 +5,30 @@ let revisiFilteredRows = [];
 let revisiDraft = { version: 2, status: "DRAFT", nomor: "", tanggal: "", pembuat: "", alasan: "", changes: {}, deletions: [], additions: [], updatedAt: null, validation: null, history: [] };
 
 const rupiah = value => "Rp" + (Number(value) || 0).toLocaleString("id-ID");
-const num = value => { const n = Number(String(value ?? "").replace(/[^0-9.-]/g, "")); return Number.isFinite(n) ? n : 0; };
+const num = value => {
+    const raw = String(value ?? "").trim().replace(/\s/g, "");
+    if (!raw) return 0;
+
+    // Mendukung input Indonesia:
+    // 35 -> 35
+    // 3,5 -> 3.5
+    // 1.500.000 -> 1500000
+    // 1.500,5 -> 1500.5
+    // 1500.5 -> 1500.5
+    let normalized = raw;
+    if (raw.includes(",") && raw.includes(".")) {
+        normalized = raw.lastIndexOf(",") > raw.lastIndexOf(".")
+            ? raw.replace(/\./g, "").replace(",", ".")
+            : raw.replace(/,/g, "");
+    } else if (raw.includes(",")) {
+        normalized = raw.replace(",", ".");
+    } else {
+        normalized = raw.replace(/,/g, "");
+    }
+
+    const n = Number(normalized.replace(/[^0-9.-]/g, ""));
+    return Number.isFinite(n) ? n : 0;
+};
 const esc = value => String(value ?? "").replace(/[&<>"']/g, s => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;" }[s]));
 const norm = value => String(value ?? "").trim();
 
@@ -206,11 +229,11 @@ function render() {
 
             return '<tr class="' + (deleted ? "deleted" : changed ? "changed" : "") + '">' +
                 '<td>' + esc(effective.kode) + '</td><td>' + esc(effective.akunLabel) + '</td><td><input class="edit-input uraian-input" data-row="' + row.rowIndex + '" data-field="uraian" value="' + esc(effective.uraian) + '" ' + (deleted ? "disabled" : "") + '></td>' +
-                '<td><input class="edit-input" type="number" min="0" step="0.01" data-row="' + row.rowIndex +
+                '<td><input class="edit-input numeric-input" type="text" inputmode="decimal" data-row="' + row.rowIndex +
                 '" data-field="volume" value="' + esc(effective.volume) + '" ' + (deleted ? "disabled" : "") + '></td>' +
                 '<td><input class="edit-input" data-row="' + row.rowIndex + '" data-field="satuan" value="' +
                 esc(effective.satuan) + '" ' + (deleted ? "disabled" : "") + '></td>' +
-                '<td><input class="edit-input money" type="number" min="0" data-row="' + row.rowIndex +
+                '<td><input class="edit-input money numeric-input" type="text" inputmode="decimal" data-row="' + row.rowIndex +
                 '" data-field="harga" value="' + esc(effective.harga) + '" ' + (deleted ? "disabled" : "") + '></td>' +
                 '<td class="text-end fw-bold">' + rupiah(effective.jumlah) + '</td>' +
                 '<td class="action-cell"><button class="btn-icon delete" data-action="delete" data-row="' +
@@ -287,6 +310,20 @@ document.addEventListener("input", event => {
     } else {
         revisiDraft.changes[String(row.rowIndex)] = change;
     }
+
+    // Jangan render ulang saat setiap karakter diketik.
+    // Render ulang saat input selesai (blur/change) agar kursor tidak meloncat
+    // dan nilai seperti "35" tetap bisa diketik langsung.
+    if (input.dataset.field === "uraian" || input.dataset.field === "satuan") {
+        input.classList.add("draft-edited");
+    } else {
+        input.classList.add("draft-edited");
+    }
+});
+
+document.addEventListener("change", event => {
+    const input = event.target;
+    if (!input.matches(".edit-input")) return;
     render();
 });
 
