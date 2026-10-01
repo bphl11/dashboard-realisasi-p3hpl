@@ -58,6 +58,14 @@ const GRAFIK_RPD_CACHE_KEY = "p3hpl_grafik_rpd_cache_v1";
 const GRAFIK_RPD_CACHE_TTL = 2 * 60 * 1000;
 let grafikRpdRefreshPromise = null;
 
+function invalidasiCacheRpdGrafik() {
+    try {
+        localStorage.removeItem(GRAFIK_RPD_CACHE_KEY);
+    } catch (error) {
+        console.warn("Cache RPD Grafik tidak dapat dihapus:", error);
+    }
+}
+
 function hitungRpdBulananGrafik(rows, tersedia = true) {
     const fields = [
         ["jan_m1","jan_m2","jan_m3","jan_m4"],
@@ -146,6 +154,41 @@ async function ambilRpdBulananGrafik(forceRefresh = false) {
             // Refresh dilakukan di belakang layar, bukan menghambat render.
             if (!grafikRpdRefreshPromise) {
                 grafikRpdRefreshPromise = ambilRpdBulananGrafik(true)
+                    .then(function (fresh) {
+                        // Jika cache ternyata berbeda dengan server, perbarui
+                        // angka grafik yang sedang tampil tanpa menunggu
+                        // pengguna membuka ulang halaman.
+                        if (fresh && fresh.tersedia) {
+                            const changed =
+                                JSON.stringify(fresh.bulanan) !== JSON.stringify(cached.bulanan) ||
+                                Number(fresh.total) !== Number(cached.total);
+
+                            if (changed) {
+                                grafikRpdBulanan = fresh.bulanan;
+                                grafikRpdTotal = fresh.total;
+
+                                if (typeof buatGrafikBulanan === "function" &&
+                                    typeof grafikParsedData !== "undefined" &&
+                                    grafikParsedData) {
+                                    try {
+                                        const totalDataNow = {
+                                            ...((window.appStore && window.appStore.get)
+                                                ? {}
+                                                : {}),
+                                            bulanan: ambilDataUtamaGrafik(grafikRawData).bulanan
+                                        };
+                                        buatGrafikBulanan(totalDataNow.bulanan, grafikRpdBulanan);
+                                        if (typeof buatGrafikKumulatif === "function") {
+                                            buatGrafikKumulatif(totalDataNow.bulanan, grafikRpdBulanan);
+                                        }
+                                    } catch (refreshRenderError) {
+                                        console.warn("Refresh grafik RPD gagal dirender:", refreshRenderError);
+                                    }
+                                }
+                            }
+                        }
+                        return fresh;
+                    })
                     .catch(function () { return cached; })
                     .finally(function () {
                         grafikRpdRefreshPromise = null;
