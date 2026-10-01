@@ -2,7 +2,7 @@ const REVISI_DRAFT_KEY = "p3hpl_revisi_anggaran_draft_v1";
 let revisiStore = null;
 let revisiRows = [];
 let revisiFilteredRows = [];
-let revisiDraft = { version: 1, status: "DRAFT", changes: {}, deletions: [], additions: [], updatedAt: null };
+let revisiDraft = { version: 2, status: "DRAFT", nomor: "", tanggal: "", pembuat: "", alasan: "", changes: {}, deletions: [], additions: [], updatedAt: null, validation: null, history: Array.isArray(parsed.history) ? parsed.history : [] };
 
 const rupiah = value => "Rp" + (Number(value) || 0).toLocaleString("id-ID");
 const num = value => { const n = Number(String(value ?? "").replace(/[^0-9.-]/g, "")); return Number.isFinite(n) ? n : 0; };
@@ -92,7 +92,7 @@ function loadDraft() {
         const raw = localStorage.getItem(REVISI_DRAFT_KEY);
         if (!raw) return;
         const parsed = JSON.parse(raw);
-        if (parsed && parsed.version === 1) {
+        if (parsed && (parsed.version === 1 || parsed.version === 2)) {
             revisiDraft = {
                 ...revisiDraft,
                 ...parsed,
@@ -106,7 +106,14 @@ function loadDraft() {
     }
 }
 
+function syncMetadataToDraft() {
+    revisiDraft.nomor = norm(document.getElementById("revisiNomor")?.value);
+    revisiDraft.tanggal = norm(document.getElementById("revisiTanggal")?.value);
+    revisiDraft.pembuat = norm(document.getElementById("revisiPembuat")?.value);
+    revisiDraft.alasan = norm(document.getElementById("revisiAlasan")?.value);
+}
 function saveDraft() {
+    syncMetadataToDraft();
     revisiDraft.updatedAt = new Date().toISOString();
     try {
         localStorage.setItem(REVISI_DRAFT_KEY, JSON.stringify(revisiDraft));
@@ -117,7 +124,7 @@ function saveDraft() {
 }
 
 function clearDraft() {
-    revisiDraft = { version:1, status:"DRAFT", changes:{}, deletions:[], additions:[], updatedAt:null };
+    revisiDraft = { version:2, status:"DRAFT", nomor:"", tanggal:"", pembuat:"", alasan:"", changes:{}, deletions:[], additions:[], updatedAt:null, validation:null, history:[] };
     localStorage.removeItem(REVISI_DRAFT_KEY);
     render();
     setStatus("Draft dikosongkan. DATA_APLIKASI tidak berubah.", "ok");
@@ -232,6 +239,8 @@ function render() {
     document.getElementById("summaryDiff").textContent = (diff >= 0 ? "+" : "-") + rupiah(Math.abs(diff));
     document.getElementById("summaryDiff").className = diff > 0 ? "text-danger" : diff < 0 ? "text-success" : "";
     document.getElementById("beforeCount").textContent = revisiFilteredRows.length + " item";
+    renderValidationState();
+    renderHistory();
     document.getElementById("afterCount").textContent = (revisiFilteredRows.length + additions.length) + " item";
 }
 
@@ -308,6 +317,48 @@ document.addEventListener("click", event => {
     });
 });
 
+function validateDraft() {
+    syncMetadataToDraft();
+    const errors = [];
+    if (!revisiDraft.nomor) errors.push("Nomor revisi belum diisi.");
+    if (!revisiDraft.tanggal) errors.push("Tanggal revisi belum diisi.");
+    if (!revisiDraft.pembuat) errors.push("Pembuat revisi belum diisi.");
+    if (!revisiDraft.alasan) errors.push("Alasan revisi belum diisi.");
+    const activeRows = revisiRows.filter(row => !isDeleted(row));
+    const before = activeRows.reduce((s,r) => s + num(r.jumlah),0);
+    const after = activeRows.reduce((s,r) => s + num(effectiveRow(r).jumlah),0) +
+        revisiDraft.additions.filter(x=>!x.deleted).reduce((s,x)=>s+num(x.volume)*num(x.harga),0);
+    const changed = Object.keys(revisiDraft.changes).length + revisiDraft.deletions.length + revisiDraft.additions.filter(x=>!x.deleted).length;
+    if (!changed) errors.push("Belum ada perubahan anggaran.");
+    if (!Number.isFinite(before) || !Number.isFinite(after)) errors.push("Total anggaran tidak valid.");
+    revisiDraft.validation = { ok: errors.length === 0, errors, before, after, diff: after-before, validatedAt: new Date().toISOString() };
+    revisiDraft.status = errors.length ? "DRAFT" : "TERVALIDASI";
+    const historyEntry = { at: revisiDraft.validation.validatedAt, action: errors.length ? "VALIDASI GAGAL" : "VALIDASI BERHASIL", nomor: revisiDraft.nomor, before, after, diff: after-before, errors };
+    revisiDraft.history = [historyEntry, ...(revisiDraft.history || [])].slice(0,20);
+    localStorage.setItem(REVISI_DRAFT_KEY, JSON.stringify(revisiDraft));
+    renderValidationState();
+    renderHistory();
+    setStatus(errors.length ? errors.join(" ") : "Revisi lolos validasi draft.", errors.length ? "warning" : "ok");
+}
+function renderValidationState() {
+    const box=document.getElementById("revisiValidationBox");
+    const status=document.getElementById("revisiValidationStatus");
+    const v=revisiDraft.validation;
+    if(!box||!status) return;
+    if(!v){ box.textContent="Validasi: belum dijalankan."; status.textContent="Belum divalidasi"; status.className="status-pill status-warning"; return; }
+    box.textContent=v.ok ? "Validasi berhasil. Total sebelum "+rupiah(v.before)+" → sesudah "+rupiah(v.after)+"; selisih "+rupiah(v.diff)+"." : "Validasi gagal: "+v.errors.join(" ");
+    status.textContent=v.ok ? "TERVALIDASI" : "PERLU PERBAIKAN";
+    status.className="status-pill "+(v.ok ? "status-ok" : "status-danger");
+    const btn=document.getElementById("btnTerapkanRevisi");
+    if(btn) btn.disabled=!v.ok;
+}
+function renderHistory() {
+    const el=document.getElementById("revisiHistoryBody"); if(!el) return;
+    const rows=(revisiDraft.history||[]);
+    el.innerHTML=rows.length ? rows.map(x=>'<div class="history-item"><strong>'+esc(x.action)+'</strong> · '+esc(x.nomor||"-")+' · '+esc(new Date(x.at).toLocaleString("id-ID"))+'<br><span>'+rupiah(x.before)+' → '+rupiah(x.after)+' (selisih '+rupiah(x.diff)+')</span></div>').join("") : "Belum ada riwayat.";
+}
+document.getElementById("btnValidasiRevisi").addEventListener("click", validateDraft);
+["revisiNomor","revisiTanggal","revisiPembuat","revisiAlasan"].forEach(id=>document.getElementById(id).addEventListener("input",()=>{revisiDraft.validation=null;renderValidationState();}));
 document.getElementById("btnSimpanDraft").addEventListener("click", saveDraft);
 document.getElementById("btnResetDraft").addEventListener("click", () => {
     if (confirm("Hapus seluruh perubahan draft? DATA_APLIKASI tetap aman.")) clearDraft();
