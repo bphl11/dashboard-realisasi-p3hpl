@@ -54,7 +54,7 @@ let grafikRpdTotal = 0;
 // Cache RPD khusus halaman Grafik.
 // Grafik boleh menampilkan cache terlebih dahulu, lalu menyegarkan RPD
 // di belakang layar agar perpindahan menu tidak menunggu request API.
-const GRAFIK_RPD_CACHE_KEY = "p3hpl_grafik_rpd_cache_v1";
+const GRAFIK_RPD_CACHE_KEY = "p3hpl_grafik_rpd_cache_v2";
 const GRAFIK_RPD_CACHE_TTL = 2 * 60 * 1000;
 let grafikRpdRefreshPromise = null;
 
@@ -267,7 +267,31 @@ async function ambilRpdBulananGrafik(forceRefresh = false) {
             );
         }
 
-        const rows = Array.isArray(result.rpd) ? result.rpd : [];
+        // Gunakan master DATA_APLIKASI sebagai sumber identitas yang sah,
+        // sama seperti halaman RPD/cetak. Record RPD lama yang sudah tidak
+        // mempunyai pasangan master tidak boleh ikut dihitung Grafik.
+        const rowsAll = Array.isArray(result.rpd) ? result.rpd : [];
+        const master = Array.isArray(result.master) ? result.master : [];
+        const validIds = new Set(
+            master
+                .map(function (row) {
+                    return String(row?.id_rpd || "").trim();
+                })
+                .filter(Boolean)
+        );
+
+        const rows = validIds.size
+            ? rowsAll.filter(function (row) {
+                return validIds.has(String(row?.id_rpd || "").trim());
+            })
+            : rowsAll;
+
+        console.log(
+            "GRAFIK RPD: record server =", rowsAll.length,
+            "record master valid =", validIds.size,
+            "record dihitung =", rows.length
+        );
+
         const data = hitungRpdBulananGrafik(rows, true);
 
         simpanCacheRpd(data);
