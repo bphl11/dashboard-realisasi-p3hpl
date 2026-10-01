@@ -29,7 +29,8 @@ function buildRows(raw) {
         const row = Array.isArray(raw[i]) ? raw[i] : [];
         if (!row.some(value => norm(value) !== "")) continue;
 
-        const kode = hv(row, context.map, ["Kode"]);\n        const kodeAkun = hv(row, context.map, ["Kode Akun", "KodeAkun", "Kode Rekening", "Kode Rekening Belanja"]);
+        const kode = hv(row, context.map, ["Kode"]);
+        const kodeAkun = hv(row, context.map, ["Kode Akun", "KodeAkun", "Kode Rekening", "Kode Rekening Belanja"]);
         const komponen = hv(row, context.map, ["Komponen", "Nama Komponen"]);
         const subKomponen = hv(row, context.map, ["Sub Komponen", "Subkomponen", "Nama Sub Komponen"]);
         const akun = hv(row, context.map, ["Akun Belanja", "Akun"]);
@@ -40,10 +41,12 @@ function buildRows(raw) {
 
         rows.push({
             rowIndex: i,
-            kode,
+            kode: kodeAkun || kode,
+            kodeAkun,
             komponen,
             subKomponen,
             akun,
+            akunLabel: kodeAkun ? (kodeAkun + " " + akun) : akun,
             itemAkun,
             detil,
             rincian,
