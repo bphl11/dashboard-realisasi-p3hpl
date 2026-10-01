@@ -485,20 +485,14 @@ function draftGlobalRows() {
 }
 
 function draftGroupKey(item) {
-    return [
-        norm(item.komponen) || "(Tanpa Komponen)",
-        norm(item.subKomponen) || "(Tanpa Sub Komponen)",
-        norm(item.kodeAkun || item.kode) || "(Tanpa Kode Akun)",
-        norm(item.akunLabel || item.akun) || "(Tanpa Akun)"
-    ].join("||");
+    // Validasi pagu hanya sampai level KOMPONEN.
+    // Perubahan antar akun belanja maupun antar sub komponen di dalam
+    // komponen yang sama diperbolehkan selama total komponen tetap.
+    return norm(item.komponen) || "(Tanpa Komponen)";
 }
 
 function draftGroupLabel(item) {
-    return [
-        norm(item.komponen) || "(Tanpa Komponen)",
-        norm(item.subKomponen) || "(Tanpa Sub Komponen)",
-        (norm(item.kodeAkun || item.kode) + " " + (norm(item.akunLabel || item.akun))).trim() || "(Tanpa Akun)"
-    ].join(" → ");
+    return norm(item.komponen) || "(Tanpa Komponen)";
 }
 
 function calculateGlobalDraftTotals() {
@@ -529,10 +523,7 @@ function calculateGlobalDraftTotals() {
             before,
             after,
             diff: after - before,
-            label: (() => {
-                const [komponen, subKomponen, akun] = key.split("||");
-                return komponen + " → " + subKomponen + " → " + akun;
-            })()
+            label: key
         };
     }).filter(group => Math.abs(group.diff) > 0.000001);
 
@@ -577,11 +568,11 @@ function validateDraft() {
     /*
      * ATURAN UTAMA:
      * 1. Total seluruh pagu harus tetap.
-     * 2. Total setiap kelompok Komponen/Sub Komponen/Akun Belanja harus tetap.
+     * 2. Total setiap KOMPONEN harus tetap.
      *
-     * Dengan demikian, pemindahan anggaran dari satu komponen ke komponen
-     * lain tidak bisa lolos validasi hanya karena total akhirnya kebetulan
-     * sama.
+     * Perubahan antar Akun Belanja dan antar Sub Komponen DI DALAM
+     * Komponen yang sama diperbolehkan. Yang tidak diperbolehkan adalah
+     * perubahan pagu total suatu Komponen.
      */
     if (Math.abs(global.diff) > 0.000001) {
         errors.push(
@@ -597,7 +588,7 @@ function validateDraft() {
 
     global.groups.forEach(group => {
         errors.push(
-            "SELISIH DITEMUKAN DI: " +
+            "SELISIH PAGU KOMPONEN: " +
             group.label +
             " — sebelum " +
             rupiah(group.before) +
@@ -605,7 +596,7 @@ function validateDraft() {
             rupiah(group.after) +
             " (selisih " +
             rupiah(group.diff) +
-            ")."
+            "). Perubahan antar akun belanja/sub komponen di dalam komponen yang sama diperbolehkan, tetapi total komponen harus tetap."
         );
     });
 
