@@ -1474,10 +1474,7 @@ function applyRevisi_(request) {
     sheet = ss.getSheetByName("DATA_APLIKASI");
     if (!sheet) throw new Error("Sheet DATA_APLIKASI tidak ditemukan.");
 
-    const log = ensureRevisiLogSheet_();
-    if (findSuccessfulRevision_(log, nomor)) {
-      throw new Error("Nomor revisi " + nomor + " sudah pernah diterapkan.");
-    }
+    const isDryRun = request.dry_run === true || String(request.dry_run || "").toLowerCase() === "true";
 
     const beforeRows = readRevisionRows_();
     const expectedHash = String(request.expected_snapshot_hash || draft.snapshotHash || "").trim();
@@ -1496,6 +1493,30 @@ function applyRevisi_(request) {
     const validation = validateRevisionServer_(beforeRows, draft);
     if (!validation.ok) {
       throw new Error("Validasi server gagal: " + validation.errors.join(" "));
+    }
+
+    // DRY-RUN SERVER-SIDE:
+    // Setelah titik ini tidak boleh ada operasi tulis spreadsheet.
+    // Tidak membuat log, tidak membuat backup/snapshot, tidak mengubah
+    // DATA_APLIKASI, tidak insert/delete/update baris.
+    if (isDryRun) {
+      return {
+        ok: true,
+        dry_run: true,
+        message: "UJI SERVER berhasil. Tidak ada perubahan ke DATA_APLIKASI.",
+        nomor: nomor,
+        before: validation.before,
+        after: validation.after,
+        diff: validation.diff,
+        components: [],
+        snapshotSheet: null,
+        writes: false
+      };
+    }
+
+    const log = ensureRevisiLogSheet_();
+    if (findSuccessfulRevision_(log, nomor)) {
+      throw new Error("Nomor revisi " + nomor + " sudah pernah diterapkan.");
     }
 
     // Backup otomatis sebelum penulisan.
