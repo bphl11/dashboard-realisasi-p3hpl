@@ -332,7 +332,7 @@ function rpdFindSavedForMaster(masterRow) {
         String(item.akun ?? item.AKUN ?? "").trim() === String(masterRow.akun ?? "").trim() &&
         String(item.item_akun ?? "").trim() === String(masterRow.itemAkun ?? "").trim() &&
         String(item.detil_akun ?? "").trim() === String(masterRow.detilAkun ?? "").trim() &&
-        String(item.rincian_item ?? "").trim() === String(masterRow.rincianItem ?? "").trim() &&
+        String(item.rincian_item ?? "").trim() === String(masterRow.rincianItem ?? "").trim()
     );
     return same.length === 1 ? same[0] : null;
 }
