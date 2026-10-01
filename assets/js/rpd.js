@@ -35,7 +35,7 @@ function rpdQuarterTotals(saved) {
 }
 
 const RPD_LOCAL_CACHE_KEY = "p3hpl_rpd_saved_v4";
-const RPD_MASTER_CACHE_KEY = "p3hpl_rpd_master_v3_realisasi";
+const RPD_MASTER_CACHE_KEY = "p3hpl_rpd_master_v4_stable_id_revisi";
 const RPD_MASTER_CACHE_TTL = 5 * 60 * 1000;
 
 function rpdLoadMasterCache() {
@@ -188,10 +188,14 @@ function rpdUniqueSorted(rows, key) {
 }
 
 function rpdStableId(row) {
+    // ID RPD TIDAK boleh bergantung pada PAGU.
+    // Revisi Anggaran dapat mengubah Pagu Detil, tetapi RPD
+    // yang sudah diinput harus tetap melekat pada item anggaran
+    // yang sama.
     const normalize = value => String(value ?? "").trim().toUpperCase().replace(/\s+/g, " ").replace(/\|/g, "/");
     return [
         row.tahun, row.kodeSubKomponen, row.subKomponen, row.akun,
-        row.itemAkun, row.detilAkun, row.rincianItem, row.pagu
+        row.itemAkun, row.detilAkun, row.rincianItem
     ].map(normalize).join("|");
 }
 
@@ -206,6 +210,23 @@ function rpdNormalizeSavedRow(row) {
         tw4:rpdNumber(source.tw4 ?? source.TW4 ?? 0),
         catatan:String(source.catatan ?? source.CATATAN ?? "").trim()
     };
+
+    // Migrasikan cache lokal lama yang masih memakai ID berbasis Pagu
+    // ke ID stabil. Dengan begitu record lama tidak menjadi duplikat
+    // ketika server sudah mengembalikan ID stabil setelah Revisi Anggaran.
+    const stableId = rpdStableId({
+        tahun: source.tahun ?? source.TAHUN,
+        kodeSubKomponen: source.kode_sub_komponen ?? source.KODE_SUB_KOMPONEN,
+        subKomponen: source.sub_komponen ?? source.SUB_KOMPONEN,
+        akun: source.akun ?? source.AKUN,
+        itemAkun: source.item_akun ?? source.ITEM_AKUN,
+        detilAkun: source.detil_akun ?? source.DETIL_AKUN,
+        rincianItem: source.rincian_item ?? source.RINCIAN_ITEM
+    });
+    if (stableId && stableId.replace(/\\|/g, "") !== "") {
+        normalized.id_rpd = stableId;
+    }
+
     RPD_WEEK_FIELDS.forEach(key => { normalized[key]=rpdNumber(source[key] ?? source[key.toUpperCase()] ?? 0); });
     // Data lama hanya memiliki TW1-TW4. Untuk record RPD lama yang
     // sebelumnya diinput pada editor Oktober/Minggu 4, pertahankan
@@ -328,8 +349,7 @@ function rpdFindSavedForMaster(masterRow) {
         String(item.akun ?? item.AKUN ?? "").trim() === String(masterRow.akun ?? "").trim() &&
         String(item.item_akun ?? "").trim() === String(masterRow.itemAkun ?? "").trim() &&
         String(item.detil_akun ?? "").trim() === String(masterRow.detilAkun ?? "").trim() &&
-        String(item.rincian_item ?? "").trim() === String(masterRow.rincianItem ?? "").trim() &&
-        rpdNumber(item.pagu_detil ?? item.pagu ?? 0) === rpdNumber(masterRow.pagu)
+        String(item.rincian_item ?? "").trim() === String(masterRow.rincianItem ?? "").trim()
     );
     return same.length === 1 ? same[0] : null;
 }

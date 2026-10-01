@@ -445,12 +445,29 @@ function applyRevisionDraft() {
             localStorage.removeItem(REVISI_DRAFT_KEY);
             setStatus("Revisi " + revisiDraft.nomor + " berhasil diterapkan. Snapshot: " + result.snapshotSheet, "ok");
 
+            // Revisi mengubah DATA_APLIKASI, sehingga cache RPD yang masih
+            // membawa master/pagu lama harus dibuang sebelum Grafik/RPD membaca ulang.
+            try {
+                localStorage.removeItem("p3hpl_rpd_master_v4_stable_id_revisi");
+                localStorage.removeItem("p3hpl_grafik_rpd_cache_v2");
+            } catch (cacheError) {
+                console.warn("Cache RPD tidak dapat diinvalidasi:", cacheError);
+            }
+            if (typeof window.invalidasiCacheRpdGrafik === "function") {
+                try { window.invalidasiCacheRpdGrafik(); } catch (cacheError) {}
+            }
+
             if (typeof window.invalidateAppStore === "function") {
                 window.invalidateAppStore();
             }
             if (window.appStore && typeof window.appStore.refresh === "function") {
                 await window.appStore.refresh();
             }
+
+            // Beri tahu halaman/menu lain bahwa DATA_APLIKASI baru saja berubah.
+            try {
+                window.dispatchEvent(new CustomEvent("p3hpl:revisi-applied"));
+            } catch (eventError) {}
 
             if (button) {
                 button.disabled = true;
