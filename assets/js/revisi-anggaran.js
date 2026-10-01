@@ -56,6 +56,8 @@ function buildRows(raw) {
         if (!row.some(value => norm(value) !== "")) continue;
 
         const kode = hv(row, context.map, ["Kode"]);
+        const kodeKomponen = hv(row, context.map, ["Kode Komponen", "KodeKomponen"]);
+        const kodeSubKomponen = hv(row, context.map, ["Kode Sub Komponen", "KodeSubKomponen"]);
         const kodeAkun = hv(row, context.map, ["Kode Akun", "KodeAkun", "Kode Rekening", "Kode Rekening Belanja"]);
         const komponen = hv(row, context.map, ["Komponen", "Nama Komponen"]);
         const subKomponen = hv(row, context.map, ["Sub Komponen", "Subkomponen", "Nama Sub Komponen"]);
@@ -92,6 +94,9 @@ function buildRows(raw) {
         rows.push({
             rowIndex: i,
             kode: inheritedCode,
+            kodeAsli: kode,
+            kodeKomponen,
+            kodeSubKomponen,
             kodeAkun: currentAkunCode,
             komponen,
             subKomponen,
@@ -671,23 +676,125 @@ function renderHistory() {
     const rows=(revisiDraft.history||[]);
     el.innerHTML=rows.length ? rows.map(x=>'<div class="history-item"><strong>'+esc(x.action)+'</strong> · '+esc(x.nomor||"-")+' · '+esc(new Date(x.at).toLocaleString("id-ID"))+'<br><span>'+rupiah(x.before)+' → '+rupiah(x.after)+' (selisih '+rupiah(x.diff)+')</span></div>').join("") : "Belum ada riwayat.";
 }
+function hierarchyLabel(value, fallbackCode = "") {
+    const text = norm(value);
+    if (!text && !fallbackCode) return { code:"", label:"" };
+
+    const sub = text.match(/^([A-Z])\.\s*(.*)$/);
+    if (sub) return { code:sub[1], label:sub[2] };
+
+    const component = text.match(/^([0-9]{4}\.[A-Z]{3}\.[0-9]{3}\.[0-9]{3})\s*[-:]?\s*(.*)$/);
+    if (component) return { code:component[1], label:component[2] || text };
+
+    return { code:norm(fallbackCode), label:text };
+}
+
+function hierarchyRowsForEntries(entries) {
+    const result = [];
+    let currentComponent = "";
+    let currentSub = "";
+    let currentAccount = "";
+
+    const accountGroups = new Map();
+    entries.forEach(entry => {
+        const source = entry.type === "addition" ? entry.item : entry.row;
+        const key = [
+            norm(source.tahun), norm(source.komponen), norm(source.subKomponen),
+            norm(source.kodeAkun || source.kode), norm(source.akunLabel || source.akun)
+        ].join("|");
+        if (!accountGroups.has(key)) accountGroups.set(key, []);
+        accountGroups.get(key).push(entry);
+    });
+
+    entries.forEach(entry => {
+        const source = entry.type === "addition" ? entry.item : entry.row;
+        const component = hierarchyLabel(source.komponen, source.kodeKomponen || "");
+        const sub = hierarchyLabel(source.subKomponen, source.kodeSubKomponen || "");
+
+        const componentKey = [norm(source.tahun), norm(source.komponen)].join("|");
+        const subKey = [componentKey, norm(source.subKomponen)].join("|");
+        const accountKey = [
+            subKey, norm(source.kodeAkun || source.kode),
+            norm(source.akunLabel || source.akun)
+        ].join("|");
+
+        if (componentKey !== currentComponent) {
+            currentComponent = componentKey;
+            currentSub = "";
+            currentAccount = "";
+            result.push({
+                type:"hierarchy", level:"component",
+                code:component.code, label:component.label,
+                before:0, after:0
+            });
+        }
+
+        if (subKey !== currentSub) {
+            currentSub = subKey;
+            currentAccount = "";
+            result.push({
+                type:"hierarchy", level:"sub",
+                code:sub.code, label:sub.label,
+                before:0, after:0
+            });
+        }
+
+        if (accountKey !== currentAccount) {
+            currentAccount = accountKey;
+            const group = accountGroups.get(accountKey) || [];
+            const before = group.reduce((sum, e) => {
+                if (e.type === "addition") return sum;
+                return sum + (isDeleted(e.row) ? 0 : num(e.row.jumlah));
+            }, 0);
+            const after = group.reduce((sum, e) => {
+                if (e.type === "addition") return sum + num(e.item.volume) * num(e.item.harga);
+                return sum + (isDeleted(e.row) ? 0 : num(effectiveRow(e.row).jumlah));
+            }, 0);
+
+            result.push({
+                type:"hierarchy", level:"account",
+                code:norm(source.kodeAkun || source.kode),
+                label:norm(source.akunLabel || source.akun),
+                before, after
+            });
+        }
+
+        result.push(entry);
+    });
+
+    return result;
+}
+
 function getComparisonExportRows() {
-    return comparisonEntries().map(entry => {
+    return hierarchyRowsForEntries(comparisonEntries()).map(entry => {
+        if (entry.type === "hierarchy") {
+            return {
+                before:[entry.code, entry.label, "", "", "", entry.before],
+                after:[entry.code, entry.label, "", "", "", entry.after],
+                status:entry.level === "sub" ? "SUB KOMPONEN" :
+                    entry.level === "component" ? "KOMPONEN" : "AKUN"
+            };
+        }
+
         if (entry.type === "addition") {
             const item = entry.item;
             return {
-                before: ["", "", "", "", "", "", ""],
-                after: [item.kode, item.akunLabel || item.akun || "", item.uraian, item.volume, item.satuan, num(item.harga), num(item.volume) * num(item.harga), "DITAMBAH"]
+                before:["","","","","",""],
+                after:[item.kode, item.uraian || item.akunLabel || item.akun || "", item.volume, item.satuan, num(item.harga), num(item.volume)*num(item.harga)],
+                status:"DITAMBAH"
             };
         }
+
         const row = entry.row;
         const effective = effectiveRow(row);
         return {
-            before: [row.kode, row.akunLabel, row.uraian, row.volume, row.satuan, num(row.harga), num(row.jumlah)],
-            after: [effective.kode, effective.akunLabel, effective.uraian, effective.volume, effective.satuan, num(effective.harga), num(effective.jumlah), isDeleted(row) ? "DIHAPUS" : (revisiDraft.changes[String(row.rowIndex)] ? "DIUBAH" : "TETAP")]
+            before:[row.kode || "", row.uraian || row.akunLabel || "", row.volume, row.satuan, num(row.harga), num(row.jumlah)],
+            after:[effective.kode || "", effective.uraian || effective.akunLabel || "", effective.volume, effective.satuan, num(effective.harga), num(effective.jumlah)],
+            status:isDeleted(row) ? "DIHAPUS" : (revisiDraft.changes[String(row.rowIndex)] ? "DIUBAH" : "TETAP")
         };
     });
 }
+
 
 function exportRevisionExcel() {
     if (typeof XLSX === "undefined") {
@@ -709,13 +816,23 @@ function exportRevisionExcel() {
         ["SEBELUM REVISI", "", "", "", "", "", "SESUDAH REVISI", "", "", "", "", ""]
     ];
 
-    entries.forEach(entry => {
+    const exportRows = hierarchyRowsForEntries(entries);
+
+    exportRows.forEach(entry => {
+        if (entry.type === "hierarchy") {
+            rows.push([
+                entry.code || "", entry.label || "", "", "", "", entry.before || 0,
+                entry.code || "", entry.label || "", "", "", "", entry.after || 0
+            ]);
+            return;
+        }
+
         if (entry.type === "addition") {
             const x = entry.item;
-            rows.push(
-                ["", "", "", "", "", "",
-                 x.kode, x.akunLabel || x.akun || "", x.volume, x.satuan, num(x.harga), num(x.volume) * num(x.harga)]
-            );
+            rows.push([
+                "", "", "", "", "", "",
+                x.kode, x.uraian || x.akunLabel || x.akun || "", x.volume, x.satuan, num(x.harga), num(x.volume) * num(x.harga)
+            ]);
             return;
         }
 
@@ -807,15 +924,18 @@ function exportRevisionExcel() {
     const isLevelCode = value => /^[A-Z]$/.test(norm(value));
 
     for (let r = 3; r < rows.length; r++) {
+        const exportEntry = exportRows[r - 3];
+
         for (let side = 0; side < 2; side++) {
             const base = side * 6;
-            const code = norm(rows[r][base]);
-            const description = norm(rows[r][base + 1]);
-            const style = isLevelCode(code)
-                ? styleSub
-                : isAccountCode(code)
-                    ? styleAccount
-                    : styleNormal;
+            let style = styleNormal;
+
+            if (exportEntry?.type === "hierarchy") {
+                style = exportEntry.level === "sub" ? styleSub :
+                    exportEntry.level === "account" ? styleAccount : styleTitle;
+            } else if (exportEntry?.type === "addition") {
+                style = {...styleNormal, fill:{patternType:"solid", fgColor:{rgb:"E2F0D9"}}};
+            }
 
             for (let c = base; c < base + 6; c++) {
                 const cell = ws[XLSX.utils.encode_cell({r,c})];
@@ -831,19 +951,10 @@ function exportRevisionExcel() {
                     };
                 }
             }
-
-            // Baris Sub Komponen/kelompok tetap diberi warna hijau
-            // pada kedua sisi meskipun kode tidak ada di salah satu sisi.
-            if (!code && isLevelCode(norm(rows[r][base === 0 ? 6 : 0]))) {
-                for (let c = base; c < base + 6; c++) {
-                    const cell = ws[XLSX.utils.encode_cell({r,c})];
-                    if (cell) cell.s = {...styleSub};
-                }
-            }
         }
 
         ws["!rows"] = ws["!rows"] || [];
-        ws["!rows"][r] = {hpt:18};
+        ws["!rows"][r] = {hpt: exportEntry?.type === "hierarchy" ? 24 : 18};
     }
 
     // Freeze header dan tampilan cetak mengikuti template.
@@ -893,7 +1004,7 @@ function exportRevisionExcel() {
 
 
 function buildPrintReport() {
-    const entries = comparisonEntries();
+    const entries = hierarchyRowsForEntries(comparisonEntries());
     const title = filters().subKomponen || "Revisi Anggaran";
     const meta = [
         ["Nomor Revisi", revisiDraft.nomor || "-"],
@@ -911,7 +1022,19 @@ function buildPrintReport() {
         let code = "";
         let type = "normal";
 
-        if (entry.type === "addition") {
+        if (entry.type === "hierarchy") {
+            code = entry.code || "";
+            values = [
+                entry.code || "",
+                entry.label || "",
+                "",
+                "",
+                "",
+                rupiah(side === "before" ? entry.before : entry.after)
+            ];
+            type = entry.level === "sub" ? "sub" :
+                entry.level === "account" ? "account" : "component";
+        } else if (entry.type === "addition") {
             const x = entry.item;
             code = x.kode;
             values = side === "after"
@@ -931,9 +1054,7 @@ function buildPrintReport() {
                 rupiah(data.harga),
                 rupiah(data.jumlah)
             ];
-            if (/^[A-Z]$/.test(norm(code))) type = "sub";
-            else if (/^\\d{6}$/.test(norm(code))) type = "account";
-            if (side === "after" && entry.type === "base" && revisiDraft.changes[String(row.rowIndex)]) {
+            if (side === "after" && revisiDraft.changes[String(row.rowIndex)]) {
                 type = "changed";
             }
             if (side === "after" && isDeleted(row)) type = "deleted";
