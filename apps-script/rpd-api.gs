@@ -998,6 +998,7 @@ function buildMasterFromDataAplikasi_() {
     const akun = headerValue_(row, context.map, ["Akun Belanja","Akun"]);
     const itemAkun = headerValue_(row, context.map, ["Item Akun","Item"]);
     const detilAkun = headerValue_(row, context.map, ["Detil Akun","Detail Akun","Detil"]);
+    const rincianItem = headerValue_(row, context.map, ["Rincian Item","Rincian"]);
     const pagu = parseAmount_(headerValue_(row, context.map, ["Pagu"]));
     const status = headerValue_(row, context.map, ["Status Pagu","Status"]);
 
