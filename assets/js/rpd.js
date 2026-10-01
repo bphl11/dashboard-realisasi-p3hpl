@@ -35,7 +35,7 @@ function rpdQuarterTotals(saved) {
 }
 
 const RPD_LOCAL_CACHE_KEY = "p3hpl_rpd_saved_v4";
-const RPD_MASTER_CACHE_KEY = "p3hpl_rpd_master_v3_realisasi";
+const RPD_MASTER_CACHE_KEY = "p3hpl_rpd_master_v4_stable_id_revisi";
 const RPD_MASTER_CACHE_TTL = 5 * 60 * 1000;
 
 function rpdLoadMasterCache() {
@@ -188,10 +188,14 @@ function rpdUniqueSorted(rows, key) {
 }
 
 function rpdStableId(row) {
+    // ID RPD TIDAK boleh bergantung pada PAGU.
+    // Revisi Anggaran dapat mengubah Pagu Detil, tetapi RPD
+    // yang sudah diinput harus tetap melekat pada item anggaran
+    // yang sama.
     const normalize = value => String(value ?? "").trim().toUpperCase().replace(/\s+/g, " ").replace(/\|/g, "/");
     return [
         row.tahun, row.kodeSubKomponen, row.subKomponen, row.akun,
-        row.itemAkun, row.detilAkun, row.rincianItem, row.pagu
+        row.itemAkun, row.detilAkun, row.rincianItem
     ].map(normalize).join("|");
 }
 
@@ -329,7 +333,6 @@ function rpdFindSavedForMaster(masterRow) {
         String(item.item_akun ?? "").trim() === String(masterRow.itemAkun ?? "").trim() &&
         String(item.detil_akun ?? "").trim() === String(masterRow.detilAkun ?? "").trim() &&
         String(item.rincian_item ?? "").trim() === String(masterRow.rincianItem ?? "").trim() &&
-        rpdNumber(item.pagu_detil ?? item.pagu ?? 0) === rpdNumber(masterRow.pagu)
     );
     return same.length === 1 ? same[0] : null;
 }
