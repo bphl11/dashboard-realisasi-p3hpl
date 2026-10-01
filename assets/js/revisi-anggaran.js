@@ -135,6 +135,19 @@ function syncMetadataToDraft() {
     revisiDraft.pembuat = norm(document.getElementById("revisiPembuat")?.value);
     revisiDraft.alasan = norm(document.getElementById("revisiAlasan")?.value);
 }
+function calculateBeforeTotal() {
+    return revisiRows.filter(row => !isDeleted(row))
+        .reduce((sum, row) => sum + num(row.jumlah), 0);
+}
+
+function calculateAfterTotal() {
+    const existing = revisiRows.filter(row => !isDeleted(row))
+        .reduce((sum, row) => sum + num(effectiveRow(row).jumlah), 0);
+    const additions = revisiDraft.additions.filter(x => !x.deleted)
+        .reduce((sum, row) => sum + num(row.volume) * num(row.harga), 0);
+    return existing + additions;
+}
+
 function saveDraft(event) {
     if (event) event.preventDefault();
 
@@ -142,10 +155,20 @@ function saveDraft(event) {
     revisiDraft.updatedAt = new Date().toISOString();
 
     try {
+        const historyEntry = {
+            at: revisiDraft.updatedAt,
+            action: "DRAFT DISIMPAN",
+            nomor: revisiDraft.nomor,
+            before: calculateBeforeTotal(),
+            after: calculateAfterTotal(),
+            diff: calculateAfterTotal() - calculateBeforeTotal(),
+            errors: []
+        };
+        revisiDraft.history = [historyEntry, ...(revisiDraft.history || [])].slice(0, 20);
+
         const serialized = JSON.stringify(revisiDraft);
         localStorage.setItem(REVISI_DRAFT_KEY, serialized);
 
-        // Pastikan benar-benar tersimpan, bukan hanya tanpa exception.
         const verified = localStorage.getItem(REVISI_DRAFT_KEY);
         if (verified !== serialized) {
             throw new Error("Penyimpanan browser tidak dapat diverifikasi.");
@@ -375,21 +398,64 @@ function validateDraft() {
     if (!revisiDraft.tanggal) errors.push("Tanggal revisi belum diisi.");
     if (!revisiDraft.pembuat) errors.push("Pembuat revisi belum diisi.");
     if (!revisiDraft.alasan) errors.push("Alasan revisi belum diisi.");
+
     const activeRows = revisiRows.filter(row => !isDeleted(row));
-    const before = activeRows.reduce((s,r) => s + num(r.jumlah),0);
-    const after = activeRows.reduce((s,r) => s + num(effectiveRow(r).jumlah),0) +
-        revisiDraft.additions.filter(x=>!x.deleted).reduce((s,x)=>s+num(x.volume)*num(x.harga),0);
-    const changed = Object.keys(revisiDraft.changes).length + revisiDraft.deletions.length + revisiDraft.additions.filter(x=>!x.deleted).length;
+    const effectiveRows = activeRows.map(effectiveRow);
+    const additions = revisiDraft.additions.filter(x => !x.deleted);
+
+    const before = activeRows.reduce((s, r) => s + num(r.jumlah), 0);
+    const afterExisting = effectiveRows.reduce((s, r) => s + num(r.jumlah), 0);
+    const afterAdditions = additions.reduce((s, x) => s + num(x.volume) * num(x.harga), 0);
+    const after = afterExisting + afterAdditions;
+
+    const changed = Object.keys(revisiDraft.changes).length +
+        revisiDraft.deletions.length +
+        additions.length;
+
     if (!changed) errors.push("Belum ada perubahan anggaran.");
     if (!Number.isFinite(before) || !Number.isFinite(after)) errors.push("Total anggaran tidak valid.");
-    revisiDraft.validation = { ok: errors.length === 0, errors, before, after, diff: after-before, validatedAt: new Date().toISOString() };
+
+    [...effectiveRows, ...additions].forEach((row, index) => {
+        const label = row.uraian || ("Item #" + (index + 1));
+        if (!norm(row.kode)) errors.push(label + ": kode akun belum diisi.");
+        if (!norm(row.akun)) errors.push(label + ": akun belanja belum diisi.");
+        if (!norm(row.uraian)) errors.push(label + ": uraian belum diisi.");
+        if (!norm(row.satuan)) errors.push(label + ": satuan belum diisi.");
+        if (num(row.volume) < 0) errors.push(label + ": volume tidak boleh negatif.");
+        if (num(row.harga) < 0) errors.push(label + ": harga tidak boleh negatif.");
+    });
+
+    const validatedAt = new Date().toISOString();
+    revisiDraft.validation = {
+        ok: errors.length === 0,
+        errors,
+        before,
+        after,
+        diff: after - before,
+        validatedAt
+    };
     revisiDraft.status = errors.length ? "DRAFT" : "TERVALIDASI";
-    const historyEntry = { at: revisiDraft.validation.validatedAt, action: errors.length ? "VALIDASI GAGAL" : "VALIDASI BERHASIL", nomor: revisiDraft.nomor, before, after, diff: after-before, errors };
-    revisiDraft.history = [historyEntry, ...(revisiDraft.history || [])].slice(0,20);
+
+    const historyEntry = {
+        at: validatedAt,
+        action: errors.length ? "VALIDASI GAGAL" : "VALIDASI BERHASIL",
+        nomor: revisiDraft.nomor,
+        before,
+        after,
+        diff: after - before,
+        errors
+    };
+    revisiDraft.history = [historyEntry, ...(revisiDraft.history || [])].slice(0, 20);
+
     localStorage.setItem(REVISI_DRAFT_KEY, JSON.stringify(revisiDraft));
+    render();
     renderValidationState();
     renderHistory();
-    setStatus(errors.length ? errors.join(" ") : "Revisi lolos validasi draft.", errors.length ? "warning" : "ok");
+
+    setStatus(
+        errors.length ? errors.join(" ") : "Revisi lolos validasi draft.",
+        errors.length ? "warning" : "ok"
+    );
 }
 function renderValidationState() {
     const box=document.getElementById("revisiValidationBox");
