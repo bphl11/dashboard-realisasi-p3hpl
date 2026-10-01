@@ -1006,7 +1006,7 @@ function buildMasterFromDataAplikasi_() {
     if (/blok/i.test(String(status))) continue;
 
     const tahun = headerValue_(row, context.map, ["Tahun","Tahun Anggaran"]) || new Date().getFullYear();
-    const id = makeRpdId_(tahun, kodeSubKomponen, subKomponen, akun, itemAkun, detilAkun, rincianItem, pagu);
+    const id = makeStableRpdId_(tahun, kodeSubKomponen, subKomponen, akun, itemAkun, detilAkun, rincianItem);
 
     if (seen[id]) continue;
     seen[id] = true;
@@ -1048,7 +1048,7 @@ function readRpd_(sheet) {
       // menyimpan ID berbasis Pagu tetap mempertahankan data mingguan,
       // tetapi API mengembalikan ID stabil agar frontend dapat
       // menyambungkannya kembali setelah Revisi Anggaran.
-      const generatedId = makeRpdId_(tahun, kodeSub, sub, akun, item, detil, rincian, paguDetil);
+      const generatedId = makeStableRpdId_(tahun, kodeSub, sub, akun, item, detil, rincian);
 
       const result = {
         id_rpd: generatedId,
@@ -1246,7 +1246,7 @@ function saveRpd_(idToken, row) {
     }
   }
 
-  const stableId = requestedId || makeRpdId_(row.tahun,row.kode_sub_komponen,row.sub_komponen,row.akun,row.item_akun,row.detil_akun,row.rincian_item,pagu);
+  const stableId = requestedId || makeStableRpdId_(row.tahun,row.kode_sub_komponen,row.sub_komponen,row.akun,row.item_akun,row.detil_akun,row.rincian_item);
   const record = {
     id_rpd: stableId,
     tahun: String(row.tahun || ""),
@@ -1362,9 +1362,14 @@ function writeLog_(action, record, oldData, email) {
 }
 
 function makeRpdId_(tahun, kodeSub, sub, akun, item, detil, rincian, paguDetil) {
-  // Pagu Detil sengaja TIDAK dimasukkan ke ID.
-  // Revisi Anggaran boleh mengubah Pagu tanpa membuat RPD
-  // lama menjadi orphan.
+  return [tahun, kodeSub, sub, akun, item, detil, rincian, paguDetil]
+    .map(normalizeKey_)
+    .join("|");
+}
+
+function makeStableRpdId_(tahun, kodeSub, sub, akun, item, detil, rincian) {
+  // ID RPD tidak bergantung pada Pagu. Revisi Anggaran dapat
+  // mengubah Pagu Detil tanpa membuat RPD lama menjadi orphan.
   return [tahun, kodeSub, sub, akun, item, detil, rincian]
     .map(normalizeKey_)
     .join("|");
