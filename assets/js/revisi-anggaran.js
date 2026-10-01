@@ -465,35 +465,146 @@ document.addEventListener("click", event => {
     });
 });
 
+function draftGlobalRows() {
+    return revisiRows.map(row => ({
+        row,
+        effective: effectiveRow(row),
+        deleted: isDeleted(row)
+    }));
+}
+
+function draftGroupKey(item) {
+    return [
+        norm(item.komponen) || "(Tanpa Komponen)",
+        norm(item.subKomponen) || "(Tanpa Sub Komponen)",
+        norm(item.kodeAkun || item.kode) || "(Tanpa Kode Akun)",
+        norm(item.akunLabel || item.akun) || "(Tanpa Akun)"
+    ].join("||");
+}
+
+function draftGroupLabel(item) {
+    return [
+        norm(item.komponen) || "(Tanpa Komponen)",
+        norm(item.subKomponen) || "(Tanpa Sub Komponen)",
+        (norm(item.kodeAkun || item.kode) + " " + (norm(item.akunLabel || item.akun))).trim() || "(Tanpa Akun)"
+    ].join(" → ");
+}
+
+function calculateGlobalDraftTotals() {
+    const beforeByGroup = new Map();
+    const afterByGroup = new Map();
+
+    draftGlobalRows().forEach(({ row, effective, deleted }) => {
+        const key = draftGroupKey(row);
+        const before = num(row.jumlah);
+        const after = deleted ? 0 : num(effective.jumlah);
+
+        beforeByGroup.set(key, (beforeByGroup.get(key) || 0) + before);
+        afterByGroup.set(key, (afterByGroup.get(key) || 0) + after);
+    });
+
+    revisiDraft.additions.filter(item => !item.deleted).forEach(item => {
+        const key = draftGroupKey(item);
+        afterByGroup.set(key, (afterByGroup.get(key) || 0) + num(item.volume) * num(item.harga));
+        if (!beforeByGroup.has(key)) beforeByGroup.set(key, 0);
+    });
+
+    const keys = new Set([...beforeByGroup.keys(), ...afterByGroup.keys()]);
+    const groups = [...keys].map(key => {
+        const before = beforeByGroup.get(key) || 0;
+        const after = afterByGroup.get(key) || 0;
+        return {
+            key,
+            before,
+            after,
+            diff: after - before,
+            label: (() => {
+                const [komponen, subKomponen, akun] = key.split("||");
+                return komponen + " → " + subKomponen + " → " + akun;
+            })()
+        };
+    }).filter(group => Math.abs(group.diff) > 0.000001);
+
+    const before = [...beforeByGroup.values()].reduce((sum, value) => sum + value, 0);
+    const after = [...afterByGroup.values()].reduce((sum, value) => sum + value, 0);
+
+    return {
+        before,
+        after,
+        diff: after - before,
+        groups
+    };
+}
+
 function validateDraft() {
     syncMetadataToDraft();
     const errors = [];
+
     if (!revisiDraft.nomor) errors.push("Nomor revisi belum diisi.");
     if (!revisiDraft.tanggal) errors.push("Tanggal revisi belum diisi.");
     if (!revisiDraft.pembuat) errors.push("Pembuat revisi belum diisi.");
     if (!revisiDraft.alasan) errors.push("Alasan revisi belum diisi.");
 
-    // Validasi harus menggunakan ruang lingkup yang sama dengan
-    // ringkasan yang sedang tampil (Tahun/Komponen/Sub Komponen/Akun).
-    // Sebelumnya validasi memakai seluruh revisiRows sehingga angka validasi
-    // bisa berbeda dengan kartu "Jumlah Sebelum/Sesudah".
-    const activeRows = filteredRows().filter(row => !isDeleted(row));
-    const effectiveRows = activeRows.map(effectiveRow);
-    const additions = filteredAdditions();
+    /*
+     * Validasi pagu dilakukan GLOBAL, bukan hanya pada filter yang sedang
+     * tampil. Tujuannya menjaga agar revisi tidak mengubah pagu total
+     * komponen maupun total seluruh anggaran.
+     */
+    const global = calculateGlobalDraftTotals();
 
-    const before = activeRows.reduce((s, r) => s + num(r.jumlah), 0);
-    const afterExisting = effectiveRows.reduce((s, r) => s + num(r.jumlah), 0);
-    const afterAdditions = additions.reduce((s, x) => s + num(x.volume) * num(x.harga), 0);
-    const after = afterExisting + afterAdditions;
+    const changedCount =
+        Object.keys(revisiDraft.changes).length +
+        revisiDraft.deletions.length +
+        revisiDraft.additions.filter(item => !item.deleted).length;
 
-    const changed = activeRows.filter(row => Boolean(revisiDraft.changes[String(row.rowIndex)])).length +
-        activeRows.filter(row => revisiDraft.deletions.includes(row.rowIndex)).length +
-        additions.length;
+    if (!changedCount) errors.push("Belum ada perubahan anggaran.");
 
-    if (!changed) errors.push("Belum ada perubahan anggaran.");
-    if (!Number.isFinite(before) || !Number.isFinite(after)) errors.push("Total anggaran tidak valid.");
+    if (!Number.isFinite(global.before) || !Number.isFinite(global.after)) {
+        errors.push("Total pagu anggaran tidak valid.");
+    }
 
-    [...effectiveRows, ...additions].forEach((row, index) => {
+    /*
+     * ATURAN UTAMA:
+     * 1. Total seluruh pagu harus tetap.
+     * 2. Total setiap kelompok Komponen/Sub Komponen/Akun Belanja harus tetap.
+     *
+     * Dengan demikian, pemindahan anggaran dari satu komponen ke komponen
+     * lain tidak bisa lolos validasi hanya karena total akhirnya kebetulan
+     * sama.
+     */
+    if (Math.abs(global.diff) > 0.000001) {
+        errors.push(
+            "TOTAL PAGU ANGGARAN BERUBAH: sebelum " +
+            rupiah(global.before) +
+            " → sesudah " +
+            rupiah(global.after) +
+            " (selisih " +
+            rupiah(global.diff) +
+            ")."
+        );
+    }
+
+    global.groups.forEach(group => {
+        errors.push(
+            "SELISIH DITEMUKAN DI: " +
+            group.label +
+            " — sebelum " +
+            rupiah(group.before) +
+            " → sesudah " +
+            rupiah(group.after) +
+            " (selisih " +
+            rupiah(group.diff) +
+            ")."
+        );
+    });
+
+    const allEffectiveRows = draftGlobalRows()
+        .filter(item => !item.deleted)
+        .map(item => item.effective);
+
+    const allAdditions = revisiDraft.additions.filter(item => !item.deleted);
+
+    [...allEffectiveRows, ...allAdditions].forEach((row, index) => {
         const label = row.uraian || ("Item #" + (index + 1));
         if (!norm(row.kode)) errors.push(label + ": kode akun belum diisi.");
         if (!norm(row.akun)) errors.push(label + ": akun belanja belum diisi.");
@@ -507,22 +618,25 @@ function validateDraft() {
     revisiDraft.validation = {
         ok: errors.length === 0,
         errors,
-        before,
-        after,
-        diff: after - before,
+        before: global.before,
+        after: global.after,
+        diff: global.diff,
+        differenceGroups: global.groups,
         validatedAt
     };
+
     revisiDraft.status = errors.length ? "DRAFT" : "TERVALIDASI";
 
     const historyEntry = {
         at: validatedAt,
         action: errors.length ? "VALIDASI GAGAL" : "VALIDASI BERHASIL",
         nomor: revisiDraft.nomor,
-        before,
-        after,
-        diff: after - before,
+        before: global.before,
+        after: global.after,
+        diff: global.diff,
         errors
     };
+
     revisiDraft.history = [historyEntry, ...(revisiDraft.history || [])].slice(0, 20);
 
     localStorage.setItem(REVISI_DRAFT_KEY, JSON.stringify(revisiDraft));
@@ -531,10 +645,13 @@ function validateDraft() {
     renderHistory();
 
     setStatus(
-        errors.length ? errors.join(" ") : "Revisi lolos validasi draft.",
+        errors.length
+            ? "Validasi ditolak. Periksa selisih pagu yang ditampilkan."
+            : "Revisi lolos validasi dan total pagu tetap.",
         errors.length ? "warning" : "ok"
     );
 }
+
 function renderValidationState() {
     const box=document.getElementById("revisiValidationBox");
     const status=document.getElementById("revisiValidationStatus");
