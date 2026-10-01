@@ -52,7 +52,7 @@ function buildRows(raw) {
             .map(value => String(value || "").trim());
         const kodeAkunBaris = kandidatKode
             .map(value => {
-                const match = value.match(/(?:^|\\D)(\\d{6})(?:\\D|$)/);
+                const match = value.match(/(?:^|\D)(\d{6})(?:\D|$)/);
                 return match ? match[1] : "";
             })
             .find(Boolean) || "";
