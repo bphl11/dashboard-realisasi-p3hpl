@@ -18,12 +18,27 @@
   #printRevisionReport .print-meta th,#printRevisionReport .print-meta td{border:1px solid #777;padding:3px 5px}
   #printRevisionReport .print-meta th{width:18%;text-align:left;background:#f0f0f0}
   #printRevisionReport .print-summary{display:flex;gap:18px;border:1px solid #777;padding:5px 7px;margin-bottom:8px;font-size:9pt}
-  #printRevisionReport .print-two-tables{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  #printRevisionReport .print-two-tables h3{font-size:10pt;margin:0;padding:5px;text-align:center;background:#e9ecef;border:1px solid #777;border-bottom:0}
-  #printRevisionReport table{width:100%;border-collapse:collapse}
-  #printRevisionReport th,#printRevisionReport td{border:1px solid #777;padding:3px 4px;font-size:7.5pt;vertical-align:top}
-  #printRevisionReport th{background:#e9ecef;text-align:center;font-weight:700}
+  #printRevisionReport .print-two-tables{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start}
+  #printRevisionReport .print-side{min-width:0}
+  #printRevisionReport .print-side h3{font-size:10pt;margin:0;padding:5px;text-align:center;border:1px solid #777;border-bottom:0;font-weight:700}
+  #printRevisionReport .before-label{background:#156082;color:#fff}
+  #printRevisionReport .after-label{background:#00B050;color:#fff}
+  #printRevisionReport table{width:100%;border-collapse:collapse;table-layout:fixed}
+  #printRevisionReport th,#printRevisionReport td{border:1px solid #777;padding:3px 4px;font-size:7.2pt;vertical-align:top}
+  #printRevisionReport th{background:#156082;color:#fff;text-align:center;font-weight:700}
+  #printRevisionReport th:nth-child(1){width:13%}
+  #printRevisionReport th:nth-child(2){width:45%}
+  #printRevisionReport th:nth-child(3){width:9%}
+  #printRevisionReport th:nth-child(4){width:10%}
+  #printRevisionReport th:nth-child(5){width:12%}
+  #printRevisionReport th:nth-child(6){width:15%}
   #printRevisionReport .money{text-align:right;white-space:nowrap}
+  #printRevisionReport .print-row-sub td{background:#00B050!important;font-weight:700}
+  #printRevisionReport .print-row-account td:first-child,
+  #printRevisionReport .print-row-account td:nth-child(2){font-weight:700}
+  #printRevisionReport .print-row-added td{background:#E2F0D9!important}
+  #printRevisionReport .print-row-changed td{background:#FFF2CC!important}
+  #printRevisionReport .print-row-deleted td{background:#F4CCCC!important;text-decoration:line-through}
 }
 </style></head><body><div class="wrapper"><aside class="sidebar"><div class="logo app-brand"><div class="brand-mark"><img src="img/logo-kemenhut.png" alt="Logo Kementerian Kehutanan" class="logo-sidebar"></div><div class="brand-text"><div class="brand-ministry">KEMENTERIAN KEHUTANAN</div><div class="brand-title">DASHBOARD REALISASI</div><div class="brand-subtitle">BPHL XI Banjarbaru</div></div></div><ul>
 <li><a href="index.html"><i class="bi bi-house"></i> Dashboard</a></li><li><a href="input-realisasi.html"><i class="bi bi-cash-coin"></i> Input Realisasi</a></li><li><a href="rpd.html"><i class="bi bi-calendar3"></i> RPD</a></li><li class="active"><a href="revisi-anggaran.html"><i class="bi bi-arrow-left-right"></i> Revisi Anggaran</a></li><li><a href="monitoring.html"><i class="bi bi-table"></i> Monitoring</a></li><li><a href="grafik.html"><i class="bi bi-bar-chart"></i> Grafik</a></li><li><a href="laporan.html"><i class="bi bi-file-earmark-text"></i> Laporan</a></li><li><a href="audit.html"><i class="bi bi-shield-check"></i> Audit Parser</a></li>
