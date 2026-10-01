@@ -350,7 +350,7 @@ function renderValidationState() {
     status.textContent=v.ok ? "TERVALIDASI" : "PERLU PERBAIKAN";
     status.className="status-pill "+(v.ok ? "status-ok" : "status-danger");
     const btn=document.getElementById("btnTerapkanRevisi");
-    if(btn) btn.disabled=!v.ok;
+    if(btn) btn.disabled=true;
 }
 function renderHistory() {
     const el=document.getElementById("revisiHistoryBody"); if(!el) return;
