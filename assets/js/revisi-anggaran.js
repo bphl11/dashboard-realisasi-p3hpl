@@ -906,34 +906,66 @@ function buildPrintReport() {
         ["Alasan Revisi", revisiDraft.alasan || "-"]
     ];
 
-    const rowCells = entries.map(entry => {
+    const makeRows = side => entries.map(entry => {
+        let values;
+        let code = "";
+        let type = "normal";
+
         if (entry.type === "addition") {
             const x = entry.item;
-            return {
-                before: ["","","","","","",""],
-                after: [x.kode,x.akunLabel || x.akun || "",x.uraian,x.volume,x.satuan,rupiah(x.harga),rupiah(num(x.volume)*num(x.harga))]
-            };
+            code = x.kode;
+            values = side === "after"
+                ? [x.kode, x.uraian || x.akunLabel || x.akun || "", x.volume, x.satuan, rupiah(x.harga), rupiah(num(x.volume) * num(x.harga))]
+                : ["", "", "", "", "", ""];
+            type = "added";
+        } else {
+            const row = entry.row;
+            const effective = effectiveRow(row);
+            const data = side === "before" ? row : effective;
+            code = data.kode;
+            values = [
+                data.kode || "",
+                data.uraian || data.akunLabel || "",
+                data.volume ?? "",
+                data.satuan || "",
+                rupiah(data.harga),
+                rupiah(data.jumlah)
+            ];
+            if (/^[A-Z]$/.test(norm(code))) type = "sub";
+            else if (/^\\d{6}$/.test(norm(code))) type = "account";
+            if (side === "after" && entry.type === "base" && revisiDraft.changes[String(row.rowIndex)]) {
+                type = "changed";
+            }
+            if (side === "after" && isDeleted(row)) type = "deleted";
         }
-        const row = entry.row, e = effectiveRow(row);
-        return {
-            before: [row.kode,row.akunLabel,row.uraian,row.volume,row.satuan,rupiah(row.harga),rupiah(row.jumlah)],
-            after: [e.kode,e.akunLabel,e.uraian,e.volume,e.satuan,rupiah(e.harga),rupiah(e.jumlah)]
-        };
-    });
 
-    const table = side => rowCells.map(x => '<tr>' + x[side].map((v,i) =>
-        '<td class="' + (i >= 5 ? 'money' : '') + '">' + esc(v) + '</td>'
-    ).join("") + '</tr>').join("");
+        return '<tr class="print-row-' + type + '">' +
+            values.map((v, i) => '<td class="' + (i >= 4 ? 'money' : '') + '">' + esc(v) + '</td>').join("") +
+            '</tr>';
+    }).join("");
+
+    const table = (side, label) =>
+        '<div class="print-side">' +
+        '<h3 class="' + side + '-label">' + label + '</h3>' +
+        '<table><thead><tr><th>KODE</th><th>Program/Kegiatan/Output/Sub Output/Komponen/Sub Komponen/Akun/Detail</th><th>VOL</th><th>SAT</th><th>HARGA</th><th>JUMLAH</th></tr></thead>' +
+        '<tbody>' + makeRows(side) + '</tbody></table></div>';
 
     const print = document.getElementById("printRevisionReport");
     if (!print) return;
+
     print.innerHTML =
         '<div class="print-title"><h1>REVISI ANGGARAN</h1><p>' + esc(title) + '</p></div>' +
-        '<table class="print-meta">' + meta.map(x => '<tr><th>' + esc(x[0]) + '</th><td>' + esc(x[1]) + '</td></tr>').join("") + '</table>' +
-        '<div class="print-summary"><strong>Jumlah Sebelum: ' + rupiah(calculateBeforeTotal()) + '</strong><strong>Jumlah Sesudah: ' + rupiah(calculateAfterTotal()) + '</strong><strong>Selisih: ' + rupiah(calculateAfterTotal()-calculateBeforeTotal()) + '</strong></div>' +
+        '<table class="print-meta">' +
+        meta.map(x => '<tr><th>' + esc(x[0]) + '</th><td>' + esc(x[1]) + '</td></tr>').join("") +
+        '</table>' +
+        '<div class="print-summary">' +
+        '<strong>Jumlah Sebelum: ' + rupiah(calculateBeforeTotal()) + '</strong>' +
+        '<strong>Jumlah Sesudah: ' + rupiah(calculateAfterTotal()) + '</strong>' +
+        '<strong>Selisih: ' + rupiah(calculateAfterTotal() - calculateBeforeTotal()) + '</strong>' +
+        '</div>' +
         '<div class="print-two-tables">' +
-        '<div><h3>SEBELUM</h3><table><thead><tr><th>Kode</th><th>Akun Belanja</th><th>Uraian</th><th>Vol</th><th>Sat</th><th>Harga</th><th>Jumlah</th></tr></thead><tbody>' + table("before") + '</tbody></table></div>' +
-        '<div><h3>SESUDAH</h3><table><thead><tr><th>Kode</th><th>Akun Belanja</th><th>Uraian</th><th>Vol</th><th>Sat</th><th>Harga</th><th>Jumlah</th></tr></thead><tbody>' + table("after") + '</tbody></table></div>' +
+        table("before", "SEBELUM REVISI") +
+        table("after", "SESUDAH REVISI") +
         '</div>';
 }
 
