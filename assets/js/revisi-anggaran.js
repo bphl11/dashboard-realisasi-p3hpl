@@ -697,9 +697,169 @@ function exportRevisionExcel() {
 
     syncMetadataToDraft();
 
-    const comparison = getComparisonExportRows();
+    const entries = comparisonEntries();
     const wb = XLSX.utils.book_new();
 
+    // Format mengikuti CONTOH.xlsx:
+    // 6 kolom SEBELUM + 6 kolom SESUDAH berdampingan.
+    const rows = [
+        ["KODE", "Program/Kegiatan/Output/Sub Output/Komponen/Sub Komponen/Akun/Detail", "VOL", "SAT", "HARGA", "JUMLAH",
+         "KODE", "Program/Kegiatan/Output/Sub Output/Komponen/Sub Komponen/Akun/Detail", "VOL", "SAT", "HARGA", "JUMLAH"],
+        [1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 6],
+        ["SEBELUM REVISI", "", "", "", "", "", "SESUDAH REVISI", "", "", "", "", ""]
+    ];
+
+    entries.forEach(entry => {
+        if (entry.type === "addition") {
+            const x = entry.item;
+            rows.push(
+                ["", "", "", "", "", "",
+                 x.kode, x.akunLabel || x.akun || "", x.volume, x.satuan, num(x.harga), num(x.volume) * num(x.harga)]
+            );
+            return;
+        }
+
+        const row = entry.row;
+        const effective = effectiveRow(row);
+        rows.push([
+            row.kode || "", row.uraian || row.akunLabel || "", row.volume ?? "", row.satuan || "",
+            num(row.harga), num(row.jumlah),
+            effective.kode || "", effective.uraian || effective.akunLabel || "", effective.volume ?? "",
+            effective.satuan || "", num(effective.harga), num(effective.jumlah)
+        ]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+
+    ws["!merges"] = [
+        {s:{r:0,c:0},e:{r:0,c:0}},
+        {s:{r:0,c:1},e:{r:0,c:1}},
+        {s:{r:0,c:2},e:{r:0,c:2}},
+        {s:{r:0,c:3},e:{r:0,c:3}},
+        {s:{r:0,c:4},e:{r:0,c:4}},
+        {s:{r:0,c:5},e:{r:0,c:5}},
+        {s:{r:0,c:6},e:{r:0,c:6}},
+        {s:{r:0,c:7},e:{r:0,c:7}},
+        {s:{r:0,c:8},e:{r:0,c:8}},
+        {s:{r:0,c:9},e:{r:0,c:9}},
+        {s:{r:0,c:10},e:{r:0,c:10}},
+        {s:{r:0,c:11},e:{r:0,c:11}},
+        {s:{r:2,c:0},e:{r:2,c:5}},
+        {s:{r:2,c:6},e:{r:2,c:11}}
+    ];
+
+    ws["!cols"] = [
+        {wch:18.5},{wch:49},{wch:8},{wch:10},{wch:15},{wch:17},
+        {wch:18.5},{wch:49},{wch:8},{wch:10},{wch:15},{wch:17}
+    ];
+    ws["!rows"] = [
+        {hpt:24},
+        {hpt:20},
+        {hpt:22}
+    ];
+
+    const blue = "156082";
+    const green = "00B050";
+    const black = "000000";
+    const white = "FFFFFF";
+    const thin = {style:"thin", color:{rgb:"B7B7B7"}};
+
+    const styleHeader = {
+        fill:{patternType:"solid", fgColor:{rgb:blue}},
+        font:{name:"Arial", sz:11, bold:true, color:{rgb:white}},
+        alignment:{horizontal:"center", vertical:"center", wrapText:true},
+        border:{top:thin,bottom:thin,left:thin,right:thin}
+    };
+
+    const styleTitle = {
+        fill:{patternType:"solid", fgColor:{rgb:blue}},
+        font:{name:"Arial", sz:11, bold:true, color:{rgb:white}},
+        alignment:{horizontal:"left", vertical:"center"},
+        border:{top:thin,bottom:thin,left:thin,right:thin}
+    };
+
+    const styleNormal = {
+        font:{name:"Arial", sz:11, color:{rgb:black}},
+        alignment:{vertical:"top"},
+        border:{bottom:thin}
+    };
+
+    const styleAccount = {
+        font:{name:"Arial", sz:11, bold:true, color:{rgb:black}},
+        alignment:{vertical:"top"},
+        border:{bottom:thin}
+    };
+
+    const styleSub = {
+        fill:{patternType:"solid", fgColor:{rgb:green}},
+        font:{name:"Arial", sz:11, bold:true, color:{rgb:black}},
+        alignment:{vertical:"top"},
+        border:{top:thin,bottom:thin,left:thin,right:thin}
+    };
+
+    for (let c = 0; c < 12; c++) {
+        ws[XLSX.utils.encode_cell({r:0,c})].s = styleHeader;
+        ws[XLSX.utils.encode_cell({r:1,c})].s = styleHeader;
+        ws[XLSX.utils.encode_cell({r:2,c})].s = styleTitle;
+    }
+
+    const isAccountCode = value => /^\\d{6}$/.test(norm(value));
+    const isLevelCode = value => /^[A-Z]$/.test(norm(value));
+
+    for (let r = 3; r < rows.length; r++) {
+        for (let side = 0; side < 2; side++) {
+            const base = side * 6;
+            const code = norm(rows[r][base]);
+            const description = norm(rows[r][base + 1]);
+            const style = isLevelCode(code)
+                ? styleSub
+                : isAccountCode(code)
+                    ? styleAccount
+                    : styleNormal;
+
+            for (let c = base; c < base + 6; c++) {
+                const cell = ws[XLSX.utils.encode_cell({r,c})];
+                if (!cell) continue;
+                cell.s = {...style};
+
+                if (c === base + 4 || c === base + 5) {
+                    cell.z = '#,##0';
+                    cell.alignment = {
+                        ...(cell.alignment || {}),
+                        horizontal:"right",
+                        vertical:"top"
+                    };
+                }
+            }
+
+            // Baris Sub Komponen/kelompok tetap diberi warna hijau
+            // pada kedua sisi meskipun kode tidak ada di salah satu sisi.
+            if (!code && isLevelCode(norm(rows[r][base === 0 ? 6 : 0]))) {
+                for (let c = base; c < base + 6; c++) {
+                    const cell = ws[XLSX.utils.encode_cell({r,c})];
+                    if (cell) cell.s = {...styleSub};
+                }
+            }
+        }
+
+        ws["!rows"] = ws["!rows"] || [];
+        ws["!rows"][r] = {hpt:18};
+    }
+
+    // Freeze header dan tampilan cetak mengikuti template.
+    ws["!freeze"] = {xSplit:0, ySplit:3};
+    ws["!pageSetup"] = {
+        orientation:"landscape",
+        paperSize:"9",
+        fitToWidth:1,
+        fitToHeight:0
+    };
+    ws["!margins"] = {
+        left:0.25,right:0.25,top:0.4,bottom:0.4,header:0.2,footer:0.2
+    };
+    ws["!printOptions"] = {gridLines:true};
+
+    // Sheet kedua berisi identitas revisi dan ringkasan.
     const summary = [
         ["REVISI ANGGARAN", ""],
         ["Nomor Revisi", revisiDraft.nomor || ""],
@@ -710,51 +870,27 @@ function exportRevisionExcel() {
         ["Komponen", filters().komponen || "Semua Komponen"],
         ["Sub Komponen", filters().subKomponen || "Semua Sub Komponen"],
         ["Akun Belanja", filters().akun || "Semua Akun Belanja"],
-        ["Status", revisiDraft.status || "DRAFT"],
         ["Jumlah Sebelum", calculateBeforeTotal()],
         ["Jumlah Sesudah", calculateAfterTotal()],
-        ["Selisih", calculateAfterTotal() - calculateBeforeTotal()]
+        ["Selisih", calculateAfterTotal() - calculateBeforeTotal()],
+        ["Status", revisiDraft.status || "DRAFT"]
     ];
-
     const wsSummary = XLSX.utils.aoa_to_sheet(summary);
-    wsSummary["!cols"] = [{wch:24},{wch:70}];
-
-    const wsData = XLSX.utils.aoa_to_sheet([
-        ["SEBELUM","","","","","","","SESUDAH","","","","","","",""],
-        ["Kode","Akun Belanja","Uraian","Volume","Satuan","Harga","Jumlah","","Kode","Akun Belanja","Uraian","Volume","Satuan","Harga","Jumlah","Status"],
-        ...comparison.map(x => [...x.before, "", ...x.after])
-    ]);
-
-    wsData["!merges"] = [
-        {s:{r:0,c:0},e:{r:0,c:6}},
-        {s:{r:0,c:8},e:{r:0,c:15}}
-    ];
-    wsData["!cols"] = [
-        {wch:12},{wch:32},{wch:52},{wch:10},{wch:12},{wch:16},{wch:18},{wch:3},
-        {wch:12},{wch:32},{wch:52},{wch:10},{wch:12},{wch:16},{wch:18},{wch:14}
-    ];
-
-    const headerStyle = {
-        fill:{fgColor:{rgb:"1F6B35"}},
-        font:{bold:true,color:{rgb:"FFFFFF"}},
-        alignment:{horizontal:"center",vertical:"center",wrapText:true}
-    };
-    ["A1","I1","A2","B2","C2","D2","E2","F2","G2","I2","J2","K2","L2","M2","N2","O2","P2","Q2"].forEach(addr => {
-        if (wsData[addr]) wsData[addr].s = headerStyle;
-    });
-
-    const lastRow = 2 + comparison.length;
-    for (let r = 2; r < lastRow; r++) {
-        if (wsData[XLSX.utils.encode_cell({r,c:8})]?.v === "DITAMBAH") continue;
+    wsSummary["!cols"] = [{wch:25},{wch:75}];
+    wsSummary["A1"].s = styleHeader;
+    wsSummary["B1"].s = styleHeader;
+    for (let r = 1; r < summary.length; r++) {
+        if (wsSummary[XLSX.utils.encode_cell({r,c:0})]) wsSummary[XLSX.utils.encode_cell({r,c:0})].s = styleAccount;
     }
 
-    XLSX.utils.book_append_sheet(wb, wsSummary, "Ringkasan");
-    XLSX.utils.book_append_sheet(wb, wsData, "Perbandingan");
+    XLSX.utils.book_append_sheet(wb, ws, "RAB Revisi");
+    XLSX.utils.book_append_sheet(wb, wsSummary, "Informasi Revisi");
 
     const safeNomor = (revisiDraft.nomor || "REV").replace(/[^a-zA-Z0-9_-]/g, "_");
     XLSX.writeFile(wb, "Revisi_Anggaran_" + safeNomor + ".xlsx");
-    setStatus("Excel berhasil dibuat.", "ok");
+    setStatus("Excel berhasil dibuat dengan format RAB seperti template.", "ok");
 }
+
 
 function buildPrintReport() {
     const entries = comparisonEntries();
