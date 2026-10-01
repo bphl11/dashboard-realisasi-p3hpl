@@ -422,6 +422,11 @@ document.addEventListener("input", event => {
         revisiDraft.changes[String(row.rowIndex)] = change;
     }
 
+    // Setiap perubahan item membuat hasil validasi sebelumnya menjadi kedaluwarsa.
+    // Jangan tampilkan pesan validasi lama yang sudah tidak sesuai dengan draft terbaru.
+    revisiDraft.validation = null;
+    revisiDraft.status = "DRAFT";
+
     // Jangan render ulang saat setiap karakter diketik.
     // Render ulang saat input selesai (blur/change) agar kursor tidak meloncat
     // dan nilai seperti "35" tetap bisa diketik langsung.
@@ -447,6 +452,9 @@ document.addEventListener("click", event => {
         const index = revisiDraft.deletions.indexOf(rowIndex);
         if (index >= 0) revisiDraft.deletions.splice(index, 1);
         else revisiDraft.deletions.push(rowIndex);
+
+        revisiDraft.validation = null;
+        revisiDraft.status = "DRAFT";
         render();
     }
 
@@ -454,6 +462,9 @@ document.addEventListener("click", event => {
         revisiDraft.additions = revisiDraft.additions.map(item =>
             item.id === button.dataset.id ? { ...item, deleted: true } : item
         );
+
+        revisiDraft.validation = null;
+        revisiDraft.status = "DRAFT";
         render();
     }
 });
@@ -896,6 +907,11 @@ document.getElementById("btnTambahkanItem").addEventListener("click", () => {
     if (item.volume <= 0) return alert("Volume harus lebih besar dari 0.");
 
     revisiDraft.additions.push(item);
+
+    // Validasi lama tidak berlaku setelah ada item baru.
+    revisiDraft.validation = null;
+    revisiDraft.status = "DRAFT";
+
     buildPrintReport();
     bootstrap.Modal.getOrCreateInstance(document.getElementById("modalTambahItem")).hide();
     render();
