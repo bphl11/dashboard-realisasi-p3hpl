@@ -1033,6 +1033,22 @@ function readRpd_(sheet) {
   const values = sheet.getDataRange().getValues();
   if (values.length < 2) return [];
 
+  // Master terbaru menjadi sumber Pagu RPD. Dengan demikian setelah
+  // Revisi Anggaran, Pagu yang tampil di RPD ikut berubah tanpa harus
+  // menginput ulang RPD terlebih dahulu.
+  let currentMasterById = new Map();
+  try {
+    const master = buildMasterFromDataAplikasi_();
+    currentMasterById = new Map(
+      (Array.isArray(master) ? master : []).map(item => [
+        String(item.id_rpd || "").trim(),
+        item
+      ])
+    );
+  } catch (error) {
+    console.warn("Master terbaru RPD tidak dapat dimuat:", error.message);
+  }
+
   const index = headerIndex_(values[0]);
   return values.slice(1)
     .filter(row => row.some(cell => String(cell ?? "").trim() !== ""))
@@ -1045,7 +1061,12 @@ function readRpd_(sheet) {
       const item = String(row[index.ITEM_AKUN] || "");
       const detil = String(row[index.DETIL_AKUN] || "");
       const rincian = String(row[index.RINCIAN_ITEM] || "");
-      const paguDetil = parseAmount_(row[index.PAGU_DETIL]);
+      const paguDetilLama = parseAmount_(row[index.PAGU_DETIL]);
+      const generatedId = makeStableRpdId_(tahun, kodeSub, sub, akun, item, detil, rincian);
+      const currentMaster = currentMasterById.get(generatedId);
+      const paguDetil = currentMaster
+        ? parseAmount_(currentMaster.pagu)
+        : paguDetilLama;
       // Normalisasi ID lama ke identitas RPD stabil. Record lama yang
       // menyimpan ID berbasis Pagu tetap mempertahankan data mingguan,
       // tetapi API mengembalikan ID stabil agar frontend dapat
