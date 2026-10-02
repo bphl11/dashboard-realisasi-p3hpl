@@ -483,31 +483,12 @@ async function submitInputRealisasi(event) {
             return;
         }
 
-        // SEBELUM VALIDASI, ambil transaksi aktif langsung dari server.
-        // Cache lokal hanya untuk tampilan; validasi harus authoritative.
-        try {
-            const freshResult = await realisasiList();
-            if (Array.isArray(freshResult?.realisasi)) {
-                realisasiRows = freshResult.realisasi
-                    .map(normalisasiRowInputRealisasi)
-                    .filter(Boolean);
+        // Validasi UI memakai state terbaru yang sudah dimuat halaman.
+    // Otoritas terakhir tetap Apps Script pada realisasi_save. Jangan
+    // melakukan realisasiList() lagi di setiap klik Simpan karena itu
+    // menambah satu round-trip API sebelum INSERT dan membuat penyimpanan
+    // terasa lambat.
 
-                if (typeof replaceInputRealisasiLocalCache === "function") {
-                    replaceInputRealisasiLocalCache(realisasiRows);
-                }
-
-                renderListInputRealisasi();
-                renderMasterInfoInputRealisasi();
-            }
-        } catch (syncError) {
-            console.warn("Sinkronisasi Input Realisasi sebelum simpan gagal:", syncError);
-            setStatusInputRealisasi(
-                "Data transaksi terbaru belum dapat disinkronkan dari server. " +
-                "Simpan dibatalkan agar tidak terjadi perbedaan antara tampilan dan validasi server.",
-                "warning"
-            );
-            return;
-        }
 
         const existingInputTotal = getExistingInputTotalForMaster(
             selectedMaster.id_anggaran,
