@@ -281,9 +281,11 @@ async function ambilRpdBulananGrafik(forceRefresh = false) {
             method: "POST",
             headers: { "Content-Type": "text/plain;charset=utf-8" },
             body: JSON.stringify({
-                // Bootstrap mengembalikan RPD + master DATA_APLIKASI.
-                // Grafik membutuhkan keduanya untuk memvalidasi ID RPD.
-                action: "bootstrap",
+                // Grafik cukup membutuhkan daftar RPD tersimpan.
+                // Tidak perlu bootstrap/master karena endpoint bootstrap
+                // membaca dan memproses seluruh DATA_APLIKASI sehingga lebih
+                // berat dan rentan 502/timeout.
+                action: "list",
                 id_token: token
             }),
             redirect: "follow",
@@ -306,24 +308,39 @@ async function ambilRpdBulananGrafik(forceRefresh = false) {
             );
         }
 
-        // Gunakan master DATA_APLIKASI sebagai sumber identitas yang sah,
-        // sama seperti halaman RPD/cetak. Record RPD lama yang sudah tidak
-        // mempunyai pasangan master tidak boleh ikut dihitung Grafik.
+        // Endpoint LIST memang hanya mengembalikan RPD tersimpan.
+        // Identitas Grafik dinormalisasi lokal tanpa ketergantungan pada Pagu,
+        // sehingga tetap kompatibel dengan record lama berbasis Pagu.
         const rowsAll = Array.isArray(result.rpd) ? result.rpd : [];
-        const master = Array.isArray(result.master) ? result.master : [];
-        const validIds = new Set(
-            master
-                .map(function (row) {
-                    return String(row?.id_rpd || "").trim();
-                })
-                .filter(Boolean)
-        );
 
-        const validRows = validIds.size
-            ? rowsAll.filter(function (row) {
-                return validIds.has(String(row?.id_rpd || "").trim());
-            })
-            : rowsAll;
+        function stableRpdIdGrafik(row) {
+            const normalize = function (value) {
+                return String(value ?? "")
+                    .trim()
+                    .toUpperCase()
+                    .replace(/\s+/g, " ")
+                    .replace(/\|/g, "/");
+            };
+
+            return [
+                row?.tahun ?? row?.TAHUN,
+                row?.kode_sub_komponen ?? row?.KODE_SUB_KOMPONEN,
+                row?.sub_komponen ?? row?.SUB_KOMPONEN,
+                row?.akun ?? row?.AKUN,
+                row?.item_akun ?? row?.ITEM_AKUN,
+                row?.detil_akun ?? row?.DETIL_AKUN,
+                row?.rincian_item ?? row?.RINCIAN_ITEM
+            ].map(normalize).join("|");
+        }
+
+        const normalizedRows = rowsAll.map(function (row) {
+            return {
+                ...row,
+                id_rpd: stableRpdIdGrafik(row)
+            };
+        });
+
+        const validRows = normalizedRows;
 
         // Satu ID RPD harus dihitung satu kali. Sheet lama dapat berisi
         // duplikasi record akibat penyimpanan/versi sebelumnya; halaman RPD
@@ -349,7 +366,6 @@ async function ambilRpdBulananGrafik(forceRefresh = false) {
 
         console.log(
             "GRAFIK RPD: record server =", rowsAll.length,
-            "record master valid =", validIds.size,
             "record valid sebelum deduplikasi =", validRows.length,
             "record dihitung =", rows.length
         );
