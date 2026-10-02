@@ -458,6 +458,16 @@ function applyRevisionDraft() {
                 try { window.invalidasiCacheRpdGrafik(); } catch (cacheError) {}
             }
 
+            // DATA_APLIKASI sudah berubah di server. Hapus cache API
+            // terlebih dahulu agar refresh tidak menghidupkan snapshot lama.
+            if (typeof invalidateApiCache === "function") {
+                try {
+                    invalidateApiCache();
+                } catch (cacheError) {
+                    console.warn("Cache API tidak dapat diinvalidasi:", cacheError);
+                }
+            }
+
             if (typeof window.invalidateAppStore === "function") {
                 window.invalidateAppStore();
             }
