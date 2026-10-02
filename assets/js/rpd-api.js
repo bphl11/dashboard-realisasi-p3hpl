@@ -106,7 +106,17 @@ async function rpdApiRequest(action, payload = {}) {
     // Proxy/Worker kadang memberi 404/502/503/504 sesaat ketika
     // GitHub Pages baru berpindah menu. Coba ulang singkat sebelum
     // menganggap RPD benar-benar gagal.
-    const maxAttempts = 3;
+    // GET/read boleh retry singkat. Mutation tidak boleh otomatis retry
+    // karena POST kedua dapat membuat transaksi tersimpan dua kali jika
+    // request pertama sebenarnya sudah diterima server tetapi respons hilang.
+    const mutationActions = new Set([
+        "save",
+        "realisasi_save",
+        "realisasi_update",
+        "realisasi_delete",
+        "apply_revisi"
+    ]);
+    const maxAttempts = mutationActions.has(action) ? 1 : 3;
     let lastError = null;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
