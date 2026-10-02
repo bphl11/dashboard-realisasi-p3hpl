@@ -28,6 +28,115 @@ const SOURCE_CSV_URL =
 
 const RPD_API_VERSION = "1.5.1";
 
+const ANGGARAN_ID_HEADER_ = "ID_ANGGARAN";
+const ANGGARAN_ID_PREFIX_ = "ANG-";
+
+// ============================================================
+// PERMANENT ID_ANGGARAN
+// ============================================================
+// ID_ANGGARAN adalah identitas permanen satu detil anggaran.
+// Pagu, volume, harga, dan uraian dapat berubah saat Revisi,
+// tetapi ID_ANGGARAN tidak boleh berubah.
+// ============================================================
+
+function ensureAnggaranIdSchema_() {
+  const ss = getSpreadsheet_();
+  const sheet = ss.getSheetByName("DATA_APLIKASI");
+  if (!sheet) throw new Error("Sheet DATA_APLIKASI tidak ditemukan.");
+
+  let values = sheet.getDataRange().getValues();
+  let headerRow = -1;
+  let map = null;
+
+  for (let r = 0; r < Math.min(values.length, 10); r++) {
+    const candidate = headerIndex_(values[r]);
+    if (
+      candidate.PAGU !== undefined &&
+      (
+        candidate.SUB_KOMPONEN !== undefined ||
+        candidate.SUBKOMPONEN !== undefined
+      )
+    ) {
+      headerRow = r;
+      map = candidate;
+      break;
+    }
+  }
+
+  if (headerRow < 0) {
+    throw new Error("Header DATA_APLIKASI tidak ditemukan.");
+  }
+
+  let idCol = map[ANGGARAN_ID_HEADER_];
+  if (idCol === undefined) idCol = map["ID ANGGARAN"];
+
+  if (idCol === undefined) {
+    idCol = sheet.getLastColumn();
+    sheet.getRange(headerRow + 1, idCol + 1).setValue(ANGGARAN_ID_HEADER_);
+    idCol = idCol;
+    values = sheet.getDataRange().getValues();
+    map = headerIndex_(values[headerRow]);
+    idCol = map[ANGGARAN_ID_HEADER_] ?? map["ID ANGGARAN"];
+  }
+
+  if (idCol === undefined) {
+    throw new Error("Kolom ID_ANGGARAN tidak dapat dibuat.");
+  }
+
+  const existingIds = new Set();
+  const out = [];
+  let changed = false;
+
+  for (let i = headerRow + 1; i < values.length; i++) {
+    const row = values[i] || [];
+    const current = String(row[idCol] ?? "").trim();
+    const hasData = row.some(v => String(v ?? "").trim() !== "");
+
+    if (!hasData) {
+      out.push([current]);
+      continue;
+    }
+
+    const pagu = map.PAGU !== undefined ? parseAmount_(row[map.PAGU]) : 0;
+    const sub = headerValue_(row, map, ["Sub Komponen", "Subkomponen", "Nama Sub Komponen"]);
+    const akun = headerValue_(row, map, ["Akun Belanja", "Akun"]);
+    const detil = headerValue_(row, map, ["Detil Akun", "Detail Akun", "Detil"]);
+    const rincian = headerValue_(row, map, ["Rincian Item", "Rincian"]);
+    const isBudgetDetail = pagu > 0 && Boolean(sub || akun || detil || rincian);
+
+    let id = current;
+    if (isBudgetDetail) {
+      if (!id || existingIds.has(id)) {
+        id = ANGGARAN_ID_PREFIX_ + Utilities.getUuid().replace(/-/g, "").toUpperCase();
+        changed = true;
+      }
+      existingIds.add(id);
+    }
+
+    out.push([id]);
+  }
+
+  if (changed) {
+    sheet
+      .getRange(headerRow + 2, idCol + 1, out.length, 1)
+      .setValues(out);
+    SpreadsheetApp.flush();
+  }
+
+  return {
+    sheet: sheet,
+    headerRow: headerRow,
+    idCol: idCol,
+    changed: changed
+  };
+}
+
+function getAnggaranIdFromRow_(row, map) {
+  return String(
+    headerValue_(row, map, ["ID_ANGGARAN", "ID ANGGARAN"]) || ""
+  ).trim();
+}
+
 const RPD_SHEETS = {
   RPD: "RPD P3HPL",
   USERS: "USERS",
@@ -460,17 +569,22 @@ function realisasiHeaderIndex_(headers) {
 // ============================================================
 
 function realisasiMasterKey_(row) {
+  const explicitId = String(
+    row.idAnggaran ||
+    row.id_anggaran ||
+    ""
+  ).trim();
 
-  return makeRpdId_(
-    row.tahun,
-    row.kodeSubKomponen,
-    row.subKomponen,
-    row.akun,
-    row.itemAkun,
-    row.detilAkun,
-    row.rincianItem,
-    row.pagu
-  );
+  return explicitId ||
+    makeStableRpdId_(
+      row.tahun,
+      row.kodeSubKomponen,
+      row.subKomponen,
+      row.akun,
+      row.itemAkun,
+      row.detilAkun,
+      row.rincianItem
+    );
 }
 
 // ============================================================
@@ -577,6 +691,7 @@ function setCachedRealisasiMaster_(master) {
 }
 
 function buildRealisasiMasterFromDataAplikasi_() {
+  ensureAnggaranIdSchema_();
   const cached = getCachedRealisasiMaster_();
 
   if (cached) {
@@ -676,6 +791,10 @@ function buildRealisasiMasterFromDataAplikasi_() {
     tahun: indexAlias([
       "Tahun",
       "Tahun Anggaran"
+    ]),
+    idAnggaran: indexAlias([
+      "ID_ANGGARAN",
+      "ID ANGGARAN"
     ])
   };
 
@@ -733,6 +852,11 @@ function buildRealisasiMasterFromDataAplikasi_() {
         ? String(row[idx.rincianItem] || "").trim()
         : "";
 
+    const idAnggaran =
+      idx.idAnggaran !== undefined
+        ? String(row[idx.idAnggaran] || "").trim()
+        : "";
+
     const pagu =
       idx.pagu !== undefined
         ? parseAmount_(row[idx.pagu])
@@ -783,7 +907,7 @@ function buildRealisasiMasterFromDataAplikasi_() {
         : String(new Date().getFullYear());
 
     const item = {
-      id_anggaran: "",
+      id_anggaran: idAnggaran || "",
       tahun: tahun,
       kodeSubKomponen: kodeSubKomponen,
       subKomponen: subKomponen,
@@ -2031,6 +2155,7 @@ function applyRevisi_(request) {
 
   try {
     ss = getSpreadsheet_();
+    if (!dryRun) ensureAnggaranIdSchema_();
     sheet = ss.getSheetByName("DATA_APLIKASI");
     if (!sheet) throw new Error("Sheet DATA_APLIKASI tidak ditemukan.");
 
@@ -2201,6 +2326,12 @@ function applyRevisi_(request) {
 
       const newRow = targetRow + 1;
       const volume = toRevisionNumber_(item.volume);
+
+      if (info.idAnggaran >= 0) {
+        sheet
+          .getRange(newRow, info.idAnggaran + 1)
+          .setValue(ANGGARAN_ID_PREFIX_ + Utilities.getUuid().replace(/-/g, "").toUpperCase());
+      }
       const harga = toRevisionNumber_(item.harga);
 
       if (info.uraian >= 0) {
@@ -2755,6 +2886,7 @@ function getRevisionHeaderInfo_(sheet) {
         satuan: revisionHeader_(map, ["SATUAN", "SAT"]),
         harga: revisionHeader_(map, ["HARGA SATUAN", "HARGA"]),
         pagu: revisionHeader_(map, ["PAGU", "JUMLAH"]),
+        idAnggaran: revisionHeader_(map, ["ID_ANGGARAN", "ID ANGGARAN"]),
         tahun: revisionHeader_(map, ["TAHUN", "TAHUN ANGGARAN"])
       };
     }
@@ -3275,6 +3407,7 @@ function listRpd_(
 // ============================================================
 
 function buildMasterFromDataAplikasi_() {
+  ensureAnggaranIdSchema_();
 
   if (!SOURCE_CSV_URL) {
 
@@ -3400,6 +3533,16 @@ function buildMasterFromDataAplikasi_() {
         ]
       );
 
+    const idAnggaran =
+      headerValue_(
+        row,
+        context.map,
+        [
+          "ID_ANGGARAN",
+          "ID ANGGARAN"
+        ]
+      );
+
     const pagu =
       parseAmount_(
         headerValue_(
@@ -3491,7 +3634,19 @@ function buildMasterFromDataAplikasi_() {
         rincianItem || "",
 
       pagu:
-        pagu
+        pagu,
+
+      id_anggaran:
+        idAnggaran ||
+        makeStableRpdId_(
+          tahun,
+          kodeSubKomponen,
+          subKomponen,
+          akun,
+          itemAkun,
+          detilAkun,
+          rincianItem
+        )
     });
   }
 
