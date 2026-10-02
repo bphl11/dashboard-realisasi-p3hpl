@@ -10,6 +10,7 @@ let rpdMasterRows = [];
 let rpdExisting = [];
 let rpdCurrentSelection = null;
 let rpdOriginalWeekly = {};
+let rpdOriginalCatatan = "";
 
 const RPD_MONTHS = [
     { key: "jan", label: "Januari", tw: 1 }, { key: "feb", label: "Februari", tw: 1 },
@@ -22,16 +23,40 @@ const RPD_MONTHS = [
 const RPD_WEEK_FIELDS = RPD_MONTHS.flatMap(month => [1,2,3,4].map(week => `${month.key}_m${week}`));
 const RPD_EMPTY = { tw1:0, tw2:0, tw3:0, tw4:0, ...Object.fromEntries(RPD_WEEK_FIELDS.map(key => [key,0])), catatan:"" };
 
+function rpdHasWeeklyFields(row) {
+    const source = row && typeof row === "object" ? row : {};
+    return RPD_WEEK_FIELDS.some(key =>
+        Object.prototype.hasOwnProperty.call(source, key) ||
+        Object.prototype.hasOwnProperty.call(source, key.toUpperCase())
+    );
+}
+
 function rpdQuarterTotals(saved) {
-    const weekly = RPD_WEEK_FIELDS.map(key => rpdNumber(saved?.[key]));
-    if (weekly.some(value => value !== 0)) {
+    const source = saved && typeof saved === "object" ? saved : {};
+
+    // Bila record memiliki skema 48 minggu, 48 field adalah sumber
+    // kebenaran, termasuk ketika seluruh nilainya sengaja 0.
+    if (rpdHasWeeklyFields(source)) {
         const q = {1:0,2:0,3:0,4:0};
         RPD_MONTHS.forEach(month => {
-            for (let week=1; week<=4; week++) q[month.tw] += rpdNumber(saved?.[`${month.key}_m${week}`]);
+            for (let week=1; week<=4; week++) {
+                const field = month.key + "_m" + week;
+                q[month.tw] += rpdNumber(
+                    source[field] ?? source[field.toUpperCase()] ?? 0
+                );
+            }
         });
         return {tw1:q[1],tw2:q[2],tw3:q[3],tw4:q[4]};
     }
-    return {tw1:rpdNumber(saved?.tw1),tw2:rpdNumber(saved?.tw2),tw3:rpdNumber(saved?.tw3),tw4:rpdNumber(saved?.tw4)};
+
+    // Hanya record lama yang benar-benar tidak memiliki field mingguan
+    // yang boleh menggunakan subtotal TW1-TW4.
+    return {
+        tw1:rpdNumber(source.tw1 ?? source.TW1),
+        tw2:rpdNumber(source.tw2 ?? source.TW2),
+        tw3:rpdNumber(source.tw3 ?? source.TW3),
+        tw4:rpdNumber(source.tw4 ?? source.TW4)
+    };
 }
 
 const RPD_LOCAL_CACHE_KEY = "p3hpl_rpd_saved_v4";
@@ -211,9 +236,6 @@ function rpdNormalizeSavedRow(row) {
         catatan:String(source.catatan ?? source.CATATAN ?? "").trim()
     };
 
-    // Migrasikan cache lokal lama yang masih memakai ID berbasis Pagu
-    // ke ID stabil. Dengan begitu record lama tidak menjadi duplikat
-    // ketika server sudah mengembalikan ID stabil setelah Revisi Anggaran.
     const stableId = rpdStableId({
         tahun: source.tahun ?? source.TAHUN,
         kodeSubKomponen: source.kode_sub_komponen ?? source.KODE_SUB_KOMPONEN,
@@ -223,18 +245,18 @@ function rpdNormalizeSavedRow(row) {
         detilAkun: source.detil_akun ?? source.DETIL_AKUN,
         rincianItem: source.rincian_item ?? source.RINCIAN_ITEM
     });
-    if (stableId && stableId.replace(/\\|/g, "") !== "") {
+    if (stableId && stableId.replace(/\|/g, "") !== "") {
         normalized.id_rpd = stableId;
     }
 
-    RPD_WEEK_FIELDS.forEach(key => { normalized[key]=rpdNumber(source[key] ?? source[key.toUpperCase()] ?? 0); });
-    // Data lama hanya memiliki TW1-TW4. Untuk record RPD lama yang
-    // sebelumnya diinput pada editor Oktober/Minggu 4, pertahankan
-    // posisi yang diharapkan pengguna: TW IV -> Oktober Minggu 4.
-    // Ini hanya dijalankan bila TIDAK ADA satu pun field 48-minggu.
-    // Record baru yang sudah memiliki field mingguan tidak disentuh.
-    const hasWeeklyInput = RPD_WEEK_FIELDS.some(key => normalized[key] !== 0);
-    if (!hasWeeklyInput) {
+    const sourceHasWeeklyFields = rpdHasWeeklyFields(source);
+    RPD_WEEK_FIELDS.forEach(key => {
+        normalized[key] = rpdNumber(source[key] ?? source[key.toUpperCase()] ?? 0);
+    });
+
+    // Hanya record yang benar-benar tidak mempunyai field mingguan
+    // yang menjalankan migrasi kompatibilitas TW1-TW4.
+    if (!sourceHasWeeklyFields) {
         const legacyQuarterMap = [
             ["tw1", "mar_m4"],
             ["tw2", "jun_m4"],
@@ -245,8 +267,6 @@ function rpdNormalizeSavedRow(row) {
             const value = rpdNumber(normalized[quarter]);
             if (value > 0) normalized[weekField] = value;
         });
-        // Penanda internal agar merge tidak menganggap hasil mapping
-        // kompatibilitas ini sebagai input minggu yang benar-benar dikirim API.
         normalized._legacyQuarterMapped = true;
     } else {
         normalized._legacyQuarterMapped = false;
@@ -316,6 +336,61 @@ function rpdRefreshFilters(options = {}) {
     }
 }
 
+function rpdRenderBudgetWarnings() {
+    const box = document.getElementById("rpdBudgetWarning");
+    if (!box) return;
+
+    const warnings = [];
+    let totalExcess = 0;
+
+    rpdMasterRows.forEach(row => {
+        const saved = rpdFindSavedForMaster(row);
+        if (!saved) return;
+
+        const q = rpdQuarterTotals(saved);
+        const total = q.tw1 + q.tw2 + q.tw3 + q.tw4;
+        const pagu = rpdNumber(row.pagu);
+        const realisasi = rpdNumber(row.realisasi);
+        const danaTersedia = Math.max(pagu - realisasi, 0);
+        const excess = total - danaTersedia;
+
+        if (excess > 0) {
+            totalExcess += excess;
+            warnings.push({
+                label: [row.itemAkun, row.akun, row.detilAkun, row.rincianItem]
+                    .filter(Boolean).join(" — "),
+                excess: excess
+            });
+        }
+    });
+
+    if (!warnings.length) {
+        box.classList.add("d-none");
+        box.innerHTML = "";
+        return;
+    }
+
+    const detail = warnings.slice(0, 5).map(item =>
+        '<div class="small mt-1">• ' +
+        rpdEsc(item.label || "Detil Anggaran") +
+        ': kelebihan ' + rpdFormatRupiah(item.excess) +
+        '</div>'
+    ).join("");
+
+    const more = warnings.length > 5
+        ? '<div class="small mt-1">dan ' + (warnings.length - 5) + ' detil lainnya...</div>'
+        : "";
+
+    box.className = "alert alert-warning mt-2";
+    box.innerHTML =
+        '<strong><i class="bi bi-exclamation-triangle"></i> Perlu Penyesuaian RPD</strong>' +
+        '<div class="small mt-1">Ada ' + warnings.length.toLocaleString("id-ID") +
+        ' detil yang RPD-nya melebihi dana tersedia setelah realisasi. Total kelebihan ' +
+        rpdFormatRupiah(totalExcess) +
+        '. Silakan buka Input/Edit pada detil terkait dan sesuaikan kembali RPD.</div>' +
+        detail + more;
+}
+
 function rpdRenderDetilTable() {
     const tbody=document.getElementById("rpdTableBody"); if(!tbody)return;
     const rows=rpdGetFilteredRows();
@@ -330,6 +405,7 @@ function rpdRenderDetilTable() {
         '<td><button type="button" class="btn btn-sm btn-success rpd-edit-btn" data-rpd-id="'+rpdEsc(row.id_rpd)+'"><i class="bi bi-pencil-square"></i> Input/Edit</button></td></tr>';
     }).join("");
     tbody.querySelectorAll(".rpd-edit-btn").forEach(button=>button.addEventListener("click",function(){rpdOpenEditor(this.dataset.rpdId);}));
+    rpdRenderBudgetWarnings();
 }
 
 function rpdFindSavedForMaster(masterRow) {
@@ -358,6 +434,7 @@ function rpdOpenEditor(id) {
     const row=rpdMasterRows.find(r=>String(r.id_rpd)===String(id)); if(!row)return;
     const saved=rpdFindSavedForMaster(row)||RPD_EMPTY; rpdCurrentSelection=row;
     rpdOriginalWeekly = Object.fromEntries(RPD_WEEK_FIELDS.map(key => [key, rpdNumber(saved?.[key])]));
+    rpdOriginalCatatan = String(saved?.catatan || "");
     document.getElementById("rpdEditId").value=row.id_rpd;
     document.getElementById("rpdEditLabel").textContent=row.detilAkun||"-";
     document.getElementById("rpdEditSub").textContent=row.subKomponen||"-";
@@ -384,14 +461,34 @@ function rpdUpdateEditorTotal() {
     const q={1:0,2:0,3:0,4:0};
     let total=0, negative=false;
     RPD_MONTHS.forEach(month=>{for(let week=1;week<=4;week++){const v=rpdNumber(document.getElementById("rpd_"+month.key+"_m"+week)?.value);q[month.tw]+=v;total+=v;if(v<0)negative=true;}});
-    const valid=!negative&&total<=danaTersedia;
+    const excess=Math.max(total-danaTersedia,0);
+    const valid=!negative&&excess===0;
     ["rpdTw1Summary","rpdTw2Summary","rpdTw3Summary","rpdTw4Summary"].forEach((id,i)=>document.getElementById(id).textContent=rpdFormatRupiah(q[i+1]));
     document.getElementById("rpdEditTotal").textContent=rpdFormatRupiah(total);
     document.getElementById("rpdEditSisa").textContent=rpdFormatRupiah(Math.max(danaTersedia-total,0));
     const state=document.getElementById("rpdEditValidation");
     state.className="small mt-2 "+(valid?"text-success":"text-danger");
-    state.textContent=negative?"Tidak valid: nilai mingguan tidak boleh negatif.":(valid?"Valid: total RPD tidak melebihi dana tersedia setelah realisasi.":"Tidak valid: total RPD melebihi dana tersedia setelah realisasi.");
+    state.textContent=negative
+        ? "Tidak valid: nilai mingguan tidak boleh negatif."
+        : (valid
+            ? "Valid: RPD sesuai dengan dana tersedia setelah Realisasi."
+            : "Perlu penyesuaian: RPD melebihi dana tersedia sebesar " + rpdFormatRupiah(excess) + ".");
     document.getElementById("rpdSaveButton").disabled=!valid;
+}
+
+function rpdResetEditor() {
+    if (!rpdCurrentSelection) return;
+
+    RPD_WEEK_FIELDS.forEach(key => {
+        const el = document.getElementById("rpd_" + key);
+        if (el) el.value = rpdNumber(rpdOriginalWeekly[key]) || "";
+    });
+
+    const catatan = document.getElementById("rpdCatatan");
+    if (catatan) catatan.value = rpdOriginalCatatan || "";
+
+    rpdUpdateEditorTotal();
+    rpdSetStatus("Input dikembalikan ke nilai RPD terakhir tersimpan.", "info");
 }
 
 async function rpdSave() {
@@ -433,6 +530,8 @@ async function rpdSave() {
         // 48-minggu yang sudah tersimpan di cache lokal.
         rpdMergeSavedRows(rpdNormalizeExistingRows(result.data??result.rpd??result));
         rpdRenderDetilTable();
+        rpdOriginalWeekly = Object.fromEntries(RPD_WEEK_FIELDS.map(key => [key, rpdNumber(localSaved?.[key])]));
+        rpdOriginalCatatan = String(localSaved?.catatan || "");
 
         bootstrap.Modal.getInstance(document.getElementById("rpdEditorModal"))?.hide();
         rpdSetStatus("RPD berhasil disimpan ke server.","success");
@@ -1004,5 +1103,6 @@ document.addEventListener("DOMContentLoaded", function () {
         rpdRenderDetilTable();
     });    document.getElementById("rpdAkun")?.addEventListener("change", rpdRenderDetilTable);
     document.getElementById("rpdSaveButton")?.addEventListener("click", rpdSave);
+    document.getElementById("rpdResetButton")?.addEventListener("click", rpdResetEditor);
     document.getElementById("rpdPrintButton")?.addEventListener("click", rpdPrintAll);
 });
