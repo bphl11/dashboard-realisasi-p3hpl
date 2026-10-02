@@ -491,17 +491,25 @@ document.addEventListener(
             grafikRpdBulanan = rpdGrafik.bulanan;
             grafikRpdTotal = rpdGrafik.total;
 
-            // Realisasi Aktual adalah angka resmi yang harus konsisten
-            // dengan Dashboard. RPD hanya menjadi data pembanding.
-            totalData.rpdTerisi = grafikRpdTotal;
-
-            // Sisa anggaran yang belum direalisasikan = Pagu - Realisasi Aktual.
-            // RPD adalah rencana penarikan dan tidak mengurangi sisa realisasi.
-            totalData.sisaRpd = Math.max(
+            // Sisa yang dapat direncanakan melalui RPD berasal dari
+            // anggaran yang BELUM direalisasikan.
+            const sisaBelumDirealisasikan = Math.max(
                 (Number(totalData.pagu) || 0) -
                 (Number(totalData.realisasi) || 0),
                 0
             );
+
+            // RPD adalah rencana penarikan atas sisa belum direalisasikan.
+            // Karena itu "Sisa Pagu Setelah RPD" = sisa belum direalisasikan
+            // dikurangi RPD yang sudah terisi, bukan Pagu dikurangi RPD.
+            totalData.sisaBelumDirealisasikan = sisaBelumDirealisasikan;
+            totalData.rpdTerisi = grafikRpdTotal;
+            totalData.sisaRpd = Math.max(
+                sisaBelumDirealisasikan - grafikRpdTotal,
+                0
+            );
+
+            totalData.selisihRpd = sisaBelumDirealisasikan - grafikRpdTotal;
 
             totalData.persen = Number(totalData.pagu) > 0
                 ? ((Number(totalData.realisasi) || 0) / Number(totalData.pagu)) * 100
@@ -509,9 +517,30 @@ document.addEventListener(
 
             const statusRpdGrafik = document.getElementById("statusRpdGrafik");
             if (statusRpdGrafik) {
-                statusRpdGrafik.textContent = rpdGrafik.tersedia
-                    ? "RPD terisi: " + formatRupiahGrafik(grafikRpdTotal)
-                    : "RPD belum dapat dimuat pada sesi ini. Login pada halaman RPD untuk menampilkan RPD terisi.";
+                if (!rpdGrafik.tersedia) {
+                    statusRpdGrafik.textContent =
+                        "RPD belum dapat dimuat pada sesi ini. Login pada halaman RPD untuk menampilkan RPD terisi.";
+                } else {
+                    const selisihRpd = Number(totalData.selisihRpd) || 0;
+
+                    if (selisihRpd < 0) {
+                        statusRpdGrafik.textContent =
+                            "Sisa belum direalisasikan: " +
+                            formatRupiahGrafik(totalData.sisaBelumDirealisasikan) +
+                            " | RPD terisi: " +
+                            formatRupiahGrafik(grafikRpdTotal) +
+                            " | Peringatan: RPD melebihi sisa belum direalisasikan sebesar " +
+                            formatRupiahGrafik(Math.abs(selisihRpd)) + ".";
+                    } else {
+                        statusRpdGrafik.textContent =
+                            "Sisa belum direalisasikan: " +
+                            formatRupiahGrafik(totalData.sisaBelumDirealisasikan) +
+                            " | RPD terisi: " +
+                            formatRupiahGrafik(grafikRpdTotal) +
+                            " | Sisa Pagu Setelah RPD: " +
+                            formatRupiahGrafik(totalData.sisaRpd);
+                    }
+                }
             }
 
 
