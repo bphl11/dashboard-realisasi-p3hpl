@@ -2367,10 +2367,13 @@ function applyRevisi_(request) {
       );
 
       if (deletedIds.size) {
+        const rpdSheet = ss.getSheetByName(RPD_SHEETS.RPD);
         const activeRpdIds = new Set(
-          readRpd_(ss.getSheetByName(RPD_SHEETS.RPD) || ensureRpdSheet_())
-            .map(function (row) { return String(row.id_anggaran || "").trim(); })
-            .filter(Boolean)
+          rpdSheet
+            ? readRpd_(rpdSheet)
+                .map(function (row) { return String(row.id_anggaran || "").trim(); })
+                .filter(Boolean)
+            : []
         );
 
         const activeRealisasiIds = new Set(
@@ -4814,16 +4817,6 @@ function saveRpd_(
 // ============================================================
 // LOG RPD
 // ============================================================
-
-function ensureRpdSheet_() {
-  const ss = getSpreadsheet_();
-  let sheet = ss.getSheetByName(RPD_SHEETS.RPD);
-  if (!sheet) {
-    sheet = ss.insertSheet(RPD_SHEETS.RPD);
-  }
-  ensureRpdSchema_(sheet);
-  return sheet;
-}
 
 function writeLog_(
   action,
