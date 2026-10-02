@@ -26,7 +26,7 @@ const RPD_CLIENT_ID =
 const SOURCE_CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vShdaPwws12pkv75bkQJL9AYjuC_4xjvANknmsoT6HVmgKeQ2DJsLLm5QzbvlKQJeQvqNGzYALsOk5n/pub?gid=1473286966&single=true&output=csv";
 
-const RPD_API_VERSION = "1.7.0";
+const RPD_API_VERSION = "1.7.2";
 const RPD_DATA_GENERATION = "RPD-CLEAN-20261002-01";
 const RPD_GENERATION_PROPERTY = "RPD_DATA_GENERATION";
 
@@ -748,24 +748,17 @@ function buildRealisasiMasterFromDataAplikasi_() {
 
   ensureAnggaranIdSchema_();
 
-  if (!SOURCE_CSV_URL) {
-    throw new Error("SOURCE_CSV_URL belum diisi.");
+  // DATA_APLIKASI adalah source of truth untuk transaksi Realisasi.
+  // Baca langsung Spreadsheet agar Pagu dan ID_ANGGARAN terbaru langsung
+  // tersedia setelah Revisi, tanpa menunggu propagasi published CSV.
+  const ss = getSpreadsheet_();
+  const dataSheet = ss.getSheetByName("DATA_APLIKASI");
+
+  if (!dataSheet) {
+    throw new Error("Sheet DATA_APLIKASI tidak ditemukan.");
   }
 
-  const response = UrlFetchApp.fetch(SOURCE_CSV_URL, {
-    muteHttpExceptions: true,
-    followRedirects: true
-  });
-
-  if (response.getResponseCode() !== 200) {
-    throw new Error(
-      "DATA_APLIKASI tidak dapat dibaca dari sumber CSV."
-    );
-  }
-
-  const values = Utilities.parseCsv(
-    response.getContentText()
-  );
+  const values = dataSheet.getDataRange().getValues();
 
   const context = detectHeader_(values);
 
@@ -3114,8 +3107,20 @@ function findLastRevisionAccountRow_(sheet, item) {
 function invalidateRealisasiMasterCache_() {
   try {
     const cache = CacheService.getScriptCache();
-    cache.remove(REALISASI_MASTER_CACHE_KEY + "_meta");
-  } catch (error) {}
+    const metaKey = REALISASI_MASTER_CACHE_KEY + "_meta";
+    const meta = cache.get(metaKey);
+    const count = Number(meta);
+
+    if (Number.isInteger(count) && count > 0) {
+      for (let i = 0; i < count; i++) {
+        cache.remove(REALISASI_MASTER_CACHE_KEY + "_" + i);
+      }
+    }
+
+    cache.remove(metaKey);
+  } catch (error) {
+    // Cache hanya optimasi; kegagalan invalidasi tidak boleh menggagalkan Revisi.
+  }
 }
 // ============================================================
 // JSON OUTPUT
