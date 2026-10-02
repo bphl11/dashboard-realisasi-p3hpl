@@ -9,6 +9,7 @@ let realisasiMaster = [];
 let realisasiRows = [];
 let selectedMaster = null;
 let editingRealisasiId = null;
+let realisasiSubmitInProgress = false;
 
 const BULAN_REALISASI = [
     "Januari","Februari","Maret","April","Mei","Juni",
@@ -446,73 +447,85 @@ async function submitInputRealisasi(event) {
     event.preventDefault();
     clearStatusInputRealisasi();
 
-    if (!selectedMaster) {
-        setStatusInputRealisasi("Pilih detil anggaran terlebih dahulu.", "warning");
+    // Guard frontend: satu klik hanya boleh menghasilkan satu request.
+    // Guard dipasang SEBELUM await realisasiList()/realisasiSave() agar
+    // double-click tidak membuat beberapa request paralel.
+    if (realisasiSubmitInProgress) {
         return;
     }
 
-    const bulan = document.getElementById("realisasiBulan").value;
-    const nominal = Number(document.getElementById("realisasiNominal").value || 0);
-    const keterangan = document.getElementById("realisasiKeterangan").value.trim();
-
-    if (!bulan) {
-        setStatusInputRealisasi("Pilih Bulan Realisasi.", "warning");
-        return;
-    }
-
-    if (!(nominal > 0)) {
-        setStatusInputRealisasi("Nominal Realisasi harus lebih besar dari 0.", "warning");
-        return;
-    }
-
-    // SEBELUM VALIDASI, ambil transaksi aktif langsung dari server.
-    // Cache lokal hanya untuk tampilan cepat; validasi penyimpanan harus
-    // memakai data authoritative agar nominal "sudah diinput" tidak tertinggal.
-    try {
-        const freshResult = await realisasiList();
-        if (Array.isArray(freshResult?.realisasi)) {
-            realisasiRows = freshResult.realisasi
-                .map(normalisasiRowInputRealisasi)
-                .filter(Boolean);
-
-            if (typeof replaceInputRealisasiLocalCache === "function") {
-                replaceInputRealisasiLocalCache(realisasiRows);
-            }
-
-            renderListInputRealisasi();
-            renderMasterInfoInputRealisasi();
-        }
-    } catch (syncError) {
-        console.warn("Sinkronisasi Input Realisasi sebelum simpan gagal:", syncError);
-        setStatusInputRealisasi(
-            "Data transaksi terbaru belum dapat disinkronkan dari server. " +
-            "Simpan dibatalkan agar tidak terjadi perbedaan antara tampilan dan validasi server.",
-            "warning"
-        );
-        return;
-    }
-
-    const existingInputTotal = getExistingInputTotalForMaster(
-        selectedMaster.id_anggaran,
-        editingRealisasiId || ""
-    );
-    const baseRealisasi = getBaseRealisasiForMaster(selectedMaster);
-    const totalSebelumInput = baseRealisasi + existingInputTotal;
-    const pagu = Number(selectedMaster.pagu) || 0;
-
-    if (totalSebelumInput + nominal > pagu) {
-        setStatusInputRealisasi(
-            "Nominal melebihi sisa pagu. Sisa saat ini: " + rupiahInput(Math.max(pagu - totalSebelumInput, 0)),
-            "warning"
-        );
-        return;
-    }
+    realisasiSubmitInProgress = true;
 
     const button = document.getElementById("realisasiSaveButton");
-    button.disabled = true;
-    button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Menyimpan...';
+    const originalButtonHtml = button?.innerHTML || "";
+    if (button) {
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Menyimpan...';
+    }
 
     try {
+        if (!selectedMaster) {
+            setStatusInputRealisasi("Pilih detil anggaran terlebih dahulu.", "warning");
+            return;
+        }
+
+        const bulan = document.getElementById("realisasiBulan").value;
+        const nominal = Number(document.getElementById("realisasiNominal").value || 0);
+        const keterangan = document.getElementById("realisasiKeterangan").value.trim();
+
+        if (!bulan) {
+            setStatusInputRealisasi("Pilih Bulan Realisasi.", "warning");
+            return;
+        }
+
+        if (!(nominal > 0)) {
+            setStatusInputRealisasi("Nominal Realisasi harus lebih besar dari 0.", "warning");
+            return;
+        }
+
+        // SEBELUM VALIDASI, ambil transaksi aktif langsung dari server.
+        // Cache lokal hanya untuk tampilan; validasi harus authoritative.
+        try {
+            const freshResult = await realisasiList();
+            if (Array.isArray(freshResult?.realisasi)) {
+                realisasiRows = freshResult.realisasi
+                    .map(normalisasiRowInputRealisasi)
+                    .filter(Boolean);
+
+                if (typeof replaceInputRealisasiLocalCache === "function") {
+                    replaceInputRealisasiLocalCache(realisasiRows);
+                }
+
+                renderListInputRealisasi();
+                renderMasterInfoInputRealisasi();
+            }
+        } catch (syncError) {
+            console.warn("Sinkronisasi Input Realisasi sebelum simpan gagal:", syncError);
+            setStatusInputRealisasi(
+                "Data transaksi terbaru belum dapat disinkronkan dari server. " +
+                "Simpan dibatalkan agar tidak terjadi perbedaan antara tampilan dan validasi server.",
+                "warning"
+            );
+            return;
+        }
+
+        const existingInputTotal = getExistingInputTotalForMaster(
+            selectedMaster.id_anggaran,
+            editingRealisasiId || ""
+        );
+        const baseRealisasi = getBaseRealisasiForMaster(selectedMaster);
+        const totalSebelumInput = baseRealisasi + existingInputTotal;
+        const pagu = Number(selectedMaster.pagu) || 0;
+
+        if (totalSebelumInput + nominal > pagu) {
+            setStatusInputRealisasi(
+                "Nominal melebihi sisa pagu. Sisa saat ini: " +
+                rupiahInput(Math.max(pagu - totalSebelumInput, 0)),
+                "warning"
+            );
+            return;
+        }
+
         const payload = {
             tahun: selectedMaster.tahun,
             id_anggaran: selectedMaster.id_anggaran,
@@ -521,34 +534,50 @@ async function submitInputRealisasi(event) {
             keterangan
         };
 
-        const result = editingRealisasiId
-            ? await realisasiUpdate({ ...payload, id_realisasi: editingRealisasiId })
+        const currentEditId = editingRealisasiId;
+        const result = currentEditId
+            ? await realisasiUpdate({ ...payload, id_realisasi: currentEditId })
             : await realisasiSave(payload);
 
-        if (!result?.ok) throw new Error(result?.message || "Realisasi gagal disimpan.");
-
-        if (editingRealisasiId) {
-            const index = realisasiRows.findIndex(item => item.id_realisasi === editingRealisasiId);
-            if (index >= 0) realisasiRows[index] = result.data;
-        } else {
-            realisasiRows.push(result.data);
+        if (!result?.ok) {
+            throw new Error(result?.message || "Realisasi gagal disimpan.");
         }
 
-        const wasEditing = Boolean(editingRealisasiId);
+        if (currentEditId) {
+            const index = realisasiRows.findIndex(
+                item => item.id_realisasi === currentEditId
+            );
+            if (index >= 0) {
+                realisasiRows[index] = normalisasiRowInputRealisasi(result.data);
+            }
+        } else {
+            const newRow = normalisasiRowInputRealisasi(result.data);
+            const newId = String(newRow?.id_realisasi || "").trim();
+
+            // Hindari memasukkan record yang sama dua kali ke array lokal.
+            if (newId) {
+                realisasiRows = realisasiRows.filter(
+                    item => String(item?.id_realisasi || "").trim() !== newId
+                );
+            }
+            if (newRow) realisasiRows.push(newRow);
+        }
+
+        const wasEditing = Boolean(currentEditId);
         editingRealisasiId = null;
+
         renderListInputRealisasi();
         renderMasterInfoInputRealisasi();
         resetFormInputRealisasi();
         setInputRealisasiEditMode(false);
 
-        // Simpan mutation ke snapshot Realisasi terlebih dahulu.
-        // Jangan menghapus cache transaksi sebelum snapshot diperbarui.
         if (typeof updateInputRealisasiLocalCache === "function") {
-            updateInputRealisasiLocalCache(wasEditing ? "update" : "save", result);
+            updateInputRealisasiLocalCache(
+                wasEditing ? "update" : "save",
+                result
+            );
         }
 
-        // Patch APP STORE yang sudah ada secara lokal. DATA_APLIKASI tidak
-        // diunduh ulang dan parser/rumus tetap sama.
         let patchedAppStore = false;
         if (typeof window.patchAppStoreRealisasi === "function") {
             try {
@@ -561,25 +590,36 @@ async function submitInputRealisasi(event) {
             }
         }
 
-        // Jika belum ada APP STORE, jangan membuat snapshot parsial.
-        // Halaman berikutnya akan melakukan load normal.
         if (!patchedAppStore && typeof window.invalidateAppStore === "function") {
             window.invalidateAppStore();
         }
 
         setStatusInputRealisasi(
-            wasEditing ? "Realisasi berhasil diperbarui." : "Realisasi bulan " + bulan + " berhasil disimpan.",
+            wasEditing
+                ? "Realisasi berhasil diperbarui."
+                : "Realisasi bulan " + bulan + " berhasil disimpan.",
             "success"
         );
     } catch (error) {
         console.error(error);
-        setStatusInputRealisasi(error.message || "Gagal menyimpan realisasi.", "danger");
+        setStatusInputRealisasi(
+            error.message || "Gagal menyimpan realisasi.",
+            "danger"
+        );
     } finally {
-        button.disabled = false;
-        setInputRealisasiEditMode(Boolean(editingRealisasiId));
+        realisasiSubmitInProgress = false;
+
+        if (button) {
+            button.disabled = false;
+            button.innerHTML =
+                originalButtonHtml ||
+                '<i class="bi bi-save"></i> <span id="realisasiSaveButtonText">Simpan Realisasi</span>';
+
+            // Jika mode edit berubah selama proses, sinkronkan kembali label/tampilan.
+            setInputRealisasiEditMode(Boolean(editingRealisasiId));
+        }
     }
 }
-
 
 
 async function deleteInputRealisasi(id) {
