@@ -215,6 +215,7 @@ const REALISASI_HEADERS = [
 
 const RPD_HEADERS = [
   "ID_RPD",
+  "ID_ANGGARAN",
   "TAHUN",
   "KODE_SUB_KOMPONEN",
   "SUB_KOMPONEN",
@@ -3837,9 +3838,11 @@ function readRpd_(
     const master =
       buildMasterFromDataAplikasi_();
 
+    const masterRows = Array.isArray(master) ? master : [];
+
     currentMasterById =
       new Map(
-        (Array.isArray(master) ? master : [])
+        masterRows
           .map(function (item) {
             return [
               String(
@@ -3850,12 +3853,30 @@ function readRpd_(
           })
       );
 
+    var currentMasterByAnggaranId =
+      new Map(
+        masterRows
+          .map(function (item) {
+            return [
+              String(
+                item.id_anggaran || ""
+              ).trim(),
+              item
+            ];
+          })
+          .filter(function (pair) {
+            return pair[0] !== "";
+          })
+      );
+
   } catch (error) {
 
     console.warn(
       "Master terbaru RPD tidak dapat dimuat:",
       error.message
     );
+
+    var currentMasterByAnggaranId = new Map();
   }
 
   return values
@@ -3924,7 +3945,12 @@ function readRpd_(
           row[index.PAGU_DETIL]
         );
 
-      const generatedId =
+      const storedAnggaranId =
+        index.ID_ANGGARAN !== undefined
+          ? String(row[index.ID_ANGGARAN] || "").trim()
+          : "";
+
+      const generatedIdentityId =
         makeStableRpdId_(
           tahun,
           kodeSub,
@@ -3936,14 +3962,24 @@ function readRpd_(
         );
 
       const currentMaster =
+        (storedAnggaranId
+          ? currentMasterByAnggaranId.get(storedAnggaranId)
+          : null) ||
         currentMasterById.get(
-          generatedId
+          generatedIdentityId
         );
 
       const result = {
 
         id_rpd:
-          generatedId,
+          currentMaster
+            ? String(currentMaster.id_rpd || "")
+            : generatedIdentityId,
+
+        id_anggaran:
+          currentMaster
+            ? String(currentMaster.id_anggaran || "")
+            : storedAnggaranId,
 
         tahun:
           tahun,
@@ -4349,6 +4385,21 @@ function saveRpd_(
         ""
       ).trim();
 
+    const currentAnggaranId =
+      index.ID_ANGGARAN !== undefined
+        ? String(values[i][index.ID_ANGGARAN] || "").trim()
+        : "";
+
+    const targetAnggaranId =
+      targetMaster
+        ? String(targetMaster.id_anggaran || "").trim()
+        : "";
+
+    const sameAnggaranId =
+      targetAnggaranId &&
+      currentAnggaranId &&
+      currentAnggaranId === targetAnggaranId;
+
     const sameId =
       requestedId &&
       (
@@ -4414,6 +4465,7 @@ function saveRpd_(
       ).trim();
 
     if (
+      sameAnggaranId ||
       sameId ||
       sameIdentity
     ) {
@@ -4429,21 +4481,30 @@ function saveRpd_(
   }
 
   const stableId =
-    requestedId ||
-    makeStableRpdId_(
-      row.tahun,
-      row.kode_sub_komponen,
-      row.sub_komponen,
-      row.akun,
-      row.item_akun,
-      row.detil_akun,
-      row.rincian_item
-    );
+    targetMaster
+      ? String(targetMaster.id_rpd || "").trim()
+      : makeStableRpdId_(
+          row.tahun,
+          row.kode_sub_komponen,
+          row.sub_komponen,
+          row.akun,
+          row.item_akun,
+          row.detil_akun,
+          row.rincian_item
+        );
+
+  const idAnggaran =
+    targetMaster
+      ? String(targetMaster.id_anggaran || "").trim()
+      : "";
 
   const record = {
 
     id_rpd:
       stableId,
+
+    id_anggaran:
+      idAnggaran,
 
     tahun:
       String(
@@ -4524,6 +4585,11 @@ function saveRpd_(
 
   output[index.ID_RPD] =
     record.id_rpd;
+
+  if (index.ID_ANGGARAN !== undefined) {
+    output[index.ID_ANGGARAN] =
+      record.id_anggaran;
+  }
 
   output[index.TAHUN] =
     record.tahun;
@@ -4658,7 +4724,7 @@ function saveRpd_(
       rpdExcess,
 
     pagu_detil:
-      pagu,
+      paguTerbaru,
 
     realisasi_aktual:
       realisasiAktual,
