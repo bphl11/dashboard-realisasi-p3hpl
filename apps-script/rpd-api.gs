@@ -1268,7 +1268,7 @@ function saveRpd_(idToken, row) {
   const rpdWarning = rpdExcess > 0
     ? (
       "RPD melebihi dana tersedia setelah Realisasi sebesar " +
-      formatRupiah_(rpdExcess) + ". Silakan sesuaikan kembali."
+      formatRevisionRupiah_(rpdExcess) + ". Silakan sesuaikan kembali."
     )
     : "";
 
