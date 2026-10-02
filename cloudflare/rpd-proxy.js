@@ -24,7 +24,7 @@ const ALLOWED_ORIGINS = new Set([
   "http://127.0.0.1"
 ]);
 
-const MAX_REDIRECTS = 2;
+const MAX_REDIRECTS = 0;
 
 function corsHeaders(origin) {
   const headers = {
@@ -94,7 +94,7 @@ export default {
         {
           ok: true,
           service: "RPD P3HPL Cloudflare Proxy",
-          version: "2.1.0",
+          version: "2.2.0",
           upstream: safeUrl(UPSTREAM_URL),
           redirect_mode: "manual",
           max_redirects: MAX_REDIRECTS
@@ -139,113 +139,21 @@ export default {
 
       baseHeaders.set("Content-Type", incomingContentType);
 
-      let currentUrl = UPSTREAM_URL;
-      let currentMethod = "POST";
-      let currentBody = body;
-      let upstreamResponse = null;
+      // Gunakan native redirect handling dari fetch().
+      // Google Apps Script ContentService melakukan redirect ke
+      // script.googleusercontent.com. Fetch native mengikuti redirect
+      // sesuai standar HTTP sehingga POST 302/303 menjadi GET dan
+      // 307/308 mempertahankan method/body tanpa kita mengelola URL
+      // redirect sementara secara manual.
+      const upstreamRequest = new Request(UPSTREAM_URL, {
+        method: "POST",
+        headers: baseHeaders,
+        body
+      });
 
-      const redirectChain = [];
-      const visited = new Set();
-
-      for (let attempt = 0; attempt <= MAX_REDIRECTS; attempt++) {
-        const normalizedCurrentUrl = safeUrl(currentUrl);
-
-        if (visited.has(currentUrl)) {
-          return json(
-            {
-              ok: false,
-              message: "Redirect loop terdeteksi pada Google Apps Script.",
-              detail: "URL tujuan redirect kembali ke URL yang sudah dikunjungi.",
-              last_status: upstreamResponse?.status || null,
-              last_url: normalizedCurrentUrl,
-              redirect_chain: redirectChain
-            },
-            508,
-            origin
-          );
-        }
-
-        visited.add(currentUrl);
-
-        const requestHeaders = new Headers(baseHeaders);
-
-        if (currentMethod === "GET" || currentMethod === "HEAD") {
-          requestHeaders.delete("Content-Type");
-        }
-
-        const upstreamRequest = new Request(currentUrl, {
-          method: currentMethod,
-          headers: requestHeaders,
-          body:
-            currentMethod === "GET" || currentMethod === "HEAD"
-              ? undefined
-              : currentBody
-        });
-
-        upstreamResponse = await fetch(upstreamRequest, {
-          redirect: "manual"
-        });
-
-        const status = upstreamResponse.status;
-        const location = upstreamResponse.headers.get("Location");
-
-        if (![301, 302, 303, 307, 308].includes(status) || !location) {
-          break;
-        }
-
-        if (attempt >= MAX_REDIRECTS) {
-          return json(
-            {
-              ok: false,
-              message: "Google Apps Script terlalu banyak redirect.",
-              detail: `Redirect melebihi batas aman (${MAX_REDIRECTS}).`,
-              last_status: status,
-              last_url: normalizedCurrentUrl,
-              redirect_to: safeUrl(new URL(location, currentUrl).toString()),
-              redirect_chain: redirectChain
-            },
-            508,
-            origin
-          );
-        }
-
-        const nextUrl = new URL(location, currentUrl).toString();
-
-        redirectChain.push({
-          step: attempt + 1,
-          status,
-          from: normalizedCurrentUrl,
-          to: safeUrl(nextUrl)
-        });
-
-        if (visited.has(nextUrl)) {
-          return json(
-            {
-              ok: false,
-              message: "Redirect loop terdeteksi pada Google Apps Script.",
-              detail: "Google Apps Script mengarahkan kembali ke URL yang sudah dikunjungi.",
-              last_status: status,
-              last_url: normalizedCurrentUrl,
-              redirect_to: safeUrl(nextUrl),
-              redirect_chain: redirectChain
-            },
-            508,
-            origin
-          );
-        }
-
-        currentUrl = nextUrl;
-
-        // Google Apps Script ContentService/Web App commonly returns
-        // 302/303 from script.google.com to script.googleusercontent.com.
-        // For these redirects, follow with GET.
-        if ([301, 302, 303].includes(status)) {
-          currentMethod = "GET";
-          currentBody = undefined;
-        }
-        // 307/308 preserve method and body.
-      }
-
+      const upstreamResponse = await fetch(upstreamRequest, {
+        redirect: "follow"
+      });
       if (!upstreamResponse) {
         return json(
           {
