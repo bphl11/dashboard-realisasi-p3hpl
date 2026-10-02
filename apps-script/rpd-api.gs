@@ -1000,6 +1000,7 @@ function buildMasterFromDataAplikasi_() {
     const detilAkun = headerValue_(row, context.map, ["Detil Akun","Detail Akun","Detil"]);
     const rincianItem = headerValue_(row, context.map, ["Rincian Item","Rincian"]);
     const pagu = parseAmount_(headerValue_(row, context.map, ["Pagu"]));
+    const realisasiKolom = parseAmount_(headerValue_(row, context.map, ["Realisasi","Jumlah Realisasi"]));
     const status = headerValue_(row, context.map, ["Status Pagu","Status"]);
 
     if (!subKomponen || !akun || pagu <= 0) continue;
@@ -1019,7 +1020,8 @@ function buildMasterFromDataAplikasi_() {
       akun: akun,
       itemAkun: itemAkun || "",
       detilAkun: detilAkun,
-      pagu: pagu
+      pagu: pagu,
+      realisasi: realisasiKolom
     });
   }
 
@@ -1224,6 +1226,26 @@ function saveRpd_(idToken, row) {
   let targetRow = -1;
   let oldData = null;
   const requestedId = String(row.id_rpd || "").trim();
+
+  // RPD hanya boleh direncanakan atas anggaran yang belum direalisasikan.
+  // Batas server harus sama dengan validasi frontend: Pagu - Realisasi Aktual.
+  const masterTarget = buildMasterFromDataAplikasi_().find(item =>
+    String(item.id_rpd || "").trim() === requestedId
+  );
+  const realisasiAktual = masterTarget
+    ? parseAmount_(masterTarget.realisasi)
+    : 0;
+  const danaTersedia = Math.max(pagu - realisasiAktual, 0);
+
+  if (finalTotal > danaTersedia) {
+    throw new Error(
+      "Total RPD 48 minggu melebihi dana tersedia setelah Realisasi. " +
+      "Pagu: " + pagu +
+      ", Realisasi: " + realisasiAktual +
+      ", Dana tersedia: " + danaTersedia +
+      ", Total RPD: " + finalTotal + "."
+    );
+  }
 
   for (let i = 1; i < values.length; i++) {
     const currentId = String(values[i][index.ID_RPD] || "").trim();
