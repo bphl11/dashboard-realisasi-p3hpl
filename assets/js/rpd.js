@@ -968,6 +968,11 @@ function rpdBuildMasterRows(rawData) {
     };
 
     const headerIndex = rawData.indexOf(headers);
+    const serverMasterByRow = new Map(
+        (Array.isArray(rawData.__anggaranMaster) ? rawData.__anggaranMaster : [])
+            .filter(item => item && item.rowIndex !== undefined)
+            .map(item => [String(item.rowIndex), item])
+    );
     const out = [];
 
     let currentKodeKomponen = "";
@@ -1041,10 +1046,27 @@ function rpdBuildMasterRows(rawData) {
         const leaf = rincian || detil || "";
         if (!leaf) continue;
 
+        const stableId = rpdStableId({
+            tahun: get(row, ["Tahun", "Tahun Anggaran"]) || new Date().getFullYear(),
+            kodeSubKomponen: kodeSub,
+            subKomponen: sub,
+            akun: akun,
+            itemAkun: item || "",
+            detilAkun: detil || "",
+            rincianItem: rincian || ""
+        });
+
+        const serverMaster = serverMasterByRow.get(String(i));
+        const idAnggaran =
+            get(row, ["ID_ANGGARAN", "ID ANGGARAN"]) ||
+            String(serverMaster?.id_anggaran || "").trim() ||
+            stableId;
+
         out.push({
             rowIndex: i,
             sourceFormat: "RPD_RAW",
-            id_rpd: rpdStableId({ tahun: get(row, ["Tahun", "Tahun Anggaran"]) || new Date().getFullYear(), kodeSubKomponen: kodeSub, subKomponen: sub, akun: akun, itemAkun: item || "", detilAkun: detil || "", rincianItem: rincian || "", pagu: pagu }),
+            id_rpd: serverMaster?.id_rpd || stableId,
+            id_anggaran: idAnggaran,
             tahun: get(row, ["Tahun", "Tahun Anggaran"]) || new Date().getFullYear(),
             kodeKomponen: currentKodeKomponen,
             komponen: currentKomponen,
