@@ -117,12 +117,29 @@ function onMasterSelectedInputRealisasi() {
 }
 
 function getExistingInputTotalForMaster(idAnggaran, excludeId = "") {
+    const targetId = String(idAnggaran || "").trim();
+    const excludedId = String(excludeId || "").trim();
+
     return realisasiRows
-        .filter(item =>
-            item.id_anggaran === idAnggaran &&
-            String(item.status || "AKTIF").toUpperCase() === "AKTIF" &&
-            (!excludeId || item.id_realisasi !== excludeId)
-        )
+        .filter(item => {
+            const itemId = String(
+                item?.id_anggaran ??
+                item?.ID_ANGGARAN ??
+                ""
+            ).trim();
+
+            const itemRealId = String(
+                item?.id_realisasi ??
+                item?.ID_REALISASI ??
+                ""
+            ).trim();
+
+            return (
+                itemId === targetId &&
+                String(item?.status || "AKTIF").trim().toUpperCase() === "AKTIF" &&
+                (!excludedId || itemRealId !== excludedId)
+            );
+        })
         .reduce((sum, item) => sum + (Number(item.nominal_realisasi) || 0), 0);
 }
 
@@ -370,7 +387,23 @@ async function loadInputRealisasiData() {
 
         realisasiRows = Array.isArray(result.realisasi)
             ? result.realisasi
+                .map(normalisasiRowInputRealisasi)
+                .filter(Boolean)
             : [];
+
+        // Setelah snapshot server terbaru masuk, hitung ulang panel detail
+        // yang sedang dipilih agar Input Bulanan dan Sisa Pagu mencerminkan
+        // transaksi aktif yang benar-benar tersimpan di server.
+        if (selectedMaster) {
+            const currentId = String(selectedMaster.id_anggaran || "").trim();
+            const refreshedMaster = realisasiMaster.find(item =>
+                String(item.id_anggaran || "").trim() === currentId
+            );
+            if (refreshedMaster) {
+                selectedMaster = refreshedMaster;
+            }
+            renderMasterInfoInputRealisasi();
+        }
 
         // Bootstrap/list adalah snapshot transaksi lengkap dari server.
         if (typeof replaceInputRealisasiLocalCache === "function") {
