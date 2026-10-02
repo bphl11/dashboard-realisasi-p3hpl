@@ -3726,6 +3726,18 @@ function buildMasterFromDataAplikasi_() {
       rincianItem:
         rincianItem || "",
 
+      id_anggaran:
+        idAnggaran ||
+        makeStableRpdId_(
+          tahun,
+          kodeSubKomponen,
+          subKomponen,
+          akun,
+          itemAkun,
+          detilAkun,
+          rincianItem
+        ),
+
       pagu:
         pagu,
 
