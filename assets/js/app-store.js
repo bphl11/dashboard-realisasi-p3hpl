@@ -12,7 +12,7 @@
 //   (parsed/calculation) yang di-invalidasi.
 // ============================================================
 
-const APP_STORE_KEY = "p3hpl_app_store_v1";
+const APP_STORE_KEY = "p3hpl_app_store_v2";
 const APP_STORE_TTL = 2 * 60 * 1000;
 
 let appStoreMemory = null;
@@ -22,7 +22,55 @@ function appStoreReadCache() {
     if (appStoreMemory && Array.isArray(appStoreMemory.rawData) &&
         Array.isArray(appStoreMemory.parsedData) &&
         appStoreMemory.calculation) {
-        return appStoreMemory;
+
+        const cached = appStoreMemory;
+        const inputRows =
+            typeof bacaCacheInputRealisasi === "function"
+                ? (bacaCacheInputRealisasi() || cached.inputRealisasi || [])
+                : (cached.inputRealisasi || []);
+
+        const masterRows =
+            typeof bacaCacheMasterAnggaran === "function"
+                ? (bacaCacheMasterAnggaran() || cached.anggaranMaster || [])
+                : (cached.anggaranMaster || []);
+
+        const inputAt =
+            typeof getInputRealisasiCacheTimestamp === "function"
+                ? getInputRealisasiCacheTimestamp()
+                : Number(cached.inputRealisasiAt || 0);
+
+        const masterAt =
+            typeof getMasterAnggaranCacheTimestamp === "function"
+                ? getMasterAnggaranCacheTimestamp()
+                : Number(cached.anggaranMasterAt || 0);
+
+        if (
+            inputAt > Number(cached.inputRealisasiAt || 0) ||
+            masterAt > Number(cached.anggaranMasterAt || 0)
+        ) {
+            attachInputRealisasiToRawData(cached.rawData, inputRows, masterRows);
+
+            const parsedData =
+                typeof parseDataMonitoring === "function"
+                    ? parseDataMonitoring(cached.rawData)
+                    : [];
+
+            const calculation =
+                typeof hitungCalculationEngine === "function"
+                    ? hitungCalculationEngine(cached.rawData, parsedData)
+                    : null;
+
+            if (Array.isArray(parsedData) && calculation) {
+                cached.parsedData = parsedData;
+                cached.calculation = calculation;
+                cached.inputRealisasi = inputRows;
+                cached.anggaranMaster = masterRows;
+                cached.inputRealisasiAt = inputAt;
+                cached.anggaranMasterAt = masterAt;
+            }
+        }
+
+        return cached;
     }
 
     try {
@@ -55,8 +103,66 @@ function appStoreReadCache() {
                 ? inputCache
                 : (Array.isArray(cached.inputRealisasi) ? cached.inputRealisasi : []);
 
-            if (Array.isArray(inputRows)) {
-                attachInputRealisasiToRawData(cached.rawData, inputRows);
+            const masterCache =
+                typeof bacaCacheMasterAnggaran === "function"
+                    ? bacaCacheMasterAnggaran()
+                    : null;
+
+            const masterRows = Array.isArray(masterCache)
+                ? masterCache
+                : (Array.isArray(cached.anggaranMaster) ? cached.anggaranMaster : []);
+
+            attachInputRealisasiToRawData(
+                cached.rawData,
+                inputRows,
+                masterRows
+            );
+
+            const inputAt =
+                typeof getInputRealisasiCacheTimestamp === "function"
+                    ? getInputRealisasiCacheTimestamp()
+                    : 0;
+
+            const masterAt =
+                typeof getMasterAnggaranCacheTimestamp === "function"
+                    ? getMasterAnggaranCacheTimestamp()
+                    : 0;
+
+            const storedInputAt = Number(cached.inputRealisasiAt || 0);
+            const storedMasterAt = Number(cached.anggaranMasterAt || 0);
+
+            // Jangan mengembalikan parsed/calculation yang sudah basi ketika
+            // transaksi atau master ID anggaran berubah di luar halaman ini.
+            if (
+                inputAt > storedInputAt ||
+                masterAt > storedMasterAt ||
+                !Array.isArray(cached.rawData.__inputRealisasi)
+            ) {
+                const parsedData =
+                    typeof parseDataMonitoring === "function"
+                        ? parseDataMonitoring(cached.rawData)
+                        : [];
+
+                const calculation =
+                    typeof hitungCalculationEngine === "function"
+                        ? hitungCalculationEngine(cached.rawData, parsedData)
+                        : null;
+
+                if (Array.isArray(parsedData) && calculation) {
+                    cached.parsedData = parsedData;
+                    cached.calculation = calculation;
+                    cached.inputRealisasi = inputRows;
+                    cached.anggaranMaster = masterRows;
+                    cached.inputRealisasiAt = inputAt;
+                    cached.anggaranMasterAt = masterAt;
+
+                    try {
+                        sessionStorage.setItem(
+                            APP_STORE_KEY,
+                            JSON.stringify(cached)
+                        );
+                    } catch (error) {}
+                }
             }
         }
 
@@ -82,12 +188,31 @@ function appStoreWriteCache(state) {
             ? state.rawData.__inputRealisasi
             : [];
 
+    const anggaranMaster =
+        state.rawData &&
+        Array.isArray(state.rawData.__anggaranMaster)
+            ? state.rawData.__anggaranMaster
+            : [];
+
+    const inputRealisasiAt =
+        typeof getInputRealisasiCacheTimestamp === "function"
+            ? getInputRealisasiCacheTimestamp()
+            : 0;
+
+    const anggaranMasterAt =
+        typeof getMasterAnggaranCacheTimestamp === "function"
+            ? getMasterAnggaranCacheTimestamp()
+            : 0;
+
     appStoreMemory = {
         timestamp: Date.now(),
         rawData: state.rawData,
         parsedData: state.parsedData,
         calculation: state.calculation,
-        inputRealisasi: inputRealisasi
+        inputRealisasi: inputRealisasi,
+        anggaranMaster: anggaranMaster,
+        inputRealisasiAt: inputRealisasiAt,
+        anggaranMasterAt: anggaranMasterAt
     };
 
     try {
@@ -194,9 +319,22 @@ function appStorePatchRealisasi(action, result) {
         return false;
     }
 
-    // Raw master DATA_APLIKASI tetap sama. Hanya metadata transaksi yang
-    // diperbarui, lalu parser dan calculation engine menghitung snapshot baru.
-    attachInputRealisasiToRawData(state.rawData, currentRows);
+    // Raw master DATA_APLIKASI tetap sama. Pertahankan juga mapping
+    // ID_ANGGARAN permanen agar patch transaksi tidak memutus relasi.
+    const currentMaster =
+        Array.isArray(state.rawData?.__anggaranMaster)
+            ? state.rawData.__anggaranMaster
+            : (Array.isArray(state.anggaranMaster)
+                ? state.anggaranMaster
+                : (typeof bacaCacheMasterAnggaran === "function"
+                    ? (bacaCacheMasterAnggaran() || [])
+                    : []));
+
+    attachInputRealisasiToRawData(
+        state.rawData,
+        currentRows,
+        currentMaster
+    );
 
     const parsedData =
         typeof parseDataMonitoring === "function"

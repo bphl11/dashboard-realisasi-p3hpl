@@ -450,6 +450,7 @@ function applyRevisionDraft() {
             try {
                 localStorage.removeItem("p3hpl_rpd_master_v4_stable_id_revisi");
                 localStorage.removeItem("p3hpl_grafik_rpd_cache_v2");
+                localStorage.removeItem("p3hpl_grafik_rpd_cache_v3");
             } catch (cacheError) {
                 console.warn("Cache RPD tidak dapat diinvalidasi:", cacheError);
             }

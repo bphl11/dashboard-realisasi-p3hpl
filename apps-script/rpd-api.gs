@@ -26,7 +26,7 @@ const RPD_CLIENT_ID =
 const SOURCE_CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vShdaPwws12pkv75bkQJL9AYjuC_4xjvANknmsoT6HVmgKeQ2DJsLLm5QzbvlKQJeQvqNGzYALsOk5n/pub?gid=1473286966&single=true&output=csv";
 
-const RPD_API_VERSION = "1.5.1";
+const RPD_API_VERSION = "1.6.0";
 
 const RPD_SHEETS = {
   RPD: "RPD P3HPL",
@@ -35,6 +35,154 @@ const RPD_SHEETS = {
   REALISASI: "REALISASI P3HPL",
   REALISASI_LOG: "REALISASI_LOG"
 };
+
+// ============================================================
+// PERMANENT ID_ANGGARAN
+// ============================================================
+// Satu detil anggaran mempunyai ID yang tidak berubah saat Pagu,
+// Volume, atau Harga direvisi. ID ini menjadi relasi resmi antara
+// DATA_APLIKASI, INPUT_REALISASI dan modul turunan aplikasi.
+// ============================================================
+
+const ANGGARAN_ID_HEADER_ = "ID_ANGGARAN";
+const ANGGARAN_ID_PREFIX_ = "ANG-";
+
+function ensureAnggaranIdSchema_() {
+  const ss = getSpreadsheet_();
+  const sheet = ss.getSheetByName("DATA_APLIKASI");
+  if (!sheet) throw new Error("Sheet DATA_APLIKASI tidak ditemukan.");
+
+  let values = sheet.getDataRange().getValues();
+  let headerRow = -1;
+  let map = null;
+
+  for (let r = 0; r < Math.min(values.length, 10); r++) {
+    const candidate = headerIndex_(values[r]);
+    if (
+      candidate.PAGU !== undefined &&
+      (candidate.SUB_KOMPONEN !== undefined || candidate.SUBKOMPONEN !== undefined)
+    ) {
+      headerRow = r;
+      map = candidate;
+      break;
+    }
+  }
+
+  if (headerRow < 0) throw new Error("Header DATA_APLIKASI tidak ditemukan.");
+
+  let idCol = map[ANGGARAN_ID_HEADER_] ?? map["ID ANGGARAN"];
+  if (idCol === undefined) {
+    idCol = sheet.getLastColumn();
+    sheet.getRange(headerRow + 1, idCol + 1).setValue(ANGGARAN_ID_HEADER_);
+    values = sheet.getDataRange().getValues();
+    map = headerIndex_(values[headerRow]);
+    idCol = map[ANGGARAN_ID_HEADER_] ?? map["ID ANGGARAN"];
+  }
+
+  if (idCol === undefined) throw new Error("Kolom ID_ANGGARAN tidak dapat dibuat.");
+
+  const existingIds = new Set();
+  const output = [];
+  let changed = false;
+
+  for (let i = headerRow + 1; i < values.length; i++) {
+    const row = values[i] || [];
+    const current = String(row[idCol] ?? "").trim();
+    const hasData = row.some(v => String(v ?? "").trim() !== "");
+
+    if (!hasData) {
+      output.push([current]);
+      continue;
+    }
+
+    const pagu = map.PAGU !== undefined ? parseAmount_(row[map.PAGU]) : 0;
+    const sub = headerValue_(row, map, ["Sub Komponen", "Subkomponen", "Nama Sub Komponen"]);
+    const akun = headerValue_(row, map, ["Akun Belanja", "Akun"]);
+    const detil = headerValue_(row, map, ["Detil Akun", "Detail Akun", "Detil"]);
+    const rincian = headerValue_(row, map, ["Rincian Item", "Rincian"]);
+    const isBudgetDetail = pagu > 0 && Boolean(sub || akun || detil || rincian);
+
+    let id = current;
+    if (isBudgetDetail) {
+      if (!id || existingIds.has(id)) {
+        id = ANGGARAN_ID_PREFIX_ + Utilities.getUuid().replace(/-/g, "").toUpperCase();
+        changed = true;
+      }
+      existingIds.add(id);
+    }
+    output.push([id]);
+  }
+
+  if (changed) {
+    sheet.getRange(headerRow + 2, idCol + 1, output.length, 1).setValues(output);
+    SpreadsheetApp.flush();
+  }
+
+  // Migrasikan ID_REALISASI yang masih memakai identitas lama
+  // (termasuk format lama yang memasukkan Pagu) ke ID_ANGGARAN baru.
+  // Ini menjaga transaksi lama tetap terhubung setelah migrasi.
+  const legacyToPermanent = new Map();
+
+  for (let i = headerRow + 1; i < values.length; i++) {
+    const row = values[i] || [];
+    const id = String(row[idCol] ?? "").trim();
+    if (!id) continue;
+
+    const tahun = headerValue_(row, map, ["Tahun", "Tahun Anggaran"]);
+    const kodeSub = headerValue_(row, map, ["Kode Sub Komponen", "KodeSubKomponen"]);
+    const sub = headerValue_(row, map, ["Sub Komponen", "Subkomponen", "Nama Sub Komponen"]);
+    const akun = headerValue_(row, map, ["Akun Belanja", "Akun"]);
+    const item = headerValue_(row, map, ["Item Akun", "Item"]);
+    const detil = headerValue_(row, map, ["Detil Akun", "Detail Akun", "Detil"]);
+    const rincian = headerValue_(row, map, ["Rincian Item", "Rincian"]);
+    const pagu = parseAmount_(row[map.PAGU]);
+
+    const stableLegacy = makeStableRpdId_(
+      tahun, kodeSub, sub, akun, item, detil, rincian
+    );
+    const paguLegacy = makeRpdId_(
+      tahun, kodeSub, sub, akun, item, detil, rincian, pagu
+    );
+
+    if (stableLegacy && stableLegacy !== id) legacyToPermanent.set(stableLegacy, id);
+    if (paguLegacy && paguLegacy !== id) legacyToPermanent.set(paguLegacy, id);
+  }
+
+  if (legacyToPermanent.size) {
+    const realisasiSheet = ss.getSheetByName(RPD_SHEETS.REALISASI);
+    if (realisasiSheet) {
+      ensureRealisasiSchema_(realisasiSheet);
+      const realisasiValues = realisasiSheet.getDataRange().getValues();
+      if (realisasiValues.length >= 2) {
+        const realisasiIndex = realisasiHeaderIndex_(realisasiValues[0]);
+        const realisasiIdCol = realisasiIndex.ID_ANGGARAN;
+        if (realisasiIdCol !== undefined) {
+          let realisasiChanged = false;
+          const migrated = realisasiValues.slice(1).map(row => {
+            const oldId = String(row[realisasiIdCol] ?? "").trim();
+            const newId = legacyToPermanent.get(oldId);
+            if (newId && newId !== oldId) {
+              const next = row.slice();
+              next[realisasiIdCol] = newId;
+              realisasiChanged = true;
+              return next;
+            }
+            return row;
+          });
+
+          if (realisasiChanged) {
+            realisasiSheet
+              .getRange(2, 1, migrated.length, realisasiValues[0].length)
+              .setValues(migrated);
+          }
+        }
+      }
+    }
+  }
+
+  return { sheet, headerRow, idCol, changed, migrated: legacyToPermanent.size };
+}
+
 
 // ============================================================
 // HEADER REALISASI
@@ -67,6 +215,7 @@ const REALISASI_HEADERS = [
 
 const RPD_HEADERS = [
   "ID_RPD",
+  "ID_ANGGARAN",
   "TAHUN",
   "KODE_SUB_KOMPONEN",
   "SUB_KOMPONEN",
@@ -460,16 +609,15 @@ function realisasiHeaderIndex_(headers) {
 // ============================================================
 
 function realisasiMasterKey_(row) {
-
-  return makeRpdId_(
+  const explicitId = String(row.idAnggaran || row.id_anggaran || "").trim();
+  return explicitId || makeStableRpdId_(
     row.tahun,
     row.kodeSubKomponen,
     row.subKomponen,
     row.akun,
     row.itemAkun,
     row.detilAkun,
-    row.rincianItem,
-    row.pagu
+    row.rincianItem
   );
 }
 
@@ -577,6 +725,7 @@ function setCachedRealisasiMaster_(master) {
 }
 
 function buildRealisasiMasterFromDataAplikasi_() {
+  ensureAnggaranIdSchema_();
   const cached = getCachedRealisasiMaster_();
 
   if (cached) {
@@ -664,6 +813,10 @@ function buildRealisasiMasterFromDataAplikasi_() {
       "Rincian Item",
       "Rincian"
     ]),
+    idAnggaran: indexAlias([
+      "ID_ANGGARAN",
+      "ID ANGGARAN"
+    ]),
     pagu: indexAlias(["Pagu"]),
     realisasi: indexAlias([
       "Realisasi",
@@ -733,6 +886,11 @@ function buildRealisasiMasterFromDataAplikasi_() {
         ? String(row[idx.rincianItem] || "").trim()
         : "";
 
+    const idAnggaran =
+      idx.idAnggaran !== undefined
+        ? String(row[idx.idAnggaran] || "").trim()
+        : "";
+
     const pagu =
       idx.pagu !== undefined
         ? parseAmount_(row[idx.pagu])
@@ -783,7 +941,8 @@ function buildRealisasiMasterFromDataAplikasi_() {
         : String(new Date().getFullYear());
 
     const item = {
-      id_anggaran: "",
+      rowIndex: i,
+      id_anggaran: idAnggaran || "",
       tahun: tahun,
       kodeSubKomponen: kodeSubKomponen,
       subKomponen: subKomponen,
@@ -1451,12 +1610,18 @@ function saveRealisasi_(
     pagu:
       target.pagu,
 
+    realisasi_dasar:
+      realisasiDasar,
+
     total_realisasi_input:
       activeTotal + nominal,
 
+    realisasi_final:
+      realisasiDasar + activeTotal + nominal,
+
     sisa_pagu_input:
       Math.max(
-        target.pagu -
+        danaTersediaInput -
         activeTotal -
         nominal,
         0
@@ -1542,6 +1707,8 @@ function listRealisasiMonitoring_() {
 
       });
 
+  const master = buildRealisasiMasterFromDataAplikasi_();
+
   return {
 
     ok: true,
@@ -1550,8 +1717,16 @@ function listRealisasiMonitoring_() {
       rows,
 
     realisasi_count:
-      rows.length
+      rows.length,
 
+    master:
+      master,
+
+    master_count:
+      master.length,
+
+    source:
+      "DATA_APLIKASI"
   };
 }
 
@@ -1711,18 +1886,31 @@ function updateRealisasi_(
     }
   }
 
+  const realisasiDasar =
+    Number(target.realisasi) || 0;
+
+  const danaTersediaInput =
+    Math.max(
+      Number(target.pagu) - realisasiDasar,
+      0
+    );
+
   if (
     activeTotalOther + nominal >
-    target.pagu
+    danaTersediaInput
   ) {
     throw new Error(
-      "Total Input Realisasi akan melebihi Pagu Detil. " +
+      "Total Realisasi Final akan melebihi Pagu Detil. " +
       "Pagu: " +
       target.pagu +
+      ", Realisasi Dasar: " +
+      realisasiDasar +
       ", input aktif lainnya: " +
       activeTotalOther +
       ", nominal baru: " +
       nominal +
+      ", sisa yang dapat diinput: " +
+      danaTersediaInput +
       "."
     );
   }
@@ -2031,6 +2219,7 @@ function applyRevisi_(request) {
 
   try {
     ss = getSpreadsheet_();
+    if (!dryRun) ensureAnggaranIdSchema_();
     sheet = ss.getSheetByName("DATA_APLIKASI");
     if (!sheet) throw new Error("Sheet DATA_APLIKASI tidak ditemukan.");
 
@@ -2164,6 +2353,52 @@ function applyRevisi_(request) {
         .filter(Number.isInteger)
     )).sort(function (a, b) { return b - a; });
 
+    // Jangan menghapus detil yang masih mempunyai RPD atau Realisasi aktif.
+    // Hal ini mencegah transaksi lama menjadi orphan setelah Revisi.
+    if (deletions.length) {
+      const deletedRows = beforeRows.filter(function (row) {
+        return deletions.indexOf(Number(row.rowIndex)) >= 0;
+      });
+
+      const deletedIds = new Set(
+        deletedRows
+          .map(function (row) { return String(row.idAnggaran || "").trim(); })
+          .filter(Boolean)
+      );
+
+      if (deletedIds.size) {
+        const rpdSheet = ss.getSheetByName(RPD_SHEETS.RPD);
+        const activeRpdIds = new Set(
+          rpdSheet
+            ? readRpd_(rpdSheet)
+                .map(function (row) { return String(row.id_anggaran || "").trim(); })
+                .filter(Boolean)
+            : []
+        );
+
+        const activeRealisasiIds = new Set(
+          readRealisasi_(getRealisasiSheet_())
+            .filter(function (row) {
+              return String(row.status || "AKTIF").toUpperCase() === "AKTIF";
+            })
+            .map(function (row) { return String(row.id_anggaran || "").trim(); })
+            .filter(Boolean)
+        );
+
+        deletedRows.forEach(function (row) {
+          const id = String(row.idAnggaran || "").trim();
+          if (id && (activeRpdIds.has(id) || activeRealisasiIds.has(id))) {
+            throw new Error(
+              "Detil anggaran " +
+              (row.uraian || row.detil || row.rincian || id) +
+              " tidak dapat dihapus karena masih memiliki RPD dan/atau Input Realisasi aktif. " +
+              "Kosongkan/selesaikan data terkait terlebih dahulu."
+            );
+          }
+        });
+      }
+    }
+
     deletions.forEach(function (rowIndex) {
       const rowNumber = rowIndex + 1;
       if (
@@ -2201,6 +2436,14 @@ function applyRevisi_(request) {
 
       const newRow = targetRow + 1;
       const volume = toRevisionNumber_(item.volume);
+
+      // Baris baru mewarisi format dari baris akun tujuan, tetapi
+      // harus mendapat ID anggaran baru agar tidak berbagi identitas.
+      if (info.idAnggaran >= 0) {
+        sheet
+          .getRange(newRow, info.idAnggaran + 1)
+          .setValue(ANGGARAN_ID_PREFIX_ + Utilities.getUuid().replace(/-/g, "").toUpperCase());
+      }
       const harga = toRevisionNumber_(item.harga);
 
       if (info.uraian >= 0) {
@@ -2241,6 +2484,8 @@ function applyRevisi_(request) {
         formatRevisionRupiah_(final.total) + "."
       );
     }
+
+    invalidateRealisasiMasterCache_();
 
     appendRevisiLog_(log, [
       nomor,
@@ -2518,7 +2763,11 @@ function readRevisionRows_() {
       satuan: value(info.satuan),
       harga: toRevisionNumber_(row[info.harga]),
       jumlah: toRevisionNumber_(row[info.pagu]),
-      tahun: currentTahun
+      tahun: currentTahun,
+      idAnggaran:
+        info.idAnggaran >= 0
+          ? String(row[info.idAnggaran] || "").trim()
+          : ""
     });
   }
 
@@ -2755,6 +3004,7 @@ function getRevisionHeaderInfo_(sheet) {
         satuan: revisionHeader_(map, ["SATUAN", "SAT"]),
         harga: revisionHeader_(map, ["HARGA SATUAN", "HARGA"]),
         pagu: revisionHeader_(map, ["PAGU", "JUMLAH"]),
+        idAnggaran: revisionHeader_(map, ["ID_ANGGARAN", "ID ANGGARAN"]),
         tahun: revisionHeader_(map, ["TAHUN", "TAHUN ANGGARAN"])
       };
     }
@@ -2845,6 +3095,12 @@ function findLastRevisionAccountRow_(sheet, item) {
     : 0;
 }
 
+function invalidateRealisasiMasterCache_() {
+  try {
+    const cache = CacheService.getScriptCache();
+    cache.remove(REALISASI_MASTER_CACHE_KEY + "_meta");
+  } catch (error) {}
+}
 // ============================================================
 // JSON OUTPUT
 // ============================================================
@@ -3275,51 +3531,37 @@ function listRpd_(
 // ============================================================
 
 function buildMasterFromDataAplikasi_() {
+  ensureAnggaranIdSchema_();
 
   if (!SOURCE_CSV_URL) {
-
-    throw new Error(
-      "SOURCE_CSV_URL belum diisi."
-    );
+    throw new Error("SOURCE_CSV_URL belum diisi.");
   }
 
-  const response =
-    UrlFetchApp.fetch(
-      SOURCE_CSV_URL,
-      {
-        muteHttpExceptions: true,
-        followRedirects: true
-      }
-    );
+  const response = UrlFetchApp.fetch(
+    SOURCE_CSV_URL,
+    {
+      muteHttpExceptions: true,
+      followRedirects: true
+    }
+  );
 
-  if (
-    response.getResponseCode() !==
-    200
-  ) {
-
+  if (response.getResponseCode() !== 200) {
     throw new Error(
       "DATA_APLIKASI tidak dapat dibaca dari sumber CSV."
     );
   }
 
-  const values =
-    Utilities.parseCsv(
-      response.getContentText()
-    );
+  const values = Utilities.parseCsv(
+    response.getContentText()
+  );
 
-  if (
-    values.length < 2
-  ) {
+  if (values.length < 2) {
     return [];
   }
 
-  const context =
-    detectHeader_(
-      values
-    );
+  const context = detectHeader_(values);
 
   if (!context) {
-
     throw new Error(
       "Header DATA_APLIKASI tidak terdeteksi."
     );
@@ -3329,95 +3571,136 @@ function buildMasterFromDataAplikasi_() {
   const seen = {};
 
   for (
-    let i =
-      context.headerIndex + 1;
+    let i = context.headerIndex + 1;
     i < values.length;
     i++
   ) {
 
-    const row =
-      values[i];
+    const row = values[i];
 
-    const subKomponen =
+    const subKomponen = headerValue_(
+      row,
+      context.map,
+      [
+        "Sub Komponen",
+        "Subkomponen",
+        "Nama Sub Komponen"
+      ]
+    );
+
+    const kodeSubKomponen = headerValue_(
+      row,
+      context.map,
+      [
+        "Kode Sub Komponen",
+        "KodeSubKomponen"
+      ]
+    );
+
+    const akun = headerValue_(
+      row,
+      context.map,
+      [
+        "Akun Belanja",
+        "Akun"
+      ]
+    );
+
+    const itemAkun = headerValue_(
+      row,
+      context.map,
+      [
+        "Item Akun",
+        "Item"
+      ]
+    );
+
+    const detilAkun = headerValue_(
+      row,
+      context.map,
+      [
+        "Detil Akun",
+        "Detail Akun",
+        "Detil"
+      ]
+    );
+
+    const rincianItem = headerValue_(
+      row,
+      context.map,
+      [
+        "Rincian Item",
+        "Rincian"
+      ]
+    );
+
+    const idAnggaran = headerValue_(
+      row,
+      context.map,
+      ["ID_ANGGARAN", "ID ANGGARAN"]
+    );
+
+    const pagu = parseAmount_(
+      headerValue_(
+        row,
+        context.map,
+        ["Pagu"]
+      )
+    );
+
+    const realisasiKolom = parseAmount_(
       headerValue_(
         row,
         context.map,
         [
-          "Sub Komponen",
-          "Subkomponen",
-          "Nama Sub Komponen"
+          "Realisasi",
+          "Jumlah Realisasi"
         ]
+      )
+    );
+
+    const bulanRealisasi = [
+      "Januari",
+      "Februari",
+      "Maret",
+      "April",
+      "Mei",
+      "Juni",
+      "Juli",
+      "Agustus",
+      "September",
+      "Oktober",
+      "November",
+      "Desember"
+    ];
+
+    const realisasiBulanan =
+      bulanRealisasi.reduce(
+        function (sum, bulan) {
+          return sum + parseAmount_(
+            headerValue_(
+              row,
+              context.map,
+              [bulan]
+            )
+          );
+        },
+        0
       );
 
-    const kodeSubKomponen =
-      headerValue_(
-        row,
-        context.map,
-        [
-          "Kode Sub Komponen",
-          "KodeSubKomponen"
-        ]
-      );
+    const realisasi =
+      realisasiKolom > 0
+        ? realisasiKolom
+        : realisasiBulanan;
 
-    const akun =
-      headerValue_(
-        row,
-        context.map,
-        [
-          "Akun Belanja",
-          "Akun"
-        ]
-      );
-
-    const itemAkun =
-      headerValue_(
-        row,
-        context.map,
-        [
-          "Item Akun",
-          "Item"
-        ]
-      );
-
-    const detilAkun =
-      headerValue_(
-        row,
-        context.map,
-        [
-          "Detil Akun",
-          "Detail Akun",
-          "Detil"
-        ]
-      );
-
-    const rincianItem =
-      headerValue_(
-        row,
-        context.map,
-        [
-          "Rincian Item",
-          "Rincian"
-        ]
-      );
-
-    const pagu =
-      parseAmount_(
-        headerValue_(
-          row,
-          context.map,
-          ["Pagu"]
-        )
-      );
-
-    const status =
-      headerValue_(
-        row,
-        context.map,
-        [
-          "Status Pagu",
-          "Status"
-        ]
-      );
+    const status = headerValue_(
+      row,
+      context.map,
+      [
+        "Status Pagu",
+        "Status"
+      ]
+    );
 
     const tahun =
       headerValue_(
@@ -3446,25 +3729,28 @@ function buildMasterFromDataAplikasi_() {
       continue;
     }
 
-    const id =
-      makeRpdId_(
-        tahun,
-        kodeSubKomponen,
-        subKomponen,
-        akun,
-        itemAkun,
-        detilAkun,
-        rincianItem,
-        pagu
-      );
+    const id = makeStableRpdId_(
+      tahun,
+      kodeSubKomponen,
+      subKomponen,
+      akun,
+      itemAkun,
+      detilAkun,
+      rincianItem
+    );
 
     if (seen[id]) {
+      // Jika struktur DATA_APLIKASI memiliki duplikasi identitas,
+      // pertahankan satu master agar RPD tidak menjadi double counting.
       continue;
     }
 
     seen[id] = true;
 
     out.push({
+
+      rowIndex:
+        i,
 
       id_rpd:
         id,
@@ -3490,87 +3776,398 @@ function buildMasterFromDataAplikasi_() {
       rincianItem:
         rincianItem || "",
 
+      id_anggaran:
+        idAnggaran ||
+        makeStableRpdId_(
+          tahun,
+          kodeSubKomponen,
+          subKomponen,
+          akun,
+          itemAkun,
+          detilAkun,
+          rincianItem
+        ),
+
       pagu:
-        pagu
+        pagu,
+
+      realisasi:
+        realisasi
+
     });
   }
 
-  return out;
+  return enrichMasterWithFinalRealisasi_(out);
+}
+
+// ============================================================
+// REALISASI FINAL UNTUK RPD
+// ============================================================
+
+function enrichMasterWithFinalRealisasi_(master) {
+  const rows = readRealisasi_(getRealisasiSheet_());
+  const byId = new Map();
+  const byIdentity = new Map();
+
+  rows.forEach(item => {
+    if (
+      String(item.status || "AKTIF").toUpperCase() !== "AKTIF" ||
+      !(Number(item.nominal_realisasi) > 0)
+    ) {
+      return;
+    }
+
+    const nominal = Number(item.nominal_realisasi) || 0;
+    const id = String(item.id_anggaran || "").trim();
+
+    if (id) {
+      byId.set(id, (byId.get(id) || 0) + nominal);
+    }
+
+    const identity = makeStableRpdId_(
+      item.tahun,
+      item.kode_sub_komponen,
+      item.sub_komponen,
+      item.akun,
+      item.item_akun,
+      item.detil_akun,
+      item.rincian_item
+    );
+
+    if (identity) {
+      byIdentity.set(identity, (byIdentity.get(identity) || 0) + nominal);
+    }
+  });
+
+  return master.map(item => {
+    const realisasiDasar = Number(item.realisasi) || 0;
+    const explicitId = String(item.id_anggaran || "").trim();
+    const identity = String(item.id_rpd || "").trim();
+
+    const realisasiInput =
+      (explicitId && byId.get(explicitId) !== undefined)
+        ? byId.get(explicitId)
+        : (byIdentity.get(identity) || 0);
+
+    const realisasiFinal = realisasiDasar + realisasiInput;
+    const pagu = Number(item.pagu) || 0;
+
+    return {
+      ...item,
+      realisasiDasar,
+      realisasiInput,
+      realisasi: realisasiFinal,
+      sisa: Math.max(pagu - realisasiFinal, 0),
+      persen: pagu > 0 ? (realisasiFinal / pagu) * 100 : 0
+    };
+  });
 }
 
 // ============================================================
 // READ RPD
 // ============================================================
 
-function readRpd_(sheet) {
-  ensureRpdSchema_(sheet);
-  const values = sheet.getDataRange().getValues();
-  if (values.length < 2) return [];
+function readRpd_(
+  sheet
+) {
 
-  const index = headerIndex_(values[0]);
+  ensureRpdSchema_(
+    sheet
+  );
 
-  let currentMasterById = new Map();
-  try {
-    const master = buildMasterFromDataAplikasi_();
-    currentMasterById = new Map(
-      (Array.isArray(master) ? master : []).map(item => [
-        String(item.id_rpd || "").trim(),
-        item
-      ])
-    );
-  } catch (error) {
-    console.warn("Master terbaru RPD tidak dapat dimuat:", error.message);
+  const values =
+    sheet
+      .getDataRange()
+      .getValues();
+
+  if (
+    values.length < 2
+  ) {
+    return [];
   }
 
-  const months = ["JAN","FEB","MAR","APR","MEI","JUN","JUL","AGU","SEP","OKT","NOV","DES"];
+  const index =
+    headerIndex_(
+      values[0]
+    );
 
-  return values.slice(1)
-    .filter(row => row.some(cell => String(cell ?? "").trim() !== ""))
-    .map(row => {
-      const tahun = String(row[index.TAHUN] || "");
-      const kodeSub = String(row[index.KODE_SUB_KOMPONEN] || "");
-      const sub = String(row[index.SUB_KOMPONEN] || "");
-      const akun = String(row[index.AKUN] || "");
-      const item = String(row[index.ITEM_AKUN] || "");
-      const detil = String(row[index.DETIL_AKUN] || "");
-      const rincian = String(row[index.RINCIAN_ITEM] || "");
-      const stableId = makeStableRpdId_(tahun,kodeSub,sub,akun,item,detil,rincian);
-      const master = currentMasterById.get(stableId);
+  // Master terbaru menjadi sumber Pagu dan Realisasi.
+  // RPD yang sudah tersimpan tetap dipertahankan berdasarkan ID stabil.
+  let currentMasterById = new Map();
+
+  try {
+
+    const master =
+      buildMasterFromDataAplikasi_();
+
+    const masterRows = Array.isArray(master) ? master : [];
+
+    currentMasterById =
+      new Map(
+        masterRows
+          .map(function (item) {
+            return [
+              String(
+                item.id_rpd || ""
+              ).trim(),
+              item
+            ];
+          })
+      );
+
+    var currentMasterByAnggaranId =
+      new Map(
+        masterRows
+          .map(function (item) {
+            return [
+              String(
+                item.id_anggaran || ""
+              ).trim(),
+              item
+            ];
+          })
+          .filter(function (pair) {
+            return pair[0] !== "";
+          })
+      );
+
+  } catch (error) {
+
+    console.warn(
+      "Master terbaru RPD tidak dapat dimuat:",
+      error.message
+    );
+
+    var currentMasterByAnggaranId = new Map();
+  }
+
+  return values
+    .slice(1)
+    .filter(function (row) {
+
+      return row.some(
+        function (cell) {
+
+          return (
+            String(
+              cell || ""
+            ).trim() !== ""
+          );
+
+        }
+      );
+
+    })
+    .map(function (row) {
+
+      const tahun =
+        String(
+          row[index.TAHUN] ||
+          ""
+        );
+
+      const kodeSub =
+        String(
+          row[index.KODE_SUB_KOMPONEN] ||
+          ""
+        );
+
+      const sub =
+        String(
+          row[index.SUB_KOMPONEN] ||
+          ""
+        );
+
+      const akun =
+        String(
+          row[index.AKUN] ||
+          ""
+        );
+
+      const item =
+        String(
+          row[index.ITEM_AKUN] ||
+          ""
+        );
+
+      const detil =
+        String(
+          row[index.DETIL_AKUN] ||
+          ""
+        );
+
+      const rincian =
+        String(
+          row[index.RINCIAN_ITEM] ||
+          ""
+        );
+
+      const paguLama =
+        parseAmount_(
+          row[index.PAGU_DETIL]
+        );
+
+      const storedAnggaranId =
+        index.ID_ANGGARAN !== undefined
+          ? String(row[index.ID_ANGGARAN] || "").trim()
+          : "";
+
+      const generatedIdentityId =
+        makeStableRpdId_(
+          tahun,
+          kodeSub,
+          sub,
+          akun,
+          item,
+          detil,
+          rincian
+        );
+
+      const currentMaster =
+        (storedAnggaranId
+          ? currentMasterByAnggaranId.get(storedAnggaranId)
+          : null) ||
+        currentMasterById.get(
+          generatedIdentityId
+        );
+
       const result = {
-        id_rpd: stableId,
-        tahun,
-        kode_sub_komponen: kodeSub,
-        sub_komponen: sub,
-        akun,
-        item_akun: item,
-        detil_akun: detil,
-        rincian_item: rincian,
-        pagu_detil: master ? parseAmount_(master.pagu) : parseAmount_(row[index.PAGU_DETIL]),
-        realisasi: master ? parseAmount_(master.realisasi) : 0,
-        catatan: String(row[index.CATATAN] || ""),
-        updated_at: row[index.UPDATED_AT] || "",
-        updated_by: String(row[index.UPDATED_BY] || "")
+
+        id_rpd:
+          currentMaster
+            ? String(currentMaster.id_rpd || "")
+            : generatedIdentityId,
+
+        id_anggaran:
+          currentMaster
+            ? String(currentMaster.id_anggaran || "")
+            : storedAnggaranId,
+
+        tahun:
+          tahun,
+
+        kode_sub_komponen:
+          kodeSub,
+
+        sub_komponen:
+          sub,
+
+        akun:
+          akun,
+
+        item_akun:
+          item,
+
+        detil_akun:
+          detil,
+
+        rincian_item:
+          rincian,
+
+        pagu_detil:
+          currentMaster
+            ? parseAmount_(
+                currentMaster.pagu
+              )
+            : paguLama,
+
+        realisasi:
+          currentMaster
+            ? parseAmount_(
+                currentMaster.realisasi
+              )
+            : 0,
+
+        tw1:
+          parseAmount_(
+            row[index.TW1]
+          ),
+
+        tw2:
+          parseAmount_(
+            row[index.TW2]
+          ),
+
+        tw3:
+          parseAmount_(
+            row[index.TW3]
+          ),
+
+        tw4:
+          parseAmount_(
+            row[index.TW4]
+          ),
+
+        total_rpd:
+          parseAmount_(
+            row[index.TOTAL_RPD]
+          ),
+
+        catatan:
+          String(
+            row[index.CATATAN] ||
+            ""
+          ),
+
+        updated_at:
+          row[index.UPDATED_AT] ||
+          "",
+
+        updated_by:
+          String(
+            row[index.UPDATED_BY] ||
+            ""
+          )
       };
 
-      months.forEach(month => {
-        for (let week=1; week<=4; week++) {
-          const col = month + "_M" + week;
-          const prop = month.toLowerCase() + "_m" + week;
-          result[prop] = parseAmount_(row[index[col]]);
-        }
-      });
+      const months = [
+        "JAN",
+        "FEB",
+        "MAR",
+        "APR",
+        "MEI",
+        "JUN",
+        "JUL",
+        "AGU",
+        "SEP",
+        "OKT",
+        "NOV",
+        "DES"
+      ];
 
-      result.tw1 = 0; result.tw2 = 0; result.tw3 = 0; result.tw4 = 0;
-      months.forEach((month, i) => {
-        const quarter = Math.floor(i/3)+1;
-        for (let week=1; week<=4; week++) {
-          result["tw"+quarter] += Number(result[month.toLowerCase()+"_m"+week]) || 0;
+      months.forEach(
+        function (month) {
+
+          for (
+            let week = 1;
+            week <= 4;
+            week++
+          ) {
+
+            const key =
+              month +
+              "_M" +
+              week;
+
+            const prop =
+              month.toLowerCase() +
+              "_m" +
+              week;
+
+            result[prop] =
+              parseAmount_(
+                row[index[key]]
+              );
+          }
         }
-      });
-      result.total_rpd = result.tw1 + result.tw2 + result.tw3 + result.tw4;
+      );
+
       return result;
     });
 }
+// ============================================================
+// SAVE RPD
+// ============================================================
 
 function saveRpd_(
   idToken,
@@ -3652,155 +4249,693 @@ function saveRpd_(
 
       for (
         let week = 1;
-function saveRpd_(idToken, row) {
-  const user = authenticate_(idToken).user;
-  if (!row || !row.id_rpd) throw new Error("ID RPD tidak lengkap.");
+        week <= 4;
+        week++
+      ) {
 
-  const sheet = getSpreadsheet_().getSheetByName(RPD_SHEETS.RPD);
-  if (!sheet) throw new Error("Sheet RPD belum dibuat.");
-  ensureRpdSchema_(sheet);
+        const key =
+          month +
+          "_m" +
+          week;
 
-  const index = headerIndex_(
-    sheet.getRange(1,1,1,sheet.getLastColumn()).getValues()[0]
+        weeklyValues[key] =
+          parseAmount_(
+            row[key]
+          );
+      }
+    }
   );
 
-  const months = ["jan","feb","mar","apr","mei","jun","jul","agu","sep","okt","nov","des"];
-  const weeklyValues = {};
+  const weekList =
+    Object.values(
+      weeklyValues
+    );
 
-  months.forEach(month => {
-    for (let week=1; week<=4; week++) {
-      const key = month + "_m" + week;
-      weeklyValues[key] = parseAmount_(row[key]);
-    }
-  });
+  if (
+    weekList.some(
+      function (value) {
+        return value < 0;
+      }
+    )
+  ) {
 
-  const weekList = Object.values(weeklyValues);
-  if (weekList.some(value => value < 0)) {
-    throw new Error("Nilai RPD mingguan tidak boleh negatif.");
+    throw new Error(
+      "Nilai RPD mingguan tidak boleh negatif."
+    );
   }
 
-  const total = weekList.reduce((sum,value)=>sum+value,0);
-  const requestedId = String(row.id_rpd || "").trim();
+  const tw1 =
+    weekList
+      .slice(0, 12)
+      .reduce(
+        function (a, b) {
+          return a + b;
+        },
+        0
+      );
 
-  const master = buildMasterFromDataAplikasi_();
-  const identityMatch = item =>
-    String(item.tahun || "").trim() === String(row.tahun || "").trim() &&
-    String(item.kodeSubKomponen || "").trim() === String(row.kode_sub_komponen || "").trim() &&
-    String(item.subKomponen || "").trim() === String(row.sub_komponen || "").trim() &&
-    String(item.akun || "").trim() === String(row.akun || "").trim() &&
-    String(item.itemAkun || "").trim() === String(row.item_akun || "").trim() &&
-    String(item.detilAkun || "").trim() === String(row.detil_akun || "").trim() &&
-    String(item.rincianItem || "").trim() === String(row.rincian_item || "").trim();
+  const tw2 =
+    weekList
+      .slice(12, 24)
+      .reduce(
+        function (a, b) {
+          return a + b;
+        },
+        0
+      );
 
-  const targetMaster =
-    master.find(item => String(item.id_rpd || "").trim() === requestedId) ||
-    master.find(identityMatch);
+  const tw3 =
+    weekList
+      .slice(24, 36)
+      .reduce(
+        function (a, b) {
+          return a + b;
+        },
+        0
+      );
 
-  const paguTerbaru = targetMaster ? parseAmount_(targetMaster.pagu) : parseAmount_(row.pagu_detil);
-  const realisasiAktual = targetMaster ? parseAmount_(targetMaster.realisasi) : 0;
-  const danaTersedia = Math.max(paguTerbaru - realisasiAktual, 0);
-  const rpdExcess = Math.max(total - danaTersedia, 0);
-  const rpdWarning = rpdExcess > 0
-    ? "RPD melebihi sisa belum direalisasikan sebesar " + formatRevisionRupiah_(rpdExcess) + ". Silakan sesuaikan kembali."
-    : "";
+  const tw4 =
+    weekList
+      .slice(36, 48)
+      .reduce(
+        function (a, b) {
+          return a + b;
+        },
+        0
+      );
 
-  const values = sheet.getDataRange().getValues();
+  const total =
+    tw1 +
+    tw2 +
+    tw3 +
+    tw4;
+
+  const requestedId =
+    String(
+      row.id_rpd || ""
+    ).trim();
+
+  const requestedAnggaranId =
+    String(
+      row.id_anggaran ||
+      row.ID_ANGGARAN ||
+      ""
+    ).trim();
+
+  // ========================================================
+  // REALISASI TERKINI DAN SISA UNTUK RPD
+  // ========================================================
+
+  const master =
+    buildMasterFromDataAplikasi_();
+
+  let targetMaster =
+    requestedAnggaranId
+      ? master.find(function (item) {
+          return String(item.id_anggaran || "").trim() === requestedAnggaranId;
+        })
+      : null;
+
+  if (!targetMaster) {
+    targetMaster =
+      master.find(
+        function (item) {
+
+          return (
+            String(
+              item.id_rpd || ""
+            ).trim() ===
+            requestedId
+          );
+
+        }
+      );
+  }
+
+  // Kompatibilitas untuk client/record lama:
+  // jika ID lama masih memakai Pagu, cari berdasarkan identitas
+  // anggaran yang tidak berubah saat Revisi Anggaran.
+  if (!targetMaster) {
+    targetMaster =
+      master.find(
+        function (item) {
+          return (
+            String(item.tahun || "").trim() ===
+              String(row.tahun || "").trim() &&
+            String(item.kodeSubKomponen || "").trim() ===
+              String(row.kode_sub_komponen || "").trim() &&
+            String(item.subKomponen || "").trim() ===
+              String(row.sub_komponen || "").trim() &&
+            String(item.akun || "").trim() ===
+              String(row.akun || "").trim() &&
+            String(item.itemAkun || "").trim() ===
+              String(row.item_akun || "").trim() &&
+            String(item.detilAkun || "").trim() ===
+              String(row.detil_akun || "").trim() &&
+            String(item.rincianItem || "").trim() ===
+              String(row.rincian_item || "").trim()
+          );
+        }
+      );
+  }
+
+  const paguTerbaru =
+    targetMaster
+      ? parseAmount_(targetMaster.pagu)
+      : pagu;
+
+  const realisasiAktual =
+    targetMaster
+      ? parseAmount_(
+          targetMaster.realisasi
+        )
+      : 0;
+
+  const danaTersedia =
+    Math.max(
+      paguTerbaru -
+      realisasiAktual,
+      0
+    );
+
+  // RPD boleh tersimpan walaupun sementara melebihi
+  // dana tersedia. Sistem memberi peringatan agar operator
+  // dapat masuk kembali ke Input/Edit dan menyesuaikan.
+  const rpdExcess =
+    Math.max(
+      total -
+      danaTersedia,
+      0
+    );
+
+  const rpdWarning =
+    rpdExcess > 0
+      ? (
+          "RPD melebihi sisa belum direalisasikan sebesar " +
+          formatRevisionRupiah_(rpdExcess) +
+          ". Silakan sesuaikan kembali."
+        )
+      : "";
+
+  // ========================================================
+  // CARI RECORD YANG SAMA
+  // ========================================================
+  // Pencocokan TIDAK menggunakan Pagu.
+  // Tujuannya agar Revisi Anggaran tidak membuat RPD baru.
+
+  const values =
+    sheet
+      .getDataRange()
+      .getValues();
+
   let targetRow = -1;
   let oldData = null;
 
-  const stableId = makeStableRpdId_(
-    row.tahun,row.kode_sub_komponen,row.sub_komponen,
-    row.akun,row.item_akun,row.detil_akun,row.rincian_item
-  );
+  for (
+    let i = 1;
+    i < values.length;
+    i++
+  ) {
 
-  for (let i=1;i<values.length;i++) {
-    const currentId = String(values[i][index.ID_RPD] || "").trim();
-    const storedStableId = makeStableRpdId_(
-      values[i][index.TAHUN],
-      values[i][index.KODE_SUB_KOMPONEN],
-      values[i][index.SUB_KOMPONEN],
-      values[i][index.AKUN],
-      values[i][index.ITEM_AKUN],
-      values[i][index.DETIL_AKUN],
-      values[i][index.RINCIAN_ITEM]
-    );
+    const currentId =
+      String(
+        values[i][index.ID_RPD] ||
+        ""
+      ).trim();
 
-    if (currentId === requestedId || currentId === stableId || storedStableId === stableId) {
-      targetRow = i + 1;
-      oldData = values[i].slice();
+    const currentAnggaranId =
+      index.ID_ANGGARAN !== undefined
+        ? String(values[i][index.ID_ANGGARAN] || "").trim()
+        : "";
+
+    const targetAnggaranId =
+      targetMaster
+        ? String(targetMaster.id_anggaran || "").trim()
+        : "";
+
+    const sameAnggaranId =
+      targetAnggaranId &&
+      currentAnggaranId &&
+      currentAnggaranId === targetAnggaranId;
+
+    const sameId =
+      requestedId &&
+      (
+        currentId ===
+        requestedId
+      );
+
+    const sameIdentity =
+      String(
+        values[i][index.TAHUN] ||
+        ""
+      ) ===
+      String(
+        row.tahun || ""
+      ) &&
+
+      String(
+        values[i][index.KODE_SUB_KOMPONEN] ||
+        ""
+      ).trim() ===
+      String(
+        row.kode_sub_komponen || ""
+      ).trim() &&
+
+      String(
+        values[i][index.SUB_KOMPONEN] ||
+        ""
+      ).trim() ===
+      String(
+        row.sub_komponen || ""
+      ).trim() &&
+
+      String(
+        values[i][index.AKUN] ||
+        ""
+      ).trim() ===
+      String(
+        row.akun || ""
+      ).trim() &&
+
+      String(
+        values[i][index.ITEM_AKUN] ||
+        ""
+      ).trim() ===
+      String(
+        row.item_akun || ""
+      ).trim() &&
+
+      String(
+        values[i][index.DETIL_AKUN] ||
+        ""
+      ).trim() ===
+      String(
+        row.detil_akun || ""
+      ).trim() &&
+
+      String(
+        values[i][index.RINCIAN_ITEM] ||
+        ""
+      ).trim() ===
+      String(
+        row.rincian_item || ""
+      ).trim();
+
+    if (
+      sameAnggaranId ||
+      sameId ||
+      sameIdentity
+    ) {
+
+      targetRow =
+        i + 1;
+
+      oldData =
+        values[i].slice();
+
       break;
     }
   }
 
+  const stableId =
+    targetMaster
+      ? String(targetMaster.id_rpd || "").trim()
+      : makeStableRpdId_(
+          row.tahun,
+          row.kode_sub_komponen,
+          row.sub_komponen,
+          row.akun,
+          row.item_akun,
+          row.detil_akun,
+          row.rincian_item
+        );
+
+  const idAnggaran =
+    targetMaster
+      ? String(targetMaster.id_anggaran || "").trim()
+      : "";
+
   const record = {
-    id_rpd: stableId,
-    tahun: String(row.tahun || ""),
-    kode_sub_komponen: String(row.kode_sub_komponen || ""),
-    sub_komponen: String(row.sub_komponen || ""),
-    akun: String(row.akun || ""),
-    item_akun: String(row.item_akun || ""),
-    detil_akun: String(row.detil_akun || ""),
-    rincian_item: String(row.rincian_item || ""),
-    pagu_detil: paguTerbaru,
-    tw1: weekList.slice(0,12).reduce((a,b)=>a+b,0),
-    tw2: weekList.slice(12,24).reduce((a,b)=>a+b,0),
-    tw3: weekList.slice(24,36).reduce((a,b)=>a+b,0),
-    tw4: weekList.slice(36,48).reduce((a,b)=>a+b,0),
-    total_rpd: total,
-    catatan: String(row.catatan || ""),
-    updated_at: new Date(),
-    updated_by: user.email
+
+    id_rpd:
+      stableId,
+
+    id_anggaran:
+      idAnggaran,
+
+    tahun:
+      String(
+        row.tahun || ""
+      ),
+
+    kode_sub_komponen:
+      String(
+        row.kode_sub_komponen ||
+        ""
+      ),
+
+    sub_komponen:
+      String(
+        row.sub_komponen ||
+        ""
+      ),
+
+    akun:
+      String(
+        row.akun ||
+        ""
+      ),
+
+    item_akun:
+      String(
+        row.item_akun ||
+        ""
+      ),
+
+    detil_akun:
+      String(
+        row.detil_akun ||
+        ""
+      ),
+
+    rincian_item:
+      String(
+        row.rincian_item ||
+        ""
+      ),
+
+    pagu_detil:
+      paguTerbaru,
+
+    tw1:
+      tw1,
+
+    tw2:
+      tw2,
+
+    tw3:
+      tw3,
+
+    tw4:
+      tw4,
+
+    total_rpd:
+      total,
+
+    catatan:
+      String(
+        row.catatan ||
+        ""
+      ),
+
+    updated_at:
+      new Date(),
+
+    updated_by:
+      user.email
   };
 
-  const output = new Array(sheet.getLastColumn()).fill("");
-  output[index.ID_RPD]=record.id_rpd;
-  output[index.TAHUN]=record.tahun;
-  output[index.KODE_SUB_KOMPONEN]=record.kode_sub_komponen;
-  output[index.SUB_KOMPONEN]=record.sub_komponen;
-  output[index.AKUN]=record.akun;
-  output[index.ITEM_AKUN]=record.item_akun;
-  output[index.DETIL_AKUN]=record.detil_akun;
-  output[index.RINCIAN_ITEM]=record.rincian_item;
-  output[index.PAGU_DETIL]=record.pagu_detil;
-  output[index.TW1]=record.tw1;
-  output[index.TW2]=record.tw2;
-  output[index.TW3]=record.tw3;
-  output[index.TW4]=record.tw4;
-  output[index.TOTAL_RPD]=record.total_rpd;
+  const output =
+    new Array(
+      sheet.getLastColumn()
+    ).fill("");
 
-  months.forEach(month => {
-    for (let week=1;week<=4;week++) {
-      const prop = month+"_m"+week;
-      const col = month.toUpperCase()+"_M"+week;
-      if (index[col] !== undefined) output[index[col]]=weeklyValues[prop];
+  output[index.ID_RPD] =
+    record.id_rpd;
+
+  if (index.ID_ANGGARAN !== undefined) {
+    output[index.ID_ANGGARAN] =
+      record.id_anggaran;
+  }
+
+  output[index.TAHUN] =
+    record.tahun;
+
+  output[index.KODE_SUB_KOMPONEN] =
+    record.kode_sub_komponen;
+
+  output[index.SUB_KOMPONEN] =
+    record.sub_komponen;
+
+  output[index.AKUN] =
+    record.akun;
+
+  output[index.ITEM_AKUN] =
+    record.item_akun;
+
+  output[index.DETIL_AKUN] =
+    record.detil_akun;
+
+  output[index.RINCIAN_ITEM] =
+    record.rincian_item;
+
+  output[index.PAGU_DETIL] =
+    record.pagu_detil;
+
+  output[index.TW1] =
+    record.tw1;
+
+  output[index.TW2] =
+    record.tw2;
+
+  output[index.TW3] =
+    record.tw3;
+
+  output[index.TW4] =
+    record.tw4;
+
+  output[index.TOTAL_RPD] =
+    record.total_rpd;
+
+  months.forEach(
+    function (month) {
+
+      for (
+        let week = 1;
+        week <= 4;
+        week++
+      ) {
+
+        const prop =
+          month +
+          "_m" +
+          week;
+
+        const column =
+          month.toUpperCase() +
+          "_M" +
+          week;
+
+        if (
+          index[column] !==
+          undefined
+        ) {
+
+          output[index[column]] =
+            weeklyValues[prop];
+
+        }
+
+      }
+
     }
-  });
+  );
 
-  output[index.CATATAN]=record.catatan;
-  output[index.UPDATED_AT]=record.updated_at;
-  output[index.UPDATED_BY]=record.updated_by;
+  output[index.CATATAN] =
+    record.catatan;
 
-  if (targetRow>0) {
-    sheet.getRange(targetRow,1,1,sheet.getLastColumn()).setValues([output]);
-    writeLog_("UPDATE",record,oldData,user.email);
+  output[index.UPDATED_AT] =
+    record.updated_at;
+
+  output[index.UPDATED_BY] =
+    record.updated_by;
+
+  if (
+    targetRow > 0
+  ) {
+
+    sheet
+      .getRange(
+        targetRow,
+        1,
+        1,
+        sheet.getLastColumn()
+      )
+      .setValues([
+        output
+      ]);
+
+    writeLog_(
+      "UPDATE",
+      record,
+      oldData,
+      user.email
+    );
+
   } else {
-    sheet.appendRow(output);
-    writeLog_("INSERT",record,null,user.email);
+
+    sheet.appendRow(
+      output
+    );
+
+    writeLog_(
+      "INSERT",
+      record,
+      null,
+      user.email
+    );
   }
 
   return {
-    ok:true,
-    message:rpdWarning || "RPD tersimpan.",
-    warning:rpdWarning,
-    rpd_excess:rpdExcess,
-    pagu_detil:paguTerbaru,
-    realisasi_aktual:realisasiAktual,
-    dana_tersedia:danaTersedia,
-    data:record
+
+    ok: true,
+
+    message:
+      rpdWarning ||
+      "RPD tersimpan.",
+
+    warning:
+      rpdWarning,
+
+    rpd_excess:
+      rpdExcess,
+
+    pagu_detil:
+      paguTerbaru,
+
+    realisasi_aktual:
+      realisasiAktual,
+
+    dana_tersedia:
+      danaTersedia,
+
+    data:
+      record
   };
 }
+// ============================================================
+// LOG RPD
+// ============================================================
 
-========
+function writeLog_(
+  action,
+  record,
+  oldData,
+  email
+) {
+
+  const sheet =
+    getSpreadsheet_()
+      .getSheetByName(
+        RPD_SHEETS.LOG
+      );
+
+  if (!sheet) {
+    return;
+  }
+
+  sheet.appendRow([
+
+    new Date(),
+
+    action,
+
+    record.id_rpd,
+
+    email,
+
+    oldData
+      ? JSON.stringify(
+          oldData
+        )
+      : "",
+
+    JSON.stringify(
+      record
+    )
+
+  ]);
+}
+
+// ============================================================
+// STABLE ID
+// ============================================================
+
+function makeStableRpdId_(
+  tahun,
+  kodeSub,
+  sub,
+  akun,
+  item,
+  detil,
+  rincian
+) {
+
+  return [
+    tahun,
+    kodeSub,
+    sub,
+    akun,
+    item,
+    detil,
+    rincian
+  ]
+    .map(
+      normalizeKey_
+    )
+    .join("|");
+}
+
+function makeRpdId_(
+  tahun,
+  kodeSub,
+  sub,
+  akun,
+  item,
+  detil,
+  rincian,
+  paguDetil
+) {
+
+  return [
+
+    tahun,
+    kodeSub,
+    sub,
+    akun,
+    item,
+    detil,
+    rincian,
+    paguDetil
+
+  ]
+    .map(
+      normalizeKey_
+    )
+    .join("|");
+}
+
+function normalizeKey_(
+  value
+) {
+
+  return String(
+    value || ""
+  )
+    .trim()
+    .toUpperCase()
+    .replace(
+      /\s+/g,
+      " "
+    )
+    .replace(
+      /\|/g,
+      "/"
+    );
+}
+
+// ============================================================
 // DETEKSI HEADER
 // ============================================================
 

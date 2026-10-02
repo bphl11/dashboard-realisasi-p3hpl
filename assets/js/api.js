@@ -11,7 +11,7 @@
 // oleh parser menjadi Realisasi Final untuk Dashboard/Monitoring/Grafik/Laporan.
 // ============================================================
 
-const API_CACHE_KEY = "p3hpl_data_cache_v2";
+const API_CACHE_KEY = "p3hpl_data_cache_v3";
 const API_CACHE_TTL = 2 * 60 * 1000;
 
 let apiMemoryCache = null;
@@ -97,11 +97,14 @@ let apiLoadingPromise = null;
 // Input Realisasi. Setelah mutasi, invalidateApiCache() menghapusnya.
 // ============================================================
 
-const INPUT_REALISASI_CACHE_KEY = "p3hpl_input_realisasi_cache_v1";
+const INPUT_REALISASI_CACHE_KEY = "p3hpl_input_realisasi_cache_v2";
+const INPUT_REALISASI_MASTER_CACHE_KEY = "p3hpl_input_realisasi_master_cache_v1";
 const INPUT_REALISASI_CACHE_TTL = 2 * 60 * 1000;
 
 let inputRealisasiCache = null;
 let inputRealisasiCacheAt = 0;
+let inputRealisasiMasterCache = null;
+let inputRealisasiMasterCacheAt = 0;
 let inputRealisasiLoadingPromise = null;
 let inputRealisasiRefreshQueued = false;
 
@@ -127,6 +130,27 @@ function bacaCacheInputRealisasi() {
     }
 }
 
+function bacaCacheMasterAnggaran() {
+    if (Array.isArray(inputRealisasiMasterCache)) {
+        return inputRealisasiMasterCache;
+    }
+
+    try {
+        const raw = sessionStorage.getItem(INPUT_REALISASI_MASTER_CACHE_KEY);
+        if (!raw) return null;
+
+        const cached = JSON.parse(raw);
+        if (!cached || !Array.isArray(cached.data)) return null;
+
+        inputRealisasiMasterCache = cached.data;
+        inputRealisasiMasterCacheAt = Number(cached.timestamp || 0);
+        return inputRealisasiMasterCache;
+    } catch (error) {
+        console.warn("Cache master anggaran tidak dapat dibaca:", error);
+        return null;
+    }
+}
+
 function simpanCacheInputRealisasi(rows) {
     if (!Array.isArray(rows)) return;
 
@@ -146,13 +170,35 @@ function simpanCacheInputRealisasi(rows) {
     }
 }
 
+function simpanCacheMasterAnggaran(rows) {
+    if (!Array.isArray(rows)) return;
+
+    inputRealisasiMasterCache = rows;
+    inputRealisasiMasterCacheAt = Date.now();
+
+    try {
+        sessionStorage.setItem(
+            INPUT_REALISASI_MASTER_CACHE_KEY,
+            JSON.stringify({
+                timestamp: inputRealisasiMasterCacheAt,
+                data: rows
+            })
+        );
+    } catch (error) {
+        console.warn("Cache master anggaran tidak dapat disimpan:", error);
+    }
+}
+
 function hapusCacheInputRealisasi() {
     inputRealisasiCache = null;
     inputRealisasiCacheAt = 0;
+    inputRealisasiMasterCache = null;
+    inputRealisasiMasterCacheAt = 0;
     inputRealisasiLoadingPromise = null;
 
     try {
         sessionStorage.removeItem(INPUT_REALISASI_CACHE_KEY);
+        sessionStorage.removeItem(INPUT_REALISASI_MASTER_CACHE_KEY);
     } catch (error) {
         console.warn("Cache INPUT_REALISASI tidak dapat dihapus:", error);
     }
@@ -279,7 +325,12 @@ async function fetchInputRealisasiMonitoring(forceRefresh = false) {
                 ? result.realisasi
                 : [];
 
+            const master = Array.isArray(result?.master)
+                ? result.master
+                : [];
+
             simpanCacheInputRealisasi(rows);
+            simpanCacheMasterAnggaran(master);
             return rows;
         } catch (error) {
             console.warn("INPUT_REALISASI monitoring tidak dapat dimuat:", error);
@@ -293,18 +344,29 @@ async function fetchInputRealisasiMonitoring(forceRefresh = false) {
     return await inputRealisasiLoadingPromise;
 }
 
-function attachInputRealisasiToRawData(data, inputRealisasi) {
+function attachInputRealisasiToRawData(data, inputRealisasi, masterAnggaran) {
     if (!Array.isArray(data)) return data;
+
+    const rows = Array.isArray(inputRealisasi) ? inputRealisasi : [];
+    const master = Array.isArray(masterAnggaran) ? masterAnggaran : [];
 
     try {
         Object.defineProperty(data, "__inputRealisasi", {
-            value: Array.isArray(inputRealisasi) ? inputRealisasi : [],
+            value: rows,
+            writable: true,
+            configurable: true,
+            enumerable: false
+        });
+
+        Object.defineProperty(data, "__anggaranMaster", {
+            value: master,
             writable: true,
             configurable: true,
             enumerable: false
         });
     } catch (error) {
-        data.__inputRealisasi = Array.isArray(inputRealisasi) ? inputRealisasi : [];
+        data.__inputRealisasi = rows;
+        data.__anggaranMaster = master;
     }
 
     return data;
@@ -324,7 +386,8 @@ async function fetchSheetData(forceRefresh = false) {
         if (cached) {
             console.log("=== MENGGUNAKAN CACHE DATA_APLIKASI ===");
             const inputRealisasi = await fetchInputRealisasiMonitoring();
-            attachInputRealisasiToRawData(cached, inputRealisasi);
+            const masterAnggaran = bacaCacheMasterAnggaran() || [];
+            attachInputRealisasiToRawData(cached, inputRealisasi, masterAnggaran);
 
             // Jika cache transaksi sudah tersedia, halaman langsung lanjut.
             // Refresh jaringan berjalan di background.
@@ -377,7 +440,11 @@ async function fetchSheetData(forceRefresh = false) {
             ]);
 
             console.log("JUMLAH BARIS DATA_APLIKASI:", data.length);
-            attachInputRealisasiToRawData(data, inputRealisasi);
+            attachInputRealisasiToRawData(
+                data,
+                inputRealisasi,
+                bacaCacheMasterAnggaran() || []
+            );
             console.log("JUMLAH INPUT_REALISASI AKTIF:", inputRealisasi.length);
 
             simpanCacheApi(data);
@@ -426,6 +493,20 @@ function invalidateInputRealisasiCache() {
 // Dipakai bila suatu halaman memang membutuhkan sinkronisasi segera.
 async function refreshInputRealisasiCache() {
     return await fetchInputRealisasiMonitoring(true);
+}
+
+function getInputRealisasiCacheTimestamp() {
+    try {
+        bacaCacheInputRealisasi();
+    } catch (error) {}
+    return Number(inputRealisasiCacheAt || 0);
+}
+
+function getMasterAnggaranCacheTimestamp() {
+    try {
+        bacaCacheMasterAnggaran();
+    } catch (error) {}
+    return Number(inputRealisasiMasterCacheAt || 0);
 }
 
 

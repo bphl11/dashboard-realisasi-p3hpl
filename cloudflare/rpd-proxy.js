@@ -24,7 +24,7 @@ const ALLOWED_ORIGINS = new Set([
   "http://127.0.0.1"
 ]);
 
-const MAX_REDIRECTS = 5;
+const MAX_REDIRECTS = 2;
 
 function corsHeaders(origin) {
   const headers = {
@@ -94,9 +94,10 @@ export default {
         {
           ok: true,
           service: "RPD P3HPL Cloudflare Proxy",
-          version: "1.2.0",
+          version: "2.1.0",
           upstream: safeUrl(UPSTREAM_URL),
-          redirect_detection: true
+          redirect_mode: "manual",
+          max_redirects: MAX_REDIRECTS
         },
         200,
         origin
@@ -129,7 +130,7 @@ export default {
       );
       baseHeaders.set(
         "User-Agent",
-        "RPD-P3HPL-Cloudflare-Proxy/1.1"
+        "RPD-P3HPL-Cloudflare-Proxy/2.1"
       );
 
       const incomingContentType =

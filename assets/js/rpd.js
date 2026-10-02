@@ -281,7 +281,20 @@ function rpdNormalizeSavedRow(row) {
         detilAkun: source.detil_akun ?? source.DETIL_AKUN,
         rincianItem: source.rincian_item ?? source.RINCIAN_ITEM
     });
-    if (stableId && stableId.replace(/\|/g, "") !== "") {
+
+    // Record server yang sudah memiliki ID_ANGGARAN permanen
+    // mempertahankan ID_RPD yang dikirim server.
+    const permanentId = String(
+        source.id_anggaran ??
+        source.ID_ANGGARAN ??
+        ""
+    ).trim();
+
+    if (
+        !permanentId &&
+        stableId &&
+        stableId.replace(/\|/g, "") !== ""
+    ) {
         normalized.id_rpd = stableId;
     }
 
@@ -449,15 +462,26 @@ function rpdRenderDetilTable() {
 }
 
 function rpdFindSavedForMaster(masterRow) {
-    // ID_RPD stabil sekarang menjadi kunci utama.
+    const permanentId = String(
+        masterRow?.id_anggaran ||
+        masterRow?.ID_ANGGARAN ||
+        ""
+    ).trim();
+
+    if (permanentId) {
+        const byPermanentId = rpdExisting.find(item =>
+            String(item.id_anggaran || item.ID_ANGGARAN || "").trim() === permanentId
+        );
+        if (byPermanentId) return byPermanentId;
+    }
+
+    // ID_RPD tetap dipakai untuk kompatibilitas.
     const exact = rpdExisting.find(item =>
         String(item.id_rpd || "").trim() === String(masterRow.id_rpd || "").trim()
     );
     if (exact) return exact;
 
     // Kompatibilitas hanya untuk record lama: seluruh identitas baris harus cocok.
-    // Jangan pernah mencocokkan hanya berdasarkan Akun/Detil karena satu akun
-    // dapat mempunyai banyak Rincian Item.
     const same = rpdExisting.filter(item =>
         String(item.tahun ?? "") === String(masterRow.tahun ?? "") &&
         String(item.kode_sub_komponen ?? "").trim() === String(masterRow.kodeSubKomponen ?? "").trim() &&
@@ -536,7 +560,7 @@ function rpdResetEditor() {
 
 async function rpdSave() {
     if(!rpdCurrentSelection||!rpdUser)return;
-    const payload={id_rpd:rpdCurrentSelection.id_rpd,tahun:rpdCurrentSelection.tahun,kode_sub_komponen:rpdCurrentSelection.kodeSubKomponen,sub_komponen:rpdCurrentSelection.subKomponen,akun:rpdCurrentSelection.akun,item_akun:rpdCurrentSelection.itemAkun,detil_akun:rpdCurrentSelection.detilAkun,rincian_item:rpdCurrentSelection.rincianItem,pagu_detil:rpdCurrentSelection.pagu,catatan:document.getElementById("rpdCatatan").value.trim()};
+    const payload={id_rpd:rpdCurrentSelection.id_rpd,id_anggaran:rpdCurrentSelection.id_anggaran || "",tahun:rpdCurrentSelection.tahun,kode_sub_komponen:rpdCurrentSelection.kodeSubKomponen,sub_komponen:rpdCurrentSelection.subKomponen,akun:rpdCurrentSelection.akun,item_akun:rpdCurrentSelection.itemAkun,detil_akun:rpdCurrentSelection.detilAkun,rincian_item:rpdCurrentSelection.rincianItem,pagu_detil:rpdCurrentSelection.pagu,catatan:document.getElementById("rpdCatatan").value.trim()};
     RPD_WEEK_FIELDS.forEach(key=>payload[key]=rpdNumber(document.getElementById("rpd_"+key)?.value));
 
     // Semua nilai dari 48 minggu dipertahankan.
@@ -944,6 +968,11 @@ function rpdBuildMasterRows(rawData) {
     };
 
     const headerIndex = rawData.indexOf(headers);
+    const serverMasterByRow = new Map(
+        (Array.isArray(rawData.__anggaranMaster) ? rawData.__anggaranMaster : [])
+            .filter(item => item && item.rowIndex !== undefined)
+            .map(item => [String(item.rowIndex), item])
+    );
     const out = [];
 
     let currentKodeKomponen = "";
@@ -1017,10 +1046,27 @@ function rpdBuildMasterRows(rawData) {
         const leaf = rincian || detil || "";
         if (!leaf) continue;
 
+        const stableId = rpdStableId({
+            tahun: get(row, ["Tahun", "Tahun Anggaran"]) || new Date().getFullYear(),
+            kodeSubKomponen: kodeSub,
+            subKomponen: sub,
+            akun: akun,
+            itemAkun: item || "",
+            detilAkun: detil || "",
+            rincianItem: rincian || ""
+        });
+
+        const serverMaster = serverMasterByRow.get(String(i));
+        const idAnggaran =
+            get(row, ["ID_ANGGARAN", "ID ANGGARAN"]) ||
+            String(serverMaster?.id_anggaran || "").trim() ||
+            stableId;
+
         out.push({
             rowIndex: i,
             sourceFormat: "RPD_RAW",
-            id_rpd: rpdStableId({ tahun: get(row, ["Tahun", "Tahun Anggaran"]) || new Date().getFullYear(), kodeSubKomponen: kodeSub, subKomponen: sub, akun: akun, itemAkun: item || "", detilAkun: detil || "", rincianItem: rincian || "", pagu: pagu }),
+            id_rpd: serverMaster?.id_rpd || stableId,
+            id_anggaran: idAnggaran,
             tahun: get(row, ["Tahun", "Tahun Anggaran"]) || new Date().getFullYear(),
             kodeKomponen: currentKodeKomponen,
             komponen: currentKomponen,
