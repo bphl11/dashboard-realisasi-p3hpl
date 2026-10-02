@@ -432,7 +432,11 @@ async function fetchSheetData(forceRefresh = false) {
                 return csvToArray(csv);
             });
 
-            const inputPromise = fetchInputRealisasiMonitoring();
+            // Saat forceRefresh, INPUT_REALISASI juga wajib dipaksa
+            // mengambil snapshot server terbaru. Sebelumnya hanya
+            // DATA_APLIKASI yang dipaksa refresh sehingga transaksi baru
+            // bisa tertinggal oleh cache sesi.
+            const inputPromise = fetchInputRealisasiMonitoring(forceRefresh);
 
             const [data, inputRealisasi] = await Promise.all([
                 dataPromise,
