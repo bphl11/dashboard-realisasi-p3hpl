@@ -96,8 +96,8 @@ export default {
           service: "RPD P3HPL Cloudflare Proxy",
           version: "2.2.0",
           upstream: safeUrl(UPSTREAM_URL),
-          redirect_mode: "manual",
-          max_redirects: MAX_REDIRECTS
+          redirect_mode: "native-follow",
+          max_redirects: null
         },
         200,
         origin
