@@ -394,7 +394,11 @@ function rpdRenderBudgetWarnings() {
 function rpdRenderDetilTable() {
     const tbody=document.getElementById("rpdTableBody"); if(!tbody)return;
     const rows=rpdGetFilteredRows();
-    if(!rows.length){tbody.innerHTML='<tr><td colspan="10" class="text-center text-muted py-4">Pilih Sub Komponen dan/atau Akun untuk menampilkan Detil.</td></tr>';return;}
+    if(!rows.length){
+        tbody.innerHTML='<tr><td colspan="10" class="text-center text-muted py-4">Pilih Sub Komponen dan/atau Akun untuk menampilkan Detil.</td></tr>';
+        rpdRenderBudgetWarnings();
+        return;
+    }
     tbody.innerHTML=rows.map(row=>{
         const saved=rpdFindSavedForMaster(row)||RPD_EMPTY, q=rpdQuarterTotals(saved);
         const realisasi=rpdNumber(row.realisasi);
