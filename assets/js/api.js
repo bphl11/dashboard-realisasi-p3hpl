@@ -210,11 +210,33 @@ function normalisasiRowInputRealisasi(row) {
     if (!row) return null;
 
     return {
-        id_realisasi: String(row.id_realisasi || ""),
-        id_anggaran: String(row.id_anggaran || ""),
-        tahun: String(row.tahun || ""),
-        bulan: String(row.bulan || row.bulan_realisasi || ""),
-        nominal_realisasi: Number(row.nominal_realisasi) || 0,
+        id_realisasi: String(
+            row.id_realisasi ??
+            row.ID_REALISASI ??
+            ""
+        ).trim(),
+        id_anggaran: String(
+            row.id_anggaran ??
+            row.ID_ANGGARAN ??
+            ""
+        ).trim(),
+        tahun: String(
+            row.tahun ??
+            row.TAHUN ??
+            ""
+        ).trim(),
+        bulan: String(
+            row.bulan ??
+            row.bulan_realisasi ??
+            row.BULAN ??
+            row.BULAN_REALISASI ??
+            ""
+        ).trim(),
+        nominal_realisasi: Number(
+            row.nominal_realisasi ??
+            row.NOMINAL_REALISASI ??
+            0
+        ) || 0,
         kode_sub_komponen: String(row.kode_sub_komponen || ""),
         sub_komponen: String(row.sub_komponen || ""),
         akun: String(row.akun || ""),
