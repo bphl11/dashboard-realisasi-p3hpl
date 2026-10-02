@@ -495,12 +495,11 @@ document.addEventListener(
             // dengan Dashboard. RPD hanya menjadi data pembanding.
             totalData.rpdTerisi = grafikRpdTotal;
 
-            // "Sisa Pagu Setelah RPD" berarti pagu yang belum dialokasikan
-            // dalam RPD. Realisasi aktual tidak dikurangkan lagi karena
-            // realisasi dan RPD adalah dua indikator berbeda, bukan dua
-            // komponen anggaran yang dijumlahkan.
+            // Sisa anggaran yang belum direalisasikan = Pagu - Realisasi Aktual.
+            // RPD adalah rencana penarikan dan tidak mengurangi sisa realisasi.
             totalData.sisaRpd = Math.max(
-                (Number(totalData.pagu) || 0) - grafikRpdTotal,
+                (Number(totalData.pagu) || 0) -
+                (Number(totalData.realisasi) || 0),
                 0
             );
 
