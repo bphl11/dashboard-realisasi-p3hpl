@@ -1323,6 +1323,17 @@ function saveRealisasi_(
     );
   }
 
+  // Realisasi Dasar berasal dari DATA_APLIKASI.
+  // Input Realisasi hanya boleh memakai sisa Pagu setelah Realisasi Dasar.
+  const realisasiDasar =
+    Number(target.realisasi) || 0;
+
+  const danaTersediaInput =
+    Math.max(
+      Number(target.pagu) - realisasiDasar,
+      0
+    );
+
   const sheet =
     getRealisasiSheet_();
 
@@ -1361,20 +1372,25 @@ function saveRealisasi_(
         0
       );
 
-  // Validasi pagu
+  // Validasi Pagu:
+  // Realisasi Final = Realisasi Dasar + seluruh Input Realisasi aktif.
   if (
     activeTotal + nominal >
-    target.pagu
+    danaTersediaInput
   ) {
 
     throw new Error(
-      "Total Input Realisasi akan melebihi Pagu Detil. " +
+      "Total Realisasi Final akan melebihi Pagu Detil. " +
       "Pagu: " +
       target.pagu +
+      ", Realisasi Dasar: " +
+      realisasiDasar +
       ", sudah diinput: " +
       activeTotal +
       ", tambahan: " +
       nominal +
+      ", sisa yang dapat diinput: " +
+      danaTersediaInput +
       "."
     );
   }
