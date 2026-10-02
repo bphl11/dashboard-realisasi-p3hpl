@@ -22,7 +22,55 @@ function appStoreReadCache() {
     if (appStoreMemory && Array.isArray(appStoreMemory.rawData) &&
         Array.isArray(appStoreMemory.parsedData) &&
         appStoreMemory.calculation) {
-        return appStoreMemory;
+
+        const cached = appStoreMemory;
+        const inputRows =
+            typeof bacaCacheInputRealisasi === "function"
+                ? (bacaCacheInputRealisasi() || cached.inputRealisasi || [])
+                : (cached.inputRealisasi || []);
+
+        const masterRows =
+            typeof bacaCacheMasterAnggaran === "function"
+                ? (bacaCacheMasterAnggaran() || cached.anggaranMaster || [])
+                : (cached.anggaranMaster || []);
+
+        const inputAt =
+            typeof getInputRealisasiCacheTimestamp === "function"
+                ? getInputRealisasiCacheTimestamp()
+                : Number(cached.inputRealisasiAt || 0);
+
+        const masterAt =
+            typeof getMasterAnggaranCacheTimestamp === "function"
+                ? getMasterAnggaranCacheTimestamp()
+                : Number(cached.anggaranMasterAt || 0);
+
+        if (
+            inputAt > Number(cached.inputRealisasiAt || 0) ||
+            masterAt > Number(cached.anggaranMasterAt || 0)
+        ) {
+            attachInputRealisasiToRawData(cached.rawData, inputRows, masterRows);
+
+            const parsedData =
+                typeof parseDataMonitoring === "function"
+                    ? parseDataMonitoring(cached.rawData)
+                    : [];
+
+            const calculation =
+                typeof hitungCalculationEngine === "function"
+                    ? hitungCalculationEngine(cached.rawData, parsedData)
+                    : null;
+
+            if (Array.isArray(parsedData) && calculation) {
+                cached.parsedData = parsedData;
+                cached.calculation = calculation;
+                cached.inputRealisasi = inputRows;
+                cached.anggaranMaster = masterRows;
+                cached.inputRealisasiAt = inputAt;
+                cached.anggaranMasterAt = masterAt;
+            }
+        }
+
+        return cached;
     }
 
     try {
