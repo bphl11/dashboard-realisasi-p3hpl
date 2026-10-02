@@ -878,6 +878,7 @@ function buildRealisasiMasterFromDataAplikasi_() {
         : String(new Date().getFullYear());
 
     const item = {
+      rowIndex: i,
       id_anggaran: idAnggaran || "",
       tahun: tahun,
       kodeSubKomponen: kodeSubKomponen,
@@ -1637,6 +1638,8 @@ function listRealisasiMonitoring_() {
 
       });
 
+  const master = buildRealisasiMasterFromDataAplikasi_();
+
   return {
 
     ok: true,
@@ -1645,8 +1648,16 @@ function listRealisasiMonitoring_() {
       rows,
 
     realisasi_count:
-      rows.length
+      rows.length,
 
+    master:
+      master,
+
+    master_count:
+      master.length,
+
+    source:
+      "DATA_APLIKASI"
   };
 }
 
@@ -3605,6 +3616,9 @@ function buildMasterFromDataAplikasi_() {
     seen[id] = true;
 
     out.push({
+
+      rowIndex:
+        i,
 
       id_rpd:
         id,
