@@ -105,8 +105,51 @@ async function ambilRpdBulananGrafik(forceRefresh = false) {
     const kosong = {
         bulanan: Array(12).fill(0),
         total: 0,
-        tersedia: false
+        tersedia: false,
+        sumber: "none"
     };
+
+    function bacaRpdLocalRows() {
+        const keys = [
+            "p3hpl_rpd_saved_v5",
+            "p3hpl_rpd_saved_v4"
+        ];
+
+        for (const key of keys) {
+            try {
+                const raw = localStorage.getItem(key);
+                if (!raw) continue;
+
+                const rows = JSON.parse(raw);
+                if (!Array.isArray(rows) || !rows.length) continue;
+
+                const validRows = rows.filter(row =>
+                    row && typeof row === "object" &&
+                    (
+                        row.id_rpd ||
+                        row.ID_RPD
+                    )
+                );
+
+                if (validRows.length) return validRows;
+            } catch (error) {
+                console.warn("Cache RPD lokal tidak dapat dibaca:", key, error);
+            }
+        }
+
+        return [];
+    }
+
+    function hitungRpdDariLocal() {
+        const rows = bacaRpdLocalRows();
+        if (!rows.length) return null;
+
+        const data = hitungRpdBulananGrafik(rows, true);
+        return {
+            ...data,
+            sumber: "local"
+        };
+    }
 
     function bacaCacheRpd() {
         try {
@@ -215,18 +258,12 @@ async function ambilRpdBulananGrafik(forceRefresh = false) {
 
         // Jika belum login, gunakan data RPD tersimpan dari modul RPD.
         if (!token) {
-            try {
-                const rawCache = localStorage.getItem("p3hpl_rpd_saved_v4");
-                const cachedRows = rawCache ? JSON.parse(rawCache) : [];
-                if (Array.isArray(cachedRows) && cachedRows.length) {
-                    const data = hitungRpdBulananGrafik(cachedRows, true);
-                    simpanCacheRpd(data);
-                    return data;
-                }
-            } catch (error) {
-                console.warn("Cache RPD lokal tidak dapat dibaca:", error);
+            const localData = hitungRpdDariLocal();
+            if (localData) {
+                simpanCacheRpd(localData);
+                return localData;
             }
-            return kosong;
+            return cached || kosong;
         }
 
         const apiUrl =
@@ -323,7 +360,17 @@ async function ambilRpdBulananGrafik(forceRefresh = false) {
 
         return data;
     } catch (error) {
-        console.warn("RPD grafik tidak dapat dimuat:", error);
+        console.warn("RPD grafik tidak dapat dimuat dari server:", error);
+
+        // Saat Worker/Apps Script sementara 502/redirect, gunakan RPD
+        // yang baru saja tersimpan di browser. Ini penting agar Grafik
+        // tetap mengikuti input terbaru operator dan tidak berubah menjadi 0.
+        const localData = hitungRpdDariLocal();
+        if (localData) {
+            simpanCacheRpd(localData);
+            return localData;
+        }
+
         return cached || kosong;
     }
 }
@@ -519,7 +566,7 @@ document.addEventListener(
             if (statusRpdGrafik) {
                 if (!rpdGrafik.tersedia) {
                     statusRpdGrafik.textContent =
-                        "RPD belum dapat dimuat pada sesi ini. Login pada halaman RPD untuk menampilkan RPD terisi.";
+                        "RPD belum dapat dimuat dari server dan belum tersedia pada cache lokal.";
                 } else {
                     const selisihRpd = Number(totalData.selisihRpd) || 0;
 
