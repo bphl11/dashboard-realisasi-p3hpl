@@ -327,26 +327,44 @@ async function loadInputRealisasiData() {
     const user = getUserInputRealisasi();
     if (!user?.email) return;
 
-    // Jangan membuat pengguna menunggu RPD hanya untuk melihat halaman.
-    // APP_STORE/cache lokal ditampilkan terlebih dahulu.
+    // Tampilkan snapshot transaksi terlebih dahulu.
     const hasLocalSnapshot = renderInputRealisasiSnapshotLocal();
 
-    if (hasLocalSnapshot) {
+    // Pastikan master anggaran tersedia sebelum menggunakan endpoint
+    // realisasi_list. Endpoint list hanya mengembalikan transaksi, bukan
+    // daftar Sub Komponen/Detil Anggaran.
+    if (!realisasiMaster.length && typeof window.appStore?.get === "function") {
+        try {
+            const store = await window.appStore.get();
+            realisasiMaster = buildInputRealisasiMasterFromAppStore(
+                store,
+                realisasiRows
+            );
+
+            if (realisasiMaster.length) {
+                populateSubKomponenInputRealisasi();
+                renderMasterInfoInputRealisasi();
+            }
+        } catch (storeError) {
+            console.warn("Master APP STORE belum tersedia:", storeError);
+        }
+    }
+
+    if (hasLocalSnapshot || realisasiMaster.length) {
         setStatusInputRealisasi(
-            "Data terakhir ditampilkan. Menyinkronkan data RPD...",
+            "Data master dan transaksi terakhir ditampilkan. Menyinkronkan...",
             "info"
         );
     }
 
     try {
-        // Jika APP_STORE sudah tersedia, master anggaran tidak perlu
-        // dibangun ulang dari DATA_APLIKASI oleh Apps Script.
-        // Cukup ambil transaksi REALISASI terbaru dari sheet.
-        const result = hasLocalSnapshot
+        // Bila master sudah tersedia dari APP_STORE, ambil transaksi saja.
+        // Bila belum, gunakan bootstrap yang mengembalikan master + transaksi.
+        const result = realisasiMaster.length
             ? await realisasiList()
             : await realisasiBootstrap();
 
-        if (Array.isArray(result.master)) {
+        if (Array.isArray(result.master) && result.master.length) {
             realisasiMaster = result.master;
         }
 
