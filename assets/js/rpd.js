@@ -59,9 +59,26 @@ function rpdQuarterTotals(saved) {
     };
 }
 
-const RPD_LOCAL_CACHE_KEY = "p3hpl_rpd_saved_v5";
-const RPD_MASTER_CACHE_KEY = "p3hpl_rpd_master_v4_stable_id_revisi";
+// CACHE GENERASI BARU: seluruh cache RPD lama sengaja diputus agar
+// nilai RPD lama tidak ikut hidup kembali setelah reset/migrasi.
+const RPD_LOCAL_CACHE_KEY = "p3hpl_rpd_saved_v6_clean";
+const RPD_MASTER_CACHE_KEY = "p3hpl_rpd_master_v5_clean";
 const RPD_MASTER_CACHE_TTL = 5 * 60 * 1000;
+const RPD_LEGACY_CACHE_KEYS = [
+    "p3hpl_rpd_saved_v5",
+    "p3hpl_rpd_saved_v4",
+    "p3hpl_rpd_master_v4_stable_id_revisi",
+    "p3hpl_grafik_rpd_cache_v2",
+    "p3hpl_grafik_rpd_cache_v3"
+];
+
+function rpdClearLegacyCaches() {
+    try {
+        RPD_LEGACY_CACHE_KEYS.forEach(key => localStorage.removeItem(key));
+    } catch (error) {
+        console.warn("Cache RPD lama tidak dapat dihapus:", error);
+    }
+}
 
 function rpdLoadMasterCache() {
     try {
@@ -1090,6 +1107,10 @@ function rpdBuildMasterRows(rawData) {
 
 async function rpdInitData() {
     rpdUser = rpdGetStoredUser();
+
+    // Reset cache generasi lama sebelum membaca master/RPD.
+    rpdClearLegacyCaches();
+
     if (!rpdUser) return;
 
     if (!RPD_CONFIG.RPD_API_URL) {
