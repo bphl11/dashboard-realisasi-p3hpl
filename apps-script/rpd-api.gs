@@ -1215,11 +1215,17 @@ function saveRpd_(idToken, row) {
   const tw4 = weekList.slice(36,48).reduce((a,b)=>a+b,0);
   const total = tw1 + tw2 + tw3 + tw4;
 
-  // Kompatibilitas: record lama yang belum mempunyai slot mingguan
-  // tetap dapat diedit. Nilai TW lama akan dipertahankan sebagai
-  // subtotal sampai operator memasukkan nilai mingguan.
-  const legacyProvided = weekList.some(value => value > 0);
-  if (!legacyProvided) {
+  // Kompatibilitas hanya untuk payload lama yang benar-benar tidak
+  // mengirim satu pun field 48 minggu. Payload baru selalu mengirim
+  // seluruh 48 field, termasuk ketika nilainya sengaja dibuat 0.
+  const hasWeeklyPayload = Object.keys(row || {}).some(key =>
+    RPD_HEADERS.includes(String(key || "").toUpperCase()) &&
+    /^((JAN|FEB|MAR|APR|MEI|JUN|JUL|AGU|SEP|OKT|NOV|DES)_M[1-4])$/.test(
+      String(key || "").toUpperCase()
+    )
+  );
+
+  if (!hasWeeklyPayload) {
     const legacy = [
       parseAmount_(row.tw1), parseAmount_(row.tw2),
       parseAmount_(row.tw3), parseAmount_(row.tw4)
@@ -1258,15 +1264,13 @@ function saveRpd_(idToken, row) {
     : 0;
   const danaTersedia = Math.max(pagu - realisasiAktual, 0);
 
-  if (finalTotal > danaTersedia) {
-    throw new Error(
-      "Total RPD 48 minggu melebihi dana tersedia setelah Realisasi. " +
-      "Pagu: " + pagu +
-      ", Realisasi: " + realisasiAktual +
-      ", Dana tersedia: " + danaTersedia +
-      ", Total RPD: " + finalTotal + "."
-    );
-  }
+  const rpdExcess = Math.max(finalTotal - danaTersedia, 0);
+  const rpdWarning = rpdExcess > 0
+    ? (
+      "RPD melebihi dana tersedia setelah Realisasi sebesar " +
+      formatRupiah_(rpdExcess) + ". Silakan sesuaikan kembali."
+    )
+    : "";
 
   for (let i = 1; i < values.length; i++) {
     const currentId = String(values[i][index.ID_RPD] || "").trim();
@@ -1386,7 +1390,9 @@ function saveRpd_(idToken, row) {
   // Client sudah mempunyai payload lengkap; response cukup satu record.
   return {
     ok: true,
-    message: "RPD tersimpan.",
+    message: rpdWarning || "RPD tersimpan.",
+    warning: rpdWarning || "",
+    rpd_excess: rpdExcess,
     data: record
   };
 }
