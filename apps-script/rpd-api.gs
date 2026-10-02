@@ -737,12 +737,16 @@ function setCachedRealisasiMaster_(master) {
 }
 
 function buildRealisasiMasterFromDataAplikasi_() {
-  ensureAnggaranIdSchema_();
+  // Master cache adalah snapshot yang diinvalidasi setelah Revisi Anggaran.
+  // Cek cache lebih dulu supaya setiap Save Realisasi tidak membaca
+  // seluruh DATA_APLIKASI dan membangun ulang ID_ANGGARAN.
   const cached = getCachedRealisasiMaster_();
 
   if (cached) {
     return cached;
   }
+
+  ensureAnggaranIdSchema_();
 
   if (!SOURCE_CSV_URL) {
     throw new Error("SOURCE_CSV_URL belum diisi.");
