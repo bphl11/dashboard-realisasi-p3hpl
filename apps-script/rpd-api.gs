@@ -2353,6 +2353,49 @@ function applyRevisi_(request) {
         .filter(Number.isInteger)
     )).sort(function (a, b) { return b - a; });
 
+    // Jangan menghapus detil yang masih mempunyai RPD atau Realisasi aktif.
+    // Hal ini mencegah transaksi lama menjadi orphan setelah Revisi.
+    if (deletions.length) {
+      const deletedRows = beforeRows.filter(function (row) {
+        return deletions.indexOf(Number(row.rowIndex)) >= 0;
+      });
+
+      const deletedIds = new Set(
+        deletedRows
+          .map(function (row) { return String(row.idAnggaran || "").trim(); })
+          .filter(Boolean)
+      );
+
+      if (deletedIds.size) {
+        const activeRpdIds = new Set(
+          readRpd_(ss.getSheetByName(RPD_SHEETS.RPD) || ensureRpdSheet_())
+            .map(function (row) { return String(row.id_anggaran || "").trim(); })
+            .filter(Boolean)
+        );
+
+        const activeRealisasiIds = new Set(
+          readRealisasi_(getRealisasiSheet_())
+            .filter(function (row) {
+              return String(row.status || "AKTIF").toUpperCase() === "AKTIF";
+            })
+            .map(function (row) { return String(row.id_anggaran || "").trim(); })
+            .filter(Boolean)
+        );
+
+        deletedRows.forEach(function (row) {
+          const id = String(row.idAnggaran || "").trim();
+          if (id && (activeRpdIds.has(id) || activeRealisasiIds.has(id))) {
+            throw new Error(
+              "Detil anggaran " +
+              (row.uraian || row.detil || row.rincian || id) +
+              " tidak dapat dihapus karena masih memiliki RPD dan/atau Input Realisasi aktif. " +
+              "Kosongkan/selesaikan data terkait terlebih dahulu."
+            );
+          }
+        });
+      }
+    }
+
     deletions.forEach(function (rowIndex) {
       const rowNumber = rowIndex + 1;
       if (
@@ -2717,7 +2760,11 @@ function readRevisionRows_() {
       satuan: value(info.satuan),
       harga: toRevisionNumber_(row[info.harga]),
       jumlah: toRevisionNumber_(row[info.pagu]),
-      tahun: currentTahun
+      tahun: currentTahun,
+      idAnggaran:
+        info.idAnggaran >= 0
+          ? String(row[info.idAnggaran] || "").trim()
+          : ""
     });
   }
 
@@ -4767,6 +4814,16 @@ function saveRpd_(
 // ============================================================
 // LOG RPD
 // ============================================================
+
+function ensureRpdSheet_() {
+  const ss = getSpreadsheet_();
+  let sheet = ss.getSheetByName(RPD_SHEETS.RPD);
+  if (!sheet) {
+    sheet = ss.insertSheet(RPD_SHEETS.RPD);
+  }
+  ensureRpdSchema_(sheet);
+  return sheet;
+}
 
 function writeLog_(
   action,
