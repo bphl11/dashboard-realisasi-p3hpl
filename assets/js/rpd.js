@@ -102,7 +102,9 @@ function rpdSaveLocalCache(rows) {
 }
 
 function rpdMergeSavedRows(rows) {
-    const byId = new Map(rpdExisting.map(item => [String(item.id_rpd || ""), item]));
+    const byId = new Map(
+        rpdExisting.map(item => [String(item.id_rpd || ""), item])
+    );
 
     (rows || []).forEach(item => {
         const normalized = rpdNormalizeSavedRow(item);
@@ -111,42 +113,76 @@ function rpdMergeSavedRows(rows) {
         const key = String(normalized.id_rpd);
         const existing = byId.get(key);
 
-        // Kompatibilitas dengan API lama:
-        // API lama hanya mengembalikan TW1-TW4 sehingga tidak boleh
-        // menimpa posisi minggu 1-4 yang baru saja diinput pengguna.
-        // API lama mengembalikan hanya TW1-TW4. rpdNormalizeSavedRow()
-        // dapat memetakan subtotal lama ke slot minggu 4 sebagai kompatibilitas.
-        // Mapping kompatibilitas tersebut BUKAN input mingguan baru dan tidak
-        // boleh menimpa posisi minggu yang sudah disimpan pada cache lokal.
+        if (!existing) {
+            byId.set(key, normalized);
+            return;
+        }
+
         const incomingLegacyQuarterMapped = item?._legacyQuarterMapped === true;
         const incomingHasWeekly = !incomingLegacyQuarterMapped &&
-            RPD_WEEK_FIELDS.some(field => {
-                return item?.[field] !== undefined ||
-                       item?.[field.toUpperCase()] !== undefined;
-            });
-        const existingHasWeekly = existing &&
-            RPD_WEEK_FIELDS.some(field => rpdNumber(existing?.[field]) !== 0);
+            RPD_WEEK_FIELDS.some(field =>
+                item?.[field] !== undefined ||
+                item?.[field.toUpperCase()] !== undefined
+            );
 
+        const existingHasWeekly = RPD_WEEK_FIELDS.some(field =>
+            Object.prototype.hasOwnProperty.call(existing, field)
+        );
+
+        // Jika perubahan lokal sudah berhasil disimpan di browser tetapi
+        // request server gagal, jangan timpa nilai baru dengan snapshot
+        // server lama saat pengguna login kembali.
+        const existingPending = existing?._localPendingSync === true;
+        const existingTime = new Date(existing?.updated_at || 0).getTime();
+        const incomingTime = new Date(normalized?.updated_at || 0).getTime();
+
+        if (existingPending && incomingTime > 0 && existingTime > incomingTime) {
+            byId.set(key, {
+                ...existing,
+                // Identity/Pagu terbaru tetap boleh disinkronkan dari server.
+                pagu_detil: normalized.pagu_detil ?? existing.pagu_detil,
+                realisasi: normalized.realisasi ?? existing.realisasi,
+                _localPendingSync: true
+            });
+            return;
+        }
+
+        // Jika API lama tidak membawa 48 minggu, jangan menimpa input
+        // mingguan yang sudah ada.
         if (existing && existingHasWeekly && !incomingHasWeekly) {
-            const preserved = {
+            byId.set(key, {
                 ...normalized,
                 ...Object.fromEntries(
                     RPD_WEEK_FIELDS.map(field => [field, rpdNumber(existing[field])])
                 ),
-                tw1: rpdNumber(existing.tw1),
-                tw2: rpdNumber(existing.tw2),
-                tw3: rpdNumber(existing.tw3),
-                tw4: rpdNumber(existing.tw4),
-                total_rpd: rpdQuarterTotals(existing).tw1 +
+                tw1:rpdNumber(existing.tw1),
+                tw2:rpdNumber(existing.tw2),
+                tw3:rpdNumber(existing.tw3),
+                tw4:rpdNumber(existing.tw4),
+                total_rpd:rpdQuarterTotals(existing).tw1 +
                            rpdQuarterTotals(existing).tw2 +
                            rpdQuarterTotals(existing).tw3 +
                            rpdQuarterTotals(existing).tw4,
-                catatan: existing.catatan || normalized.catatan || ""
-            };
-            byId.set(key, preserved);
-        } else {
-            byId.set(key, normalized);
+                catatan:existing.catatan || normalized.catatan || "",
+                _localPendingSync:existingPending
+            });
+            return;
         }
+
+        // Server yang lebih baru menjadi sumber kebenaran.
+        // Hapus penanda pending setelah konfirmasi server berhasil.
+        if (
+            normalized.updated_at &&
+            existingTime > 0 &&
+            incomingTime > 0 &&
+            incomingTime < existingTime &&
+            existingPending
+        ) {
+            return;
+        }
+
+        normalized._localPendingSync = false;
+        byId.set(key, normalized);
     });
 
     rpdExisting = [...byId.values()];
@@ -516,7 +552,12 @@ async function rpdSave() {
     RPD_MONTHS.forEach(month=>{for(let week=1;week<=4;week++)q[month.tw]+=payload[month.key+"_m"+week];});
     payload.tw1=q[1];payload.tw2=q[2];payload.tw3=q[3];payload.tw4=q[4];payload.total_rpd=total;
     const button=document.getElementById("rpdSaveButton");button.disabled=true;button.innerHTML='<span class="spinner-border spinner-border-sm"></span> Menyimpan...';
-    const localSaved=rpdNormalizeSavedRow(payload);
+    const localSaved=rpdNormalizeSavedRow({
+        ...payload,
+        // Tandai sebagai perubahan lokal sampai server mengonfirmasi.
+        updated_at: new Date().toISOString(),
+        _localPendingSync: true
+    });
 
     // Simpan ke cache lokal SEBELUM menghubungi API.
     // Dengan demikian input 48-minggu tidak hilang hanya karena
@@ -535,7 +576,11 @@ async function rpdSave() {
         // API boleh mengembalikan record tersimpan; jika API lama hanya
         // mengembalikan TW1-TW4, rpdMergeSavedRows() menjaga posisi
         // 48-minggu yang sudah tersimpan di cache lokal.
-        rpdMergeSavedRows(rpdNormalizeExistingRows(result.data??result.rpd??result));
+        const serverSavedRows = rpdNormalizeExistingRows(result.data??result.rpd??result).map(item => ({
+            ...item,
+            _localPendingSync: false
+        }));
+        rpdMergeSavedRows(serverSavedRows);
         rpdRenderDetilTable();
         rpdOriginalWeekly = Object.fromEntries(RPD_WEEK_FIELDS.map(key => [key, rpdNumber(localSaved?.[key])]));
         rpdOriginalCatatan = String(localSaved?.catatan || "");
