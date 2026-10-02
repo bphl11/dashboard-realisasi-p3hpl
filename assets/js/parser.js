@@ -152,6 +152,7 @@ function realisasiMasterKeyClient(item) {
         return text === "-" ? "" : text;
     };
 
+    // ID_ANGGARAN stabil dan tidak bergantung pada Pagu.
     return [
         item.tahun || new Date().getFullYear(),
         item.kodeSubKomponen || "",
@@ -159,8 +160,7 @@ function realisasiMasterKeyClient(item) {
         item.akun || "",
         item.itemAkun || "",
         item.detilAkun || "",
-        item.rincianItem || "",
-        item.pagu || 0
+        item.rincianItem || ""
     ].map(emptyToBlank).map(normalisasiKeyRealisasiClient).join("|");
 }
 
@@ -249,6 +249,8 @@ function parseDataAplikasi(data) {
         // ID stabil ini sama dengan ID_ANGGARAN yang dibuat Apps Script.
         // Dipakai untuk menggabungkan transaksi Input Realisasi.
         item.idAnggaran = realisasiMasterKeyClient(item);
+        item.realisasiDasar = Number(item.realisasi) || 0;
+        item.realisasiInput = 0;
 
         bulan.forEach(function (namaBulan) {
             item.bulanan[namaBulan] = angkaDataAplikasi(
@@ -415,8 +417,7 @@ function gabungkanInputRealisasi(items, inputRealisasi) {
             item?.akun || "",
             item?.itemAkun || "",
             item?.detilAkun || "",
-            item?.rincianItem || "",
-            item?.pagu || 0
+            item?.rincianItem || ""
         ].map(function (value) {
             return String(value ?? "")
                 .trim()
@@ -470,8 +471,7 @@ function gabungkanInputRealisasi(items, inputRealisasi) {
             transaksi?.akun || transaksi?.AKUN || "",
             transaksi?.item_akun || transaksi?.ITEM_AKUN || "",
             transaksi?.detil_akun || transaksi?.DETIL_AKUN || "",
-            transaksi?.rincian_item || transaksi?.RINCIAN_ITEM || "",
-            transaksi?.pagu_detil || transaksi?.PAGU_DETIL || 0
+            transaksi?.rincian_item || transaksi?.RINCIAN_ITEM || ""
         ].map(function (value) {
             return String(value ?? "")
                 .trim()
@@ -494,8 +494,12 @@ function gabungkanInputRealisasi(items, inputRealisasi) {
         item.bulanan[bulan] =
             (Number(item.bulanan[bulan]) || 0) + nominal;
 
+        item.realisasiInput =
+            (Number(item.realisasiInput) || 0) + nominal;
+
         item.realisasi =
-            (Number(item.realisasi) || 0) + nominal;
+            (Number(item.realisasiDasar) || 0) +
+            (Number(item.realisasiInput) || 0);
 
         item.sisa = Math.max(
             (Number(item.pagu) || 0) -
