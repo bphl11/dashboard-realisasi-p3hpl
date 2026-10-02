@@ -11,7 +11,7 @@
 // oleh parser menjadi Realisasi Final untuk Dashboard/Monitoring/Grafik/Laporan.
 // ============================================================
 
-const API_CACHE_KEY = "p3hpl_data_cache_v2";
+const API_CACHE_KEY = "p3hpl_data_cache_v3";
 const API_CACHE_TTL = 2 * 60 * 1000;
 
 let apiMemoryCache = null;
