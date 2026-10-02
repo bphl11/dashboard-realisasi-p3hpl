@@ -364,12 +364,21 @@ function doPost(e) {
     }
 
     if (action === "realisasi_save") {
-      return jsonOutput(
-        saveRealisasi_(
-          request.id_token,
-          request.row
-        )
-      );
+      // Serialisasi INSERT Realisasi agar dua klik/request paralel
+      // tidak sama-sama melewati validasi total lalu keduanya appendRow().
+      const lock = LockService.getScriptLock();
+      lock.waitLock(30000);
+
+      try {
+        return jsonOutput(
+          saveRealisasi_(
+            request.id_token,
+            request.row
+          )
+        );
+      } finally {
+        lock.releaseLock();
+      }
     }
 
     if (action === "realisasi_update") {
