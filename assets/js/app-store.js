@@ -319,9 +319,22 @@ function appStorePatchRealisasi(action, result) {
         return false;
     }
 
-    // Raw master DATA_APLIKASI tetap sama. Hanya metadata transaksi yang
-    // diperbarui, lalu parser dan calculation engine menghitung snapshot baru.
-    attachInputRealisasiToRawData(state.rawData, currentRows);
+    // Raw master DATA_APLIKASI tetap sama. Pertahankan juga mapping
+    // ID_ANGGARAN permanen agar patch transaksi tidak memutus relasi.
+    const currentMaster =
+        Array.isArray(state.rawData?.__anggaranMaster)
+            ? state.rawData.__anggaranMaster
+            : (Array.isArray(state.anggaranMaster)
+                ? state.anggaranMaster
+                : (typeof bacaCacheMasterAnggaran === "function"
+                    ? (bacaCacheMasterAnggaran() || [])
+                    : []));
+
+    attachInputRealisasiToRawData(
+        state.rawData,
+        currentRows,
+        currentMaster
+    );
 
     const parsedData =
         typeof parseDataMonitoring === "function"
