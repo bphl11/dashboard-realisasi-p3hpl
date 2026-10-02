@@ -377,7 +377,8 @@ async function appStoreLoad(forceRefresh = false) {
 
     appStoreLoadingPromise = (async function () {
         try {
-            const rawData = await getSheetDataMonitoring();
+            // Teruskan forceRefresh sampai API layer.
+            const rawData = await getSheetDataMonitoring(forceRefresh);
 
             if (!Array.isArray(rawData)) {
                 throw new Error("Data aplikasi tidak valid.");
