@@ -171,6 +171,15 @@ function parseDataAplikasi(data) {
     const hasil = [];
     const map = context.map;
 
+    // Master server membawa ID_ANGGARAN permanen. rowIndex dipakai
+    // sebagai relasi aman ketika kolom ID_ANGGARAN pada CSV publik belum
+    // ikut terbit atau identitas uraian berubah setelah revisi.
+    const anggaranMasterByRow = new Map(
+        (Array.isArray(data.__anggaranMaster) ? data.__anggaranMaster : [])
+            .filter(item => item && item.rowIndex !== undefined)
+            .map(item => [String(item.rowIndex), item])
+    );
+
     const bulan = [
         "Januari", "Februari", "Maret", "April", "Mei", "Juni",
         "Juli", "Agustus", "September", "Oktober", "November", "Desember"
@@ -256,8 +265,11 @@ function parseDataAplikasi(data) {
         // Utamakan ID_ANGGARAN permanen dari DATA_APLIKASI.
         // Fallback stable identity hanya dipakai untuk kompatibilitas
         // terhadap CSV lama yang belum memuat kolom ID_ANGGARAN.
+        const serverMaster = anggaranMasterByRow.get(String(i));
+
         item.idAnggaran =
             idAnggaranSource ||
+            String(serverMaster?.id_anggaran || "").trim() ||
             realisasiMasterKeyClient(item);
 
         item.realisasiDasar = Number(item.realisasi) || 0;
