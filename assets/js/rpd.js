@@ -59,7 +59,7 @@ function rpdQuarterTotals(saved) {
     };
 }
 
-const RPD_LOCAL_CACHE_KEY = "p3hpl_rpd_saved_v4";
+const RPD_LOCAL_CACHE_KEY = "p3hpl_rpd_saved_v5";
 const RPD_MASTER_CACHE_KEY = "p3hpl_rpd_master_v4_stable_id_revisi";
 const RPD_MASTER_CACHE_TTL = 5 * 60 * 1000;
 
