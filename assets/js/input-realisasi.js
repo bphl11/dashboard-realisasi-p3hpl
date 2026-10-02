@@ -465,6 +465,33 @@ async function submitInputRealisasi(event) {
         return;
     }
 
+    // SEBELUM VALIDASI, ambil transaksi aktif langsung dari server.
+    // Cache lokal hanya untuk tampilan cepat; validasi penyimpanan harus
+    // memakai data authoritative agar nominal "sudah diinput" tidak tertinggal.
+    try {
+        const freshResult = await realisasiList();
+        if (Array.isArray(freshResult?.realisasi)) {
+            realisasiRows = freshResult.realisasi
+                .map(normalisasiRowInputRealisasi)
+                .filter(Boolean);
+
+            if (typeof replaceInputRealisasiLocalCache === "function") {
+                replaceInputRealisasiLocalCache(realisasiRows);
+            }
+
+            renderListInputRealisasi();
+            renderMasterInfoInputRealisasi();
+        }
+    } catch (syncError) {
+        console.warn("Sinkronisasi Input Realisasi sebelum simpan gagal:", syncError);
+        setStatusInputRealisasi(
+            "Data transaksi terbaru belum dapat disinkronkan dari server. " +
+            "Simpan dibatalkan agar tidak terjadi perbedaan antara tampilan dan validasi server.",
+            "warning"
+        );
+        return;
+    }
+
     const existingInputTotal = getExistingInputTotalForMaster(
         selectedMaster.id_anggaran,
         editingRealisasiId || ""
