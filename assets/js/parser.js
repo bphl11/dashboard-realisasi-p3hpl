@@ -208,6 +208,11 @@ function parseDataAplikasi(data) {
         const itemAkun = nilaiHeaderDataAplikasi(row, map, ["Item Akun", "Item"]);
         const detilAkun = nilaiHeaderDataAplikasi(row, map, ["Detil Akun", "Detail Akun", "Detil"]);
         const rincianItem = nilaiHeaderDataAplikasi(row, map, ["Rincian Item", "Rincian"]);
+        const idAnggaranSource = nilaiHeaderDataAplikasi(
+            row,
+            map,
+            ["ID_ANGGARAN", "ID ANGGARAN"]
+        );
 
         const pagu = angkaDataAplikasi(nilaiHeaderDataAplikasi(row, map, ["Pagu"]));
         const realisasi = angkaDataAplikasi(nilaiHeaderDataAplikasi(row, map, ["Realisasi", "Jumlah Realisasi"]));
@@ -248,7 +253,13 @@ function parseDataAplikasi(data) {
 
         // ID stabil ini sama dengan ID_ANGGARAN yang dibuat Apps Script.
         // Dipakai untuk menggabungkan transaksi Input Realisasi.
-        item.idAnggaran = realisasiMasterKeyClient(item);
+        // Utamakan ID_ANGGARAN permanen dari DATA_APLIKASI.
+        // Fallback stable identity hanya dipakai untuk kompatibilitas
+        // terhadap CSV lama yang belum memuat kolom ID_ANGGARAN.
+        item.idAnggaran =
+            idAnggaranSource ||
+            realisasiMasterKeyClient(item);
+
         item.realisasiDasar = Number(item.realisasi) || 0;
         item.realisasiInput = 0;
 
