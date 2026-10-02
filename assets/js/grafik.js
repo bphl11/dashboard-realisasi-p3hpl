@@ -110,9 +110,21 @@ async function ambilRpdBulananGrafik(forceRefresh = false) {
     };
 
     function bacaRpdLocalRows() {
-        const keys = [
+        // Gunakan hanya cache generasi RPD bersih.
+        // Cache v4/v5 lama tidak boleh ikut masuk ke Grafik.
+        const legacyKeys = [
             "p3hpl_rpd_saved_v5",
             "p3hpl_rpd_saved_v4"
+        ];
+
+        try {
+            legacyKeys.forEach(key => localStorage.removeItem(key));
+        } catch (error) {
+            console.warn("Cache RPD Grafik lama tidak dapat dihapus:", error);
+        }
+
+        const keys = [
+            "p3hpl_rpd_saved_v6_clean"
         ];
 
         for (const key of keys) {
