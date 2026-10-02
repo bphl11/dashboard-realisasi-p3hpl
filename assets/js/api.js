@@ -544,8 +544,10 @@ async function getSheetData() {
 // GET DATA UNTUK MONITORING
 // ============================================================
 
-async function getSheetDataMonitoring() {
-    return await fetchSheetData();
+async function getSheetDataMonitoring(forceRefresh = false) {
+    // Teruskan forceRefresh sampai fetchSheetData agar refresh
+    // setelah Revisi benar-benar mengambil DATA_APLIKASI terbaru.
+    return await fetchSheetData(forceRefresh);
 }
 
 
