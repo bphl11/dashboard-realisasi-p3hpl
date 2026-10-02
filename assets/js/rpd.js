@@ -354,6 +354,29 @@ function rpdNormalizeExistingRows(value) {
     return [];
 }
 
+function rpdCountTerisi() {
+    // "Sudah Diisi" berarti detil yang memiliki TOTAL RPD > 0.
+    // Record yang pernah disimpan lalu dikembalikan menjadi 0 tidak
+    // dihitung sebagai RPD terisi.
+    const countedIds = new Set();
+
+    rpdExisting.forEach(item => {
+        const total = rpdQuarterTotals(item).tw1 +
+            rpdQuarterTotals(item).tw2 +
+            rpdQuarterTotals(item).tw3 +
+            rpdQuarterTotals(item).tw4;
+
+        if (total > 0) {
+            const id = String(item.id_rpd || "").trim();
+            if (id) countedIds.add(id);
+        }
+    });
+
+    return rpdMasterRows.filter(row =>
+        countedIds.has(String(row.id_rpd || "").trim())
+    ).length;
+}
+
 function rpdGetFilteredRows() {
     const sub = document.getElementById("rpdSubKomponen")?.value || "";
     const akun = document.getElementById("rpdAkun")?.value || "";
@@ -606,9 +629,8 @@ async function rpdSave() {
     // langsung dipakai untuk preview/cetak.
     rpdMergeSavedRows([localSaved]);
     rpdRenderDetilTable();
-    const uniqueExisting=new Set(rpdExisting.map(r=>String(r.id_rpd||"")));
-    document.getElementById("rpdTotalTerisi").textContent=rpdMasterRows
-        .filter(r=>uniqueExisting.has(String(r.id_rpd))).length.toLocaleString("id-ID");
+    document.getElementById("rpdTotalTerisi").textContent =
+        rpdCountTerisi().toLocaleString("id-ID");
 
     try{
         const result=await rpdApiRequest("save",{id_token:rpdUser.id_token,row:payload});
@@ -1199,9 +1221,8 @@ async function rpdInitData() {
         document.getElementById("rpdTotalDetil").textContent =
             rpdMasterRows.length.toLocaleString("id-ID");
 
-        const uniqueExisting = new Set(rpdExisting.map(r => String(r.id_rpd || "")));
         document.getElementById("rpdTotalTerisi").textContent =
-            rpdMasterRows.filter(r => uniqueExisting.has(String(r.id_rpd))).length.toLocaleString("id-ID");
+            rpdCountTerisi().toLocaleString("id-ID");
 
         if (!rpdMasterRows.length) {
             rpdSetStatus("DATA_APLIKASI tidak menghasilkan Detil Akun yang dapat digunakan untuk RPD. Periksa kolom Sub Komponen, Akun Belanja, dan Detil Akun.", "warning");
