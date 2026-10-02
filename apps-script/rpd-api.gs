@@ -26,7 +26,9 @@ const RPD_CLIENT_ID =
 const SOURCE_CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vShdaPwws12pkv75bkQJL9AYjuC_4xjvANknmsoT6HVmgKeQ2DJsLLm5QzbvlKQJeQvqNGzYALsOk5n/pub?gid=1473286966&single=true&output=csv";
 
-const RPD_API_VERSION = "1.6.0";
+const RPD_API_VERSION = "1.7.0";
+const RPD_DATA_GENERATION = "RPD-CLEAN-20261002-01";
+const RPD_GENERATION_PROPERTY = "RPD_DATA_GENERATION";
 
 const RPD_SHEETS = {
   RPD: "RPD P3HPL",
@@ -216,6 +218,7 @@ const REALISASI_HEADERS = [
 const RPD_HEADERS = [
   "ID_RPD",
   "ID_ANGGARAN",
+  "DATA_GENERATION",
   "TAHUN",
   "KODE_SUB_KOMPONEN",
   "SUB_KOMPONEN",
@@ -3176,23 +3179,38 @@ function ensureRpdSchema_(sheet) {
       }
     );
 
-  if (!missing.length) {
-    return;
+  if (missing.length) {
+    const start =
+      sheet.getLastColumn() + 1;
+
+    sheet
+      .getRange(
+        1,
+        start,
+        1,
+        missing.length
+      )
+      .setValues([
+        missing
+      ]);
   }
 
-  const start =
-    sheet.getLastColumn() + 1;
+  // RESET GENERASI RPD:
+  // Setelah RPD_DATA_GENERATION dinaikkan, seluruh record RPD lama
+  // dibersihkan satu kali. Ini mencegah RPD lama muncul kembali dari
+  // server setelah revisi/reset. Setelah properti sama dengan generasi
+  // saat ini, data baru tidak akan dihapus lagi.
+  const properties = PropertiesService.getScriptProperties();
+  const activeGeneration = properties.getProperty(RPD_GENERATION_PROPERTY) || "";
 
-  sheet
-    .getRange(
-      1,
-      start,
-      1,
-      missing.length
-    )
-    .setValues([
-      missing
-    ]);
+  if (activeGeneration !== RPD_DATA_GENERATION) {
+    const lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      sheet.deleteRows(2, lastRow - 1);
+    }
+    properties.setProperty(RPD_GENERATION_PROPERTY, RPD_DATA_GENERATION);
+    SpreadsheetApp.flush();
+  }
 }
 
 // ============================================================
@@ -3941,22 +3959,31 @@ function readRpd_(
     var currentMasterByAnggaranId = new Map();
   }
 
+  const generationColumn =
+    index.DATA_GENERATION !== undefined
+      ? index.DATA_GENERATION
+      : -1;
+
   return values
     .slice(1)
     .filter(function (row) {
 
-      return row.some(
-        function (cell) {
+      if (!row.some(function (cell) {
+        return String(cell || "").trim() !== "";
+      })) {
+        return false;
+      }
 
-          return (
-            String(
-              cell || ""
-            ).trim() !== ""
-          );
+      // Record tanpa generation dianggap legacy dan tidak boleh
+      // dihidupkan kembali setelah reset generasi.
+      if (
+        generationColumn >= 0 &&
+        String(row[generationColumn] || "").trim() !== RPD_DATA_GENERATION
+      ) {
+        return false;
+      }
 
-        }
-      );
-
+      return true;
     })
     .map(function (row) {
 
@@ -4032,6 +4059,9 @@ function readRpd_(
         );
 
       const result = {
+
+        data_generation:
+          RPD_DATA_GENERATION,
 
         id_rpd:
           currentMaster
@@ -4578,6 +4608,9 @@ function saveRpd_(
 
   const record = {
 
+    data_generation:
+      RPD_DATA_GENERATION,
+
     id_rpd:
       stableId,
 
@@ -4667,6 +4700,11 @@ function saveRpd_(
   if (index.ID_ANGGARAN !== undefined) {
     output[index.ID_ANGGARAN] =
       record.id_anggaran;
+  }
+
+  if (index.DATA_GENERATION !== undefined) {
+    output[index.DATA_GENERATION] =
+      record.data_generation;
   }
 
   output[index.TAHUN] =
