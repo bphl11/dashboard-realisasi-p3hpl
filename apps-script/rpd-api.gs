@@ -4273,6 +4273,13 @@ function saveRpd_(
       row.id_rpd || ""
     ).trim();
 
+  const requestedAnggaranId =
+    String(
+      row.id_anggaran ||
+      row.ID_ANGGARAN ||
+      ""
+    ).trim();
+
   // ========================================================
   // REALISASI TERKINI DAN SISA UNTUK RPD
   // ========================================================
@@ -4281,18 +4288,27 @@ function saveRpd_(
     buildMasterFromDataAplikasi_();
 
   let targetMaster =
-    master.find(
-      function (item) {
+    requestedAnggaranId
+      ? master.find(function (item) {
+          return String(item.id_anggaran || "").trim() === requestedAnggaranId;
+        })
+      : null;
 
-        return (
-          String(
-            item.id_rpd || ""
-          ).trim() ===
-          requestedId
-        );
+  if (!targetMaster) {
+    targetMaster =
+      master.find(
+        function (item) {
 
-      }
-    );
+          return (
+            String(
+              item.id_rpd || ""
+            ).trim() ===
+            requestedId
+          );
+
+        }
+      );
+  }
 
   // Kompatibilitas untuk client/record lama:
   // jika ID lama masih memakai Pagu, cari berdasarkan identitas
