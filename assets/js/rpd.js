@@ -466,18 +466,21 @@ function rpdUpdateEditorTotal() {
     let total=0, negative=false;
     RPD_MONTHS.forEach(month=>{for(let week=1;week<=4;week++){const v=rpdNumber(document.getElementById("rpd_"+month.key+"_m"+week)?.value);q[month.tw]+=v;total+=v;if(v<0)negative=true;}});
     const excess=Math.max(total-danaTersedia,0);
-    const valid=!negative&&excess===0;
+    // Kelebihan RPD tetap boleh disimpan agar operator dapat memperbaikinya
+    // setelah Revisi Anggaran; sistem hanya memberi peringatan.
+    const valid=!negative;
     ["rpdTw1Summary","rpdTw2Summary","rpdTw3Summary","rpdTw4Summary"].forEach((id,i)=>document.getElementById(id).textContent=rpdFormatRupiah(q[i+1]));
     document.getElementById("rpdEditTotal").textContent=rpdFormatRupiah(total);
     document.getElementById("rpdEditSisa").textContent=rpdFormatRupiah(Math.max(danaTersedia-total,0));
     const state=document.getElementById("rpdEditValidation");
     state.className="small mt-2 "+(valid?"text-success":"text-danger");
+    state.className="small mt-2 "+(negative?"text-danger":(excess>0?"text-warning":"text-success"));
     state.textContent=negative
         ? "Tidak valid: nilai mingguan tidak boleh negatif."
-        : (valid
-            ? "Valid: RPD sesuai dengan dana tersedia setelah Realisasi."
-            : "Perlu penyesuaian: RPD melebihi dana tersedia sebesar " + rpdFormatRupiah(excess) + ".");
-    document.getElementById("rpdSaveButton").disabled=!valid;
+        : (excess>0
+            ? "Peringatan: RPD melebihi dana tersedia sebesar " + rpdFormatRupiah(excess) + ". Nilai tetap dapat disimpan dan dapat disesuaikan kembali."
+            : "Valid: RPD sesuai dengan dana tersedia setelah Realisasi.");
+    document.getElementById("rpdSaveButton").disabled=negative;
 }
 
 function rpdResetEditor() {
@@ -508,7 +511,7 @@ async function rpdSave() {
     if(RPD_WEEK_FIELDS.some(key=>payload[key]<0)){rpdSetStatus("Nilai RPD mingguan tidak boleh negatif.","danger");return;}
     const realisasiTerkini=rpdNumber(rpdCurrentSelection?.realisasi);
     const danaTersedia=Math.max(rpdNumber(payload.pagu_detil)-realisasiTerkini,0);
-    if(total>danaTersedia){rpdSetStatus("Total RPD 48 minggu melebihi dana tersedia setelah realisasi.","danger");return;}
+    const rpdExcess=Math.max(total-danaTersedia,0);
     const q={1:0,2:0,3:0,4:0};
     RPD_MONTHS.forEach(month=>{for(let week=1;week<=4;week++)q[month.tw]+=payload[month.key+"_m"+week];});
     payload.tw1=q[1];payload.tw2=q[2];payload.tw3=q[3];payload.tw4=q[4];payload.total_rpd=total;
@@ -538,7 +541,14 @@ async function rpdSave() {
         rpdOriginalCatatan = String(localSaved?.catatan || "");
 
         bootstrap.Modal.getInstance(document.getElementById("rpdEditorModal"))?.hide();
-        rpdSetStatus("RPD berhasil disimpan ke server.","success");
+        rpdSetStatus(
+            result.warning
+                ? result.warning
+                : (rpdExcess > 0
+                    ? "RPD berhasil disimpan dengan peringatan kelebihan " + rpdFormatRupiah(rpdExcess) + ". Silakan sesuaikan kembali."
+                    : "RPD berhasil disimpan ke server."),
+            rpdExcess > 0 ? "warning" : "success"
+        );
     }catch(error){
         console.error(error);
 
