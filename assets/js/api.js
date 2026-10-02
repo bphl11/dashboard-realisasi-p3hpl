@@ -495,6 +495,20 @@ async function refreshInputRealisasiCache() {
     return await fetchInputRealisasiMonitoring(true);
 }
 
+function getInputRealisasiCacheTimestamp() {
+    try {
+        bacaCacheInputRealisasi();
+    } catch (error) {}
+    return Number(inputRealisasiCacheAt || 0);
+}
+
+function getMasterAnggaranCacheTimestamp() {
+    try {
+        bacaCacheMasterAnggaran();
+    } catch (error) {}
+    return Number(inputRealisasiMasterCacheAt || 0);
+}
+
 
 
 
