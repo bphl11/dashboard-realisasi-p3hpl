@@ -152,6 +152,8 @@ function rpdMergeSavedRows(rows) {
 
         if (!existing) {
             byId.set(key, normalized);
+            if (permanentId) byPermanentId.set(permanentId, normalized);
+            if (identity) byIdentity.set(identity, normalized);
             return;
         }
 
@@ -219,6 +221,15 @@ function rpdMergeSavedRows(rows) {
         }
 
         normalized._localPendingSync = false;
+
+        // Jika record server ditemukan melalui ID permanen/identitas tetapi
+        // mempunyai ID_RPD berbeda, ganti record lama sepenuhnya.
+        for (const [oldKey, oldItem] of byId.entries()) {
+            if (oldItem === existing && oldKey !== key) {
+                byId.delete(oldKey);
+            }
+        }
+
         byId.set(key, normalized);
 
         if (permanentId) byPermanentId.set(permanentId, normalized);
