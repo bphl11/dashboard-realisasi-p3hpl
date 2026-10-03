@@ -4451,27 +4451,9 @@ function saveRpd_(
       0
     );
 
-  // RPD boleh tersimpan walaupun sementara melebihi
-  // dana tersedia. Sistem memberi peringatan agar operator
-  // dapat masuk kembali ke Input/Edit dan menyesuaikan.
-  const rpdExcess =
-    Math.max(
-      total -
-      danaTersedia,
-      0
-    );
-
-  const rpdWarning =
-    rpdExcess > 0
-      ? (
-          "RPD melebihi sisa belum direalisasikan sebesar " +
-          formatRevisionRupiah_(rpdExcess) +
-          ". Silakan sesuaikan kembali."
-        )
-      : "";
-
   // ========================================================
   // CARI RECORD YANG SAMA
+  // ========================================================
   // ========================================================
   // Pencocokan TIDAK menggunakan Pagu.
   // Tujuannya agar Revisi Anggaran tidak membuat RPD baru.
@@ -4590,6 +4572,40 @@ function saveRpd_(
       break;
     }
   }
+
+  // ========================================================
+  // VALIDASI RPD TERHADAP REALISASI TERKINI
+  // ========================================================
+  // Jika RPD sudah tersimpan lebih dahulu lalu Realisasi bertambah,
+  // RPD lama tetap dipertahankan. Yang menjadi batas tambahan hanyalah
+  // Dana Tersedia saat ini + RPD lama pada detil yang sama.
+  let rpdLama = 0;
+
+  if (oldData) {
+    months.forEach(function (month) {
+      for (let week = 1; week <= 4; week++) {
+        const column = month.toUpperCase() + "_M" + week;
+        if (index[column] !== undefined) {
+          rpdLama += parseAmount_(oldData[index[column]]);
+        }
+      }
+    });
+  }
+
+  const kapasitasRpd =
+    danaTersedia + rpdLama;
+
+  const rpdExcess =
+    Math.max(total - kapasitasRpd, 0);
+
+  const rpdWarning =
+    rpdExcess > 0
+      ? (
+          "Tambahan/perubahan RPD melebihi kapasitas yang tersedia sebesar " +
+          formatRevisionRupiah_(rpdExcess) +
+          ". RPD yang sudah tersimpan sebelumnya tetap diperhitungkan."
+        )
+      : "";
 
   const stableId =
     targetMaster
@@ -4998,278 +5014,3 @@ function detectHeader_(
 
     const map =
       headerIndex_(
-        values[r]
-      );
-
-    if (
-      map.PAGU !==
-        undefined &&
-
-      (
-        map.REALISASI !==
-          undefined ||
-
-        map[
-          "JUMLAH REALISASI"
-        ] !==
-          undefined
-      ) &&
-
-      (
-        map[
-          "SUB KOMPONEN"
-        ] !==
-          undefined ||
-
-        map.SUBKOMPONEN !==
-          undefined
-      )
-    ) {
-
-      return {
-
-        headerIndex:
-          r,
-
-        map:
-          map
-      };
-    }
-  }
-
-  return null;
-}
-
-// ============================================================
-// HEADER INDEX
-// ============================================================
-
-function headerIndex_(
-  headers
-) {
-
-  const map = {};
-
-  headers.forEach(
-    function (value, i) {
-
-      const raw =
-        String(
-          value || ""
-        )
-          .trim()
-          .toUpperCase();
-
-      const key =
-        raw
-          .replace(
-            /[._-]/g,
-            " "
-          )
-          .replace(
-            /\s+/g,
-            " "
-          );
-
-      if (!key) {
-        return;
-      }
-
-      map[key] = i;
-
-      const underscoreKey =
-        key.replace(
-          / /g,
-          "_"
-        );
-
-      if (underscoreKey) {
-        map[
-          underscoreKey
-        ] = i;
-      }
-    }
-  );
-
-  // Alias
-  if (
-    map.SUBKOMPONEN !==
-      undefined &&
-    map["SUB KOMPONEN"] ===
-      undefined
-  ) {
-
-    map["SUB KOMPONEN"] =
-      map.SUBKOMPONEN;
-  }
-
-  if (
-    map[
-      "KODE SUBKOMPONEN"
-    ] !== undefined &&
-    map[
-      "KODE SUB KOMPONEN"
-    ] === undefined
-  ) {
-
-    map[
-      "KODE SUB KOMPONEN"
-    ] =
-      map[
-        "KODE SUBKOMPONEN"
-      ];
-  }
-
-  if (
-    map.AKUN !==
-      undefined &&
-    map[
-      "AKUN BELANJA"
-    ] ===
-      undefined
-  ) {
-
-    map[
-      "AKUN BELANJA"
-    ] =
-      map.AKUN;
-  }
-
-  if (
-    map.ITEM !==
-      undefined &&
-    map[
-      "ITEM AKUN"
-    ] ===
-      undefined
-  ) {
-
-    map[
-      "ITEM AKUN"
-    ] =
-      map.ITEM;
-  }
-
-  if (
-    map[
-      "DETAIL AKUN"
-    ] !==
-      undefined &&
-    map[
-      "DETIL AKUN"
-    ] ===
-      undefined
-  ) {
-
-    map[
-      "DETIL AKUN"
-    ] =
-      map[
-        "DETAIL AKUN"
-      ];
-  }
-
-  return map;
-}
-
-// ============================================================
-// HEADER VALUE
-// ============================================================
-
-function headerValue_(
-  row,
-  map,
-  aliases
-) {
-
-  for (
-    const alias of aliases
-  ) {
-
-    const key =
-      String(alias)
-        .trim()
-        .toUpperCase()
-        .replace(
-          /[._-]/g,
-          " "
-        )
-        .replace(
-          /\s+/g,
-          " "
-        );
-
-    const idx =
-      map[key];
-
-    if (
-      idx !==
-      undefined
-    ) {
-
-      return String(
-        row[idx] || ""
-      ).trim();
-    }
-  }
-
-  return "";
-}
-
-// ============================================================
-// PARSE NOMINAL
-// ============================================================
-
-function parseAmount_(
-  value
-) {
-
-  if (
-    typeof value ===
-    "number"
-  ) {
-
-    return Number.isFinite(
-      value
-    )
-      ? value
-      : 0;
-  }
-
-  let text =
-    String(
-      value || ""
-    ).trim();
-
-  if (
-    !text ||
-    text === "-"
-  ) {
-
-    return 0;
-  }
-
-  text =
-    text
-      .replace(
-        /Rp/gi,
-        ""
-      )
-      .replace(
-        /[^0-9.,-]/g,
-        ""
-      );
-
-  // DATA_APLIKASI menggunakan
-  // format Rupiah dengan titik
-  // sebagai pemisah ribuan.
-  text =
-    text.replace(
-      /[.,]/g,
-      ""
-    );
-
-  return (
-    Number(text) || 0
-  );
-}
