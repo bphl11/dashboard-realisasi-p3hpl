@@ -537,9 +537,12 @@ function rpdRenderDetilTable() {
         const danaTersedia=rpdDanaTersedia(row);
         const total=q.tw1+q.tw2+q.tw3+q.tw4;
 
-        // RPD adalah proyeksi. Sisa RPD hanya melihat Pagu dikurangi
-        // Total RPD, bukan Pagu dikurangi Realisasi.
-        const sisa=Math.max(rpdNumber(row.pagu)-total,0);
+        // RPD lama tetap sah ketika Realisasi bertambah setelahnya.
+        // Jika sudah ada RPD, Sisa RPD = Pagu - RPD.
+        // Jika belum ada RPD, yang tersedia untuk RPD pertama = Pagu - Realisasi.
+        const sisa = total > 0
+            ? Math.max(rpdNumber(row.pagu) - total, 0)
+            : Math.max(rpdNumber(row.pagu) - realisasi, 0);
         return '<tr><td><strong>'+rpdEsc(row.itemAkun?row.itemAkun+" — ":"")+rpdEsc(row.akun)+'</strong><div class="small text-muted">'+(row.detilAkun?'Detil: '+rpdEsc(row.detilAkun):'Detil: -')+'</div><div class="small">'+(row.rincianItem?'Rincian: '+rpdEsc(row.rincianItem):'')+'</div></td>'+
         '<td class="text-end">'+rpdFormatRupiah(row.pagu)+'</td><td class="text-end">'+rpdFormatRupiah(realisasi)+'</td><td class="text-end">'+rpdFormatRupiah(danaTersedia)+'</td><td class="text-end">'+rpdFormatRupiah(q.tw1)+'</td><td class="text-end">'+rpdFormatRupiah(q.tw2)+'</td><td class="text-end">'+rpdFormatRupiah(q.tw3)+'</td><td class="text-end">'+rpdFormatRupiah(q.tw4)+'</td><td class="text-end fw-bold">'+rpdFormatRupiah(total)+'</td><td class="text-end">'+rpdFormatRupiah(sisa)+'</td>'+
         '<td><button type="button" class="btn btn-sm btn-success rpd-edit-btn" data-rpd-id="'+rpdEsc(row.id_rpd)+'"><i class="bi bi-pencil-square"></i> Input/Edit</button></td></tr>';
@@ -648,23 +651,31 @@ function rpdUpdateEditorTotal() {
         rpdQuarterTotals(savedExisting).tw3 +
         rpdQuarterTotals(savedExisting).tw4;
 
-    // RPD adalah proyeksi. Realisasi aktual tidak mengurangi
-    // kapasitas RPD. Batas RPD hanya Pagu.
-    const kapasitasRpd = pagu;
+    // RPD yang sudah tersimpan tetap sah walaupun Realisasi bertambah.
+    // Untuk RPD baru, batas awal adalah Pagu - Realisasi.
+    // Untuk RPD lama, tambahan yang boleh direncanakan adalah Dana Tersedia
+    // di atas RPD lama, sehingga kapasitas total = RPD lama + Dana Tersedia,
+    // dibatasi maksimum Pagu.
+    const kapasitasRpd = Math.min(
+        pagu,
+        savedTotal > 0 ? savedTotal + danaTersedia : danaTersedia
+    );
     const excess=Math.max(total-kapasitasRpd,0);
 
     const valid=!negative;
     ["rpdTw1Summary","rpdTw2Summary","rpdTw3Summary","rpdTw4Summary"].forEach((id,i)=>document.getElementById(id).textContent=rpdFormatRupiah(q[i+1]));
     document.getElementById("rpdEditTotal").textContent=rpdFormatRupiah(total);
-    // Sisa RPD = Pagu - Total RPD. Realisasi aktual tidak mengurangi RPD.
-    document.getElementById("rpdEditSisa").textContent=rpdFormatRupiah(Math.max(pagu-total,0));
+    const sisaEditor = total > 0
+        ? Math.max(pagu - total, 0)
+        : Math.max(pagu - realisasi, 0);
+    document.getElementById("rpdEditSisa").textContent=rpdFormatRupiah(sisaEditor);
     const state=document.getElementById("rpdEditValidation");
     state.className="small mt-2 "+(valid?"text-success":"text-danger");
     state.className="small mt-2 "+(negative?"text-danger":(excess>0?"text-warning":"text-success"));
     state.textContent=negative
         ? "Tidak valid: nilai mingguan tidak boleh negatif."
         : (excess>0
-            ? "Peringatan: tambahan/perubahan RPD melebihi kapasitas yang tersedia sebesar " + rpdFormatRupiah(excess) + ". RPD yang sudah tersimpan sebelumnya tetap diperhitungkan."
+            ? "Peringatan: RPD melebihi batas yang masih dapat direncanakan sebesar " + rpdFormatRupiah(excess) + "."
             : "Valid: RPD sesuai. Realisasi setelah RPD tidak dianggap sebagai kelebihan RPD.");
     document.getElementById("rpdSaveButton").disabled=negative;
 }
@@ -698,13 +709,30 @@ async function rpdSave() {
     const realisasiTerkini=rpdNumber(rpdCurrentSelection?.realisasi);
     const danaTersedia=Math.max(rpdNumber(payload.pagu_detil)-realisasiTerkini,0);
 
-    // RPD adalah proyeksi dan Realisasi adalah aktual.
-    // Validasi RPD hanya terhadap Pagu, bukan Dana Tersedia.
-    const kapasitasRpd = rpdNumber(payload.pagu_detil);
+    // Tentukan RPD lama sebelum perubahan.
+    const savedBeforeSave = rpdFindSavedForMaster(rpdCurrentSelection) || RPD_EMPTY;
+    const savedTotalBeforeSave =
+        rpdQuarterTotals(savedBeforeSave).tw1 +
+        rpdQuarterTotals(savedBeforeSave).tw2 +
+        rpdQuarterTotals(savedBeforeSave).tw3 +
+        rpdQuarterTotals(savedBeforeSave).tw4;
+
+    // RPD lama tetap sah. Hanya ruang yang belum direncanakan yang
+    // dapat ditambahkan dari Dana Tersedia saat ini.
+    const kapasitasRpd = Math.min(
+        rpdNumber(payload.pagu_detil),
+        savedTotalBeforeSave > 0
+            ? savedTotalBeforeSave + danaTersedia
+            : danaTersedia
+    );
     const rpdExcess=Math.max(total-kapasitasRpd,0);
 
     if(rpdExcess>0){
-        rpdSetStatus("Total RPD melebihi Pagu sebesar "+rpdFormatRupiah(rpdExcess)+". RPD tidak boleh melebihi Pagu.","danger");
+        rpdSetStatus(
+            "RPD melebihi batas yang masih dapat direncanakan sebesar " +
+            rpdFormatRupiah(rpdExcess) + ".",
+            "danger"
+        );
         return;
     }
     const q={1:0,2:0,3:0,4:0};
