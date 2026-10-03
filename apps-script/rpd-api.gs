@@ -4574,11 +4574,10 @@ function saveRpd_(
   }
 
   // ========================================================
-  // VALIDASI RPD TERHADAP REALISASI TERKINI
+  // VALIDASI RPD: RPD LAMA + RUANG RPD YANG MASIH TERSEDIA
   // ========================================================
-  // Jika RPD sudah tersimpan lebih dahulu lalu Realisasi bertambah,
-  // RPD lama tetap dipertahankan. Yang menjadi batas tambahan hanyalah
-  // Dana Tersedia saat ini + RPD lama pada detil yang sama.
+  // RPD yang sudah tersimpan tetap sah ketika Realisasi bertambah.
+  // Hanya ruang yang belum direncanakan yang dapat ditambahkan.
   let rpdLama = 0;
 
   if (oldData) {
@@ -4592,8 +4591,15 @@ function saveRpd_(
     });
   }
 
-  const kapasitasRpd =
-    danaTersedia + rpdLama;
+  const ruangRpdBaru = Math.max(
+    paguTerbaru - realisasiAktual - rpdLama,
+    0
+  );
+
+  const kapasitasRpd = Math.min(
+    paguTerbaru,
+    rpdLama + ruangRpdBaru
+  );
 
   const rpdExcess =
     Math.max(total - kapasitasRpd, 0);
@@ -4601,9 +4607,9 @@ function saveRpd_(
   const rpdWarning =
     rpdExcess > 0
       ? (
-          "Tambahan/perubahan RPD melebihi kapasitas yang tersedia sebesar " +
+          "RPD melebihi batas yang masih dapat direncanakan sebesar " +
           formatRevisionRupiah_(rpdExcess) +
-          ". RPD yang sudah tersimpan sebelumnya tetap diperhitungkan."
+          "."
         )
       : "";
 
