@@ -1257,6 +1257,121 @@ function rpdBuildMasterRows(rawData) {
     return out;
 }
 
+
+function rpdApplyServerSnapshot(rows) {
+    // SERVER adalah sumber kebenaran. Cache lama yang sudah tersinkron
+    // tidak boleh digabung kembali ke snapshot server.
+    const serverRows = rpdNormalizeExistingRows(
+        Array.isArray(rows) ? rows : []
+    ).map(item => ({
+        ...item,
+        _localPendingSync: false
+    }));
+
+    // Hanya perubahan lokal yang BELUM berhasil dikonfirmasi server
+    // yang boleh dipertahankan.
+    let localRows = [];
+    try {
+        const raw = localStorage.getItem(RPD_LOCAL_CACHE_KEY);
+        localRows = rpdNormalizeExistingRows(raw ? JSON.parse(raw) : []);
+    } catch (e) {
+        localRows = [];
+    }
+
+    const pendingRows = localRows.filter(
+        item => item && item._localPendingSync === true
+    );
+
+    const byPermanentId = new Map();
+    const byId = new Map();
+    const byIdentity = new Map();
+
+    serverRows.forEach(item => {
+        const permanentId = String(
+            item.id_anggaran ?? item.ID_ANGGARAN ?? ""
+        ).trim();
+        const id = String(
+            item.id_rpd ?? item.ID_RPD ?? ""
+        ).trim();
+        const identity = rpdIdentityKey(item);
+
+        if (permanentId) byPermanentId.set(permanentId, item);
+        if (id) byId.set(id, item);
+        if (identity) byIdentity.set(identity, item);
+    });
+
+    const pendingUnmatched = [];
+
+    pendingRows.forEach(localItem => {
+        const permanentId = String(
+            localItem.id_anggaran ?? localItem.ID_ANGGARAN ?? ""
+        ).trim();
+        const id = String(
+            localItem.id_rpd ?? localItem.ID_RPD ?? ""
+        ).trim();
+        const identity = rpdIdentityKey(localItem);
+
+        const serverItem =
+            (permanentId && byPermanentId.get(permanentId)) ||
+            (id && byId.get(id)) ||
+            (identity && byIdentity.get(identity)) ||
+            null;
+
+        if (!serverItem) {
+            // Belum pernah dikonfirmasi server: pertahankan sementara.
+            pendingUnmatched.push(localItem);
+            return;
+        }
+
+        // Jika server sudah mempunyai record yang sama dan waktunya sama/
+        // lebih baru, server dianggap sudah mengonfirmasi perubahan lokal.
+        const localTime = new Date(localItem.updated_at || 0).getTime();
+        const serverTime = new Date(serverItem.updated_at || 0).getTime();
+
+        if (localTime > 0 && serverTime > 0 && localTime > serverTime) {
+            // Perubahan lokal lebih baru dan belum terlihat di server.
+            const idx = serverRows.indexOf(serverItem);
+            if (idx >= 0) {
+                serverRows[idx] = {
+                    ...localItem,
+                    _localPendingSync: true
+                };
+            }
+        }
+        // Selain kondisi di atas, server menang dan pending dibersihkan.
+    });
+
+    // Snapshot server + hanya pending lokal yang belum mempunyai pasangan.
+    const combined = [...serverRows, ...pendingUnmatched];
+    const unique = [];
+    const seenPermanent = new Set();
+    const seenId = new Set();
+    const seenIdentity = new Set();
+
+    combined.forEach(item => {
+        const permanentId = String(
+            item.id_anggaran ?? item.ID_ANGGARAN ?? ""
+        ).trim();
+        const id = String(
+            item.id_rpd ?? item.ID_RPD ?? ""
+        ).trim();
+        const identity = rpdIdentityKey(item);
+
+        if (permanentId && seenPermanent.has(permanentId)) return;
+        if (!permanentId && id && seenId.has(id)) return;
+        if (!permanentId && !id && identity && seenIdentity.has(identity)) return;
+
+        if (permanentId) seenPermanent.add(permanentId);
+        if (id) seenId.add(id);
+        if (identity) seenIdentity.add(identity);
+
+        unique.push(item);
+    });
+
+    rpdExisting = unique;
+    rpdSaveLocalCache(rpdExisting);
+}
+
 async function rpdInitData() {
     rpdUser = rpdGetStoredUser();
 
@@ -1314,8 +1429,12 @@ async function rpdInitData() {
         rpdMasterRows = builtMaster;
         rpdSaveMasterCache(rpdMasterRows);
 
-        // Tampilkan cache RPD lebih dulu agar halaman tidak menunggu API.
-        rpdExisting = rpdLoadLocalCache();
+        // Jangan hidupkan kembali cache RPD lama.
+        // Hanya perubahan lokal yang belum tersinkron yang boleh ditampilkan
+        // sebelum snapshot server berhasil dimuat.
+        rpdExisting = rpdLoadLocalCache().filter(
+            item => item && item._localPendingSync === true
+        );
         rpdRefreshFilters({ keepAkun: false });
         rpdRenderDetilTable();
 
@@ -1339,12 +1458,17 @@ async function rpdInitData() {
         // membangun MASTER dari DATA_APLIKASI sehingga jauh lebih ringan.
         try {
             const result = await rpdApiRequest("list", { id_token: rpdUser.id_token });
-            rpdMergeSavedRows(result.rpd ?? result.data ?? result);
+            // Setelah list server berhasil, snapshot server menggantikan
+            // cache lama. Hanya pending lokal yang belum terkonfirmasi
+            // yang dipertahankan.
+            rpdApplyServerSnapshot(result.rpd ?? result.data ?? result);
             rpdRenderDetilTable();
         } catch (apiError) {
-            console.warn("List RPD dari API gagal; cache lokal tetap digunakan:", apiError);
+            console.warn("List RPD dari API gagal:", apiError);
             if (rpdExisting.length) {
-                rpdSetStatus("RPD ditampilkan dari cache terakhir. Sinkronisasi server gagal.", "warning");
+                rpdSetStatus("Server RPD belum dapat diakses. Hanya perubahan lokal yang belum tersinkron yang ditampilkan.", "warning");
+            } else {
+                rpdSetStatus("Server RPD belum dapat diakses. Data RPD tersimpan di server tidak ditampilkan sampai sinkronisasi berhasil.", "warning");
             }
         }
 
