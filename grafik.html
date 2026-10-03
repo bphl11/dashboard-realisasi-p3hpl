@@ -10,7 +10,14 @@
 <li><a href="laporan.html"><i class="bi bi-file-earmark-text"></i> Laporan</a></li>
 <li><a href="audit.html"><i class="bi bi-shield-check"></i> Audit Parser</a></li>
 </ul></aside>
-<main class="content"><header><h2>Grafik Realisasi Anggaran P3HPHL</h2><p>BPHL XI Banjarbaru</p></header><div class="row g-4"><div class="col-md-3"><div class="card summary-card"><h6>Total Pagu</h6><h3 id="totalPagu">Rp0</h3></div></div><div class="col-md-3"><div class="card summary-card"><h6>Realisasi Aktual</h6><h3 id="totalRealisasi">Rp0</h3></div></div><div class="col-md-3"><div class="card summary-card"><h6>RPD Terisi</h6><h3 id="rpdTerisi">Rp0</h3></div></div><div class="col-md-3"><div class="card summary-card"><h6>Sisa Pagu Setelah RPD</h6><h3 id="sisaAnggaran">Rp0</h3></div></div></div>
+<main class="content"><header><h2>Grafik Realisasi Anggaran P3HPHL</h2><p>BPHL XI Banjarbaru</p></header><div class="row g-4">
+<div class="col-md-2"><div class="card summary-card"><h6>Total Pagu</h6><h3 id="totalPagu">Rp0</h3></div></div>
+<div class="col-md-2"><div class="card summary-card"><h6>Realisasi Aktual</h6><h3 id="totalRealisasi">Rp0</h3></div></div>
+<div class="col-md-2"><div class="card summary-card"><h6>RPD Terisi</h6><h3 id="rpdTerisi">Rp0</h3></div></div>
+<div class="col-md-2"><div class="card summary-card"><h6>Sisa Pagu Setelah RPD</h6><h3 id="sisaAnggaran">Rp0</h3></div></div>
+<div class="col-md-2"><div class="card summary-card"><h6>Realisasi + RPD</h6><h3 id="totalRealisasiRpd">Rp0</h3></div></div>
+<div class="col-md-2"><div class="card summary-card"><h6>Persentase</h6><h3 id="persentaseRealisasiRpd">0,00%</h3></div></div>
+</div>
 <div class="card chart-card"><h5>Realisasi Aktual vs RPD Bulanan</h5><p class="text-muted">Perbandingan realisasi aktual dengan RPD terisi dari Januari sampai Desember</p><div id="statusRpdGrafik" class="small text-muted mb-2">Memuat RPD terisi...</div><div id="loadingGrafikBulanan" class="loading-box">Memuat data grafik...</div><div class="chart-container"><canvas id="grafikBulanan"></canvas></div></div>
 <div class="card chart-card"><h5>Realisasi Kumulatif vs RPD Kumulatif</h5><p class="text-muted">Melihat perkembangan akumulasi realisasi aktual dan RPD sepanjang tahun</p><div class="chart-container"><canvas id="grafikKumulatif"></canvas></div></div>
 <div class="card chart-card"><h5>Perbandingan Anggaran Normal dan Diblokir</h5><p class="text-muted">Perbandingan pagu dan realisasi anggaran berdasarkan status Normal dan Diblokir</p><div class="chart-container" style="height:380px"><canvas id="grafikStatusAnggaran"></canvas></div></div>
