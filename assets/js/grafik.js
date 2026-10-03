@@ -919,35 +919,12 @@ function ambilDataUtamaGrafik(data) {
 // ============================================================
 
 function tampilkanCardGrafik(data) {
-    setTextGrafik(
-        "totalPagu",
-        formatRupiahGrafik(data.pagu)
-    );
-
-    setTextGrafik(
-        "totalRealisasiSebelum",
-        formatRupiahGrafik(data.realisasiSebelumBulanIni || 0)
-    );
-
-    setTextGrafik(
-        "totalRealisasiBulanIni",
-        formatRupiahGrafik(data.realisasiBulanIni || 0)
-    );
-
-    setTextGrafik(
-        "rpdBulanBerikutnya",
-        formatRupiahGrafik(data.rpdBulanBerikutnya || 0)
-    );
-
-    setTextGrafik(
-        "prediksiRealisasiAkhirTahun",
-        formatRupiahGrafik(data.prediksiRealisasiAkhirTahun || 0)
-    );
-
-    setTextGrafik(
-        "persentasePrediksi",
-        formatPersenGrafik(data.persentasePrediksi || 0)
-    );
+    setTextGrafik("totalPagu", formatRupiahGrafik(data.pagu));
+    setTextGrafik("totalRealisasiSebelum", formatRupiahGrafik(data.realisasiSebelumBulanIni || 0));
+    setTextGrafik("totalRealisasiBulanIni", formatRupiahGrafik(data.realisasiBulanIni || 0));
+    setTextGrafik("rpdBulanBerikutnya", formatRupiahGrafik(data.rpdBulanBerikutnya || 0));
+    setTextGrafik("prediksiRealisasiAkhirTahun", formatRupiahGrafik(data.prediksiRealisasiAkhirTahun || 0));
+    setTextGrafik("persentasePrediksi", formatPersenGrafik(data.persentasePrediksi || 0));
 }
 
 
@@ -2144,3 +2121,636 @@ function parseNumberGrafik(
     // ========================================================
     // HAPUS Rp
     // ========================================================
+
+    text =
+
+        text.replace(
+
+            /Rp/gi,
+
+            ""
+
+        );
+
+
+    // ========================================================
+    // HAPUS SPASI
+    // ========================================================
+
+    text =
+
+        text.replace(
+
+            /\s/g,
+
+            ""
+
+        );
+
+
+    // ========================================================
+    // TITIK + KOMA
+    // ========================================================
+
+    if (
+        text.includes(
+            "."
+        ) &&
+        text.includes(
+            ","
+        )
+    ) {
+
+        const lastDot =
+
+            text.lastIndexOf(
+                "."
+            );
+
+
+        const lastComma =
+
+            text.lastIndexOf(
+                ","
+            );
+
+
+        // ====================================================
+        // FORMAT INDONESIA
+        // 3.133.003.500,00
+        // ====================================================
+
+        if (
+            lastComma >
+            lastDot
+        ) {
+
+            text =
+
+                text.replace(
+
+                    /\./g,
+
+                    ""
+
+                );
+
+
+            text =
+
+                text.replace(
+
+                    ",",
+
+                    "."
+
+                );
+
+        }
+
+
+        // ====================================================
+        // FORMAT INTERNASIONAL
+        // 3,133,003,500.00
+        // ====================================================
+
+        else {
+
+            text =
+
+                text.replace(
+
+                    /,/g,
+
+                    ""
+
+                );
+
+        }
+
+    }
+
+
+    // ========================================================
+    // HANYA TITIK
+    // ========================================================
+
+    else if (
+        text.includes(
+            "."
+        )
+    ) {
+
+        const bagian =
+
+            text.split(
+                "."
+            );
+
+
+        if (
+            bagian.length > 1 &&
+            bagian
+                .slice(
+                    1
+                )
+                .every(
+
+                    function (
+                        x
+                    ) {
+
+                        return (
+
+                            x.length ===
+                            3
+
+                        );
+
+                    }
+
+                )
+        ) {
+
+            text =
+
+                bagian.join(
+                    ""
+                );
+
+        }
+
+    }
+
+
+    // ========================================================
+    // HANYA KOMA
+    // ========================================================
+
+    else if (
+        text.includes(
+            ","
+        )
+    ) {
+
+        const bagian =
+
+            text.split(
+                ","
+            );
+
+
+        if (
+            bagian.length > 1 &&
+            bagian
+                .slice(
+                    1
+                )
+                .every(
+
+                    function (
+                        x
+                    ) {
+
+                        return (
+
+                            x.length ===
+                            3
+
+                        );
+
+                    }
+
+                )
+        ) {
+
+            text =
+
+                bagian.join(
+                    ""
+                );
+
+        }
+
+        else {
+
+            text =
+
+                text.replace(
+
+                    ",",
+
+                    "."
+
+                );
+
+        }
+
+    }
+
+
+    // ========================================================
+    // SISAKAN ANGKA
+    // ========================================================
+
+    text =
+
+        text.replace(
+
+            /[^0-9.-]/g,
+
+            ""
+
+        );
+
+
+    if (!text) {
+
+        return null;
+
+    }
+
+
+    const number =
+
+        Number(
+            text
+        );
+
+
+    if (
+        !Number.isFinite(
+            number
+        )
+    ) {
+
+        return null;
+
+    }
+
+
+    return number;
+
+}
+
+
+
+// ============================================================
+// FORMAT RUPIAH
+// ============================================================
+
+function formatRupiahGrafik(
+    value
+) {
+
+    const number =
+
+        Number(
+            value
+        ) || 0;
+
+
+    return (
+
+        "Rp"
+
+        +
+
+        Math.round(
+
+            number
+
+        ).toLocaleString(
+
+            "id-ID"
+
+        )
+
+    );
+
+}
+
+
+
+// ============================================================
+// FORMAT RUPIAH SINGKAT
+// ============================================================
+
+function formatSingkatRupiah(
+    value
+) {
+
+    const number =
+
+        Number(
+            value
+        ) || 0;
+
+
+    // ========================================================
+    // MILIAR
+    // ========================================================
+
+    if (
+        number >=
+        1000000000
+    ) {
+
+        return (
+
+            "Rp"
+
+            +
+
+            (
+                number /
+                1000000000
+            )
+                .toLocaleString(
+
+                    "id-ID",
+
+                    {
+
+                        maximumFractionDigits:
+                            1
+
+                    }
+
+                )
+
+            +
+
+            " M"
+
+        );
+
+    }
+
+
+    // ========================================================
+    // JUTA
+    // ========================================================
+
+    if (
+        number >=
+        1000000
+    ) {
+
+        return (
+
+            "Rp"
+
+            +
+
+            (
+                number /
+                1000000
+            )
+                .toLocaleString(
+
+                    "id-ID",
+
+                    {
+
+                        maximumFractionDigits:
+                            1
+
+                    }
+
+                )
+
+            +
+
+            " Jt"
+
+        );
+
+    }
+
+
+    // ========================================================
+    // RIBU
+    // ========================================================
+
+    if (
+        number >=
+        1000
+    ) {
+
+        return (
+
+            "Rp"
+
+            +
+
+            (
+                number /
+                1000
+            )
+                .toLocaleString(
+
+                    "id-ID",
+
+                    {
+
+                        maximumFractionDigits:
+                            1
+
+                    }
+
+                )
+
+            +
+
+            " Rb"
+
+        );
+
+    }
+
+
+    return (
+
+        "Rp"
+
+        +
+
+        number.toLocaleString(
+
+            "id-ID"
+
+        )
+
+    );
+
+}
+
+
+
+// ============================================================
+// FORMAT PERSEN
+// ============================================================
+
+function formatPersenGrafik(
+    value
+) {
+
+    const number =
+
+        Number(
+            value
+        ) || 0;
+
+
+    return (
+
+        number.toLocaleString(
+
+            "id-ID",
+
+            {
+
+                minimumFractionDigits:
+                    2,
+
+                maximumFractionDigits:
+                    2
+
+            }
+
+        )
+
+        +
+
+        "%"
+
+    );
+
+}
+
+
+
+// ============================================================
+// SET TEXT
+// ============================================================
+
+function setTextGrafik(
+    id,
+    value
+) {
+
+    const element =
+
+        document.getElementById(
+
+            id
+
+        );
+
+
+    if (element) {
+
+        element.textContent =
+
+            value;
+
+    }
+
+}
+
+
+
+// ============================================================
+// CLEAN TEXT
+// ============================================================
+
+function cleanGrafik(
+    value
+) {
+
+    if (
+        value === null ||
+        value === undefined
+    ) {
+
+        return "";
+
+    }
+
+
+    return String(
+
+        value
+
+    )
+
+        .replace(
+
+            /\s+/g,
+
+            " "
+
+        )
+
+        .trim();
+
+}
+
+
+
+// ============================================================
+// ESCAPE HTML
+// ============================================================
+
+function escapeHtmlGrafik(
+    value
+) {
+
+    return String(
+
+        value ?? ""
+
+    )
+
+        .replace(
+
+            /&/g,
+
+            "&amp;"
+
+        )
+
+        .replace(
+
+            /</g,
+
+            "&lt;"
+
+        )
+
+        .replace(
+
+            />/g,
+
+            "&gt;"
+
+        )
+
+        .replace(
+
+            /"/g,
+
+            "&quot;"
+
+        )
+
+        .replace(
+
+            /'/g,
+
+            "&#039;"
+
+        );
+
+}
