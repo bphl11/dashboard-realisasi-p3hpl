@@ -481,11 +481,10 @@ function rpdRenderBudgetWarnings() {
         const realisasi = rpdNumber(row.realisasi);
         const danaTersedia = Math.max(pagu - realisasi, 0);
 
-        // RPD yang sudah tersimpan sebelum Realisasi tetap sah.
-        // Untuk menilai apakah perlu penyesuaian, bandingkan RPD saat ini
-        // dengan kapasitas: Dana Tersedia saat ini + RPD lama.
-        const kapasitasRpd = danaTersedia + total;
-        const excess = 0;
+        // RPD adalah PROYEKSI, sedangkan Realisasi adalah AKTUAL.
+        // Karena keduanya berbeda fungsi, Realisasi TIDAK mengurangi
+        // kapasitas RPD. Batas RPD hanya Pagu yang sebenarnya.
+        const excess = Math.max(total - pagu, 0);
 
         if (excess > 0) {
             totalExcess += excess;
@@ -518,7 +517,7 @@ function rpdRenderBudgetWarnings() {
     box.innerHTML =
         '<strong><i class="bi bi-exclamation-triangle"></i> Perlu Penyesuaian RPD</strong>' +
         '<div class="small mt-1">Ada ' + warnings.length.toLocaleString("id-ID") +
-        ' detil yang RPD-nya melebihi dana tersedia setelah realisasi. Total kelebihan ' +
+        ' detil yang total RPD-nya melebihi Pagu. Total kelebihan ' +
         rpdFormatRupiah(totalExcess) +
         '. Silakan buka Input/Edit pada detil terkait dan sesuaikan kembali RPD.</div>' +
         detail + more;
@@ -538,10 +537,9 @@ function rpdRenderDetilTable() {
         const danaTersedia=rpdDanaTersedia(row);
         const total=q.tw1+q.tw2+q.tw3+q.tw4;
 
-        // Sisa RPD adalah kapasitas RPD yang masih tersedia saat ini.
-        // Validasi RPD lama terhadap Realisasi dilakukan terpisah di editor/save,
-        // sehingga Realisasi baru tidak dianggap sebagai kelebihan RPD lama.
-        const sisa=Math.max(danaTersedia-total,0);
+        // RPD adalah proyeksi. Sisa RPD hanya melihat Pagu dikurangi
+        // Total RPD, bukan Pagu dikurangi Realisasi.
+        const sisa=Math.max(rpdNumber(row.pagu)-total,0);
         return '<tr><td><strong>'+rpdEsc(row.itemAkun?row.itemAkun+" — ":"")+rpdEsc(row.akun)+'</strong><div class="small text-muted">'+(row.detilAkun?'Detil: '+rpdEsc(row.detilAkun):'Detil: -')+'</div><div class="small">'+(row.rincianItem?'Rincian: '+rpdEsc(row.rincianItem):'')+'</div></td>'+
         '<td class="text-end">'+rpdFormatRupiah(row.pagu)+'</td><td class="text-end">'+rpdFormatRupiah(realisasi)+'</td><td class="text-end">'+rpdFormatRupiah(danaTersedia)+'</td><td class="text-end">'+rpdFormatRupiah(q.tw1)+'</td><td class="text-end">'+rpdFormatRupiah(q.tw2)+'</td><td class="text-end">'+rpdFormatRupiah(q.tw3)+'</td><td class="text-end">'+rpdFormatRupiah(q.tw4)+'</td><td class="text-end fw-bold">'+rpdFormatRupiah(total)+'</td><td class="text-end">'+rpdFormatRupiah(sisa)+'</td>'+
         '<td><button type="button" class="btn btn-sm btn-success rpd-edit-btn" data-rpd-id="'+rpdEsc(row.id_rpd)+'"><i class="bi bi-pencil-square"></i> Input/Edit</button></td></tr>';
@@ -650,18 +648,16 @@ function rpdUpdateEditorTotal() {
         rpdQuarterTotals(savedExisting).tw3 +
         rpdQuarterTotals(savedExisting).tw4;
 
-    // RPD lama tetap menjadi hak rencana. Realisasi setelah RPD
-    // mengurangi Dana Tersedia, tetapi tidak membuat RPD lama menjadi
-    // "kelebihan". Yang diuji adalah tambahan/perubahan RPD.
-    const kapasitasRpd = danaTersedia + savedTotal;
+    // RPD adalah proyeksi. Realisasi aktual tidak mengurangi
+    // kapasitas RPD. Batas RPD hanya Pagu.
+    const kapasitasRpd = pagu;
     const excess=Math.max(total-kapasitasRpd,0);
 
     const valid=!negative;
     ["rpdTw1Summary","rpdTw2Summary","rpdTw3Summary","rpdTw4Summary"].forEach((id,i)=>document.getElementById(id).textContent=rpdFormatRupiah(q[i+1]));
     document.getElementById("rpdEditTotal").textContent=rpdFormatRupiah(total);
-    // Tampilan Sisa RPD mengikuti rumus tabel: Dana Tersedia - Total RPD.
-    // Kapasitas validasi tetap memakai Dana Tersedia + RPD lama.
-    document.getElementById("rpdEditSisa").textContent=rpdFormatRupiah(Math.max(danaTersedia-total,0));
+    // Sisa RPD = Pagu - Total RPD. Realisasi aktual tidak mengurangi RPD.
+    document.getElementById("rpdEditSisa").textContent=rpdFormatRupiah(Math.max(pagu-total,0));
     const state=document.getElementById("rpdEditValidation");
     state.className="small mt-2 "+(valid?"text-success":"text-danger");
     state.className="small mt-2 "+(negative?"text-danger":(excess>0?"text-warning":"text-success"));
@@ -702,15 +698,15 @@ async function rpdSave() {
     const realisasiTerkini=rpdNumber(rpdCurrentSelection?.realisasi);
     const danaTersedia=Math.max(rpdNumber(payload.pagu_detil)-realisasiTerkini,0);
 
-    const savedBeforeSave = rpdFindSavedForMaster(rpdCurrentSelection) || RPD_EMPTY;
-    const savedTotalBeforeSave = rpdQuarterTotals(savedBeforeSave).tw1 +
-        rpdQuarterTotals(savedBeforeSave).tw2 +
-        rpdQuarterTotals(savedBeforeSave).tw3 +
-        rpdQuarterTotals(savedBeforeSave).tw4;
-
-    // Realisasi yang masuk setelah RPD tidak menghapus kapasitas RPD lama.
-    const kapasitasRpd = danaTersedia + savedTotalBeforeSave;
+    // RPD adalah proyeksi dan Realisasi adalah aktual.
+    // Validasi RPD hanya terhadap Pagu, bukan Dana Tersedia.
+    const kapasitasRpd = rpdNumber(payload.pagu_detil);
     const rpdExcess=Math.max(total-kapasitasRpd,0);
+
+    if(rpdExcess>0){
+        rpdSetStatus("Total RPD melebihi Pagu sebesar "+rpdFormatRupiah(rpdExcess)+". RPD tidak boleh melebihi Pagu.","danger");
+        return;
+    }
     const q={1:0,2:0,3:0,4:0};
     RPD_MONTHS.forEach(month=>{for(let week=1;week<=4;week++)q[month.tw]+=payload[month.key+"_m"+week];});
     payload.tw1=q[1];payload.tw2=q[2];payload.tw3=q[3];payload.tw4=q[4];payload.total_rpd=total;
@@ -1520,7 +1516,7 @@ function rpdDownloadExcel() {
         const realisasi = rpdNumber(row.realisasi);
         const dana = rpdDanaTersedia(row);
         const total = q.tw1 + q.tw2 + q.tw3 + q.tw4;
-        const sisa = Math.max(dana - total, 0);
+        const sisa = Math.max(rpdNumber(row.pagu) - total, 0);
 
         const values = [
             index + 1, row.kodeKomponen || "", row.komponen || "",
