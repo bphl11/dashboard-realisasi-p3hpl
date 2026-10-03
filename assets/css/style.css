@@ -822,3 +822,164 @@ table.table-hover > tbody > tr:hover > *{
     .sidebar{display:none;}
     .content{max-width:100%;width:100%;padding:18px;}
 }
+
+
+/* ==========================================================
+   SAKTI-INSPIRED VISUAL LAYER
+   Tampilan saja: struktur, ID, JS, API dan alur aplikasi tetap
+   ========================================================== */
+:root{
+    --sakti-blue:#4f7fe6;
+    --sakti-blue-dark:#294884;
+    --sakti-blue-soft:#edf3ff;
+    --sakti-sidebar:#e9edf3;
+    --sakti-border:#d4dbe5;
+    --sakti-text:#374151;
+}
+
+/* Aksen header biru seperti aplikasi SAKTI, tanpa menambah struktur HTML */
+body::before{
+    content:"";
+    position:fixed;
+    top:0;
+    left:250px;
+    right:0;
+    height:5px;
+    background:linear-gradient(90deg,var(--sakti-blue-dark),var(--sakti-blue));
+    z-index:1000;
+}
+
+.sidebar{
+    background:var(--sakti-sidebar);
+    border-right:1px solid #cfd7e2;
+}
+
+.logo.app-brand{
+    background:linear-gradient(135deg,#243f78 0%,#315ca9 100%);
+    margin:-14px -12px 14px;
+    padding:14px 15px;
+    min-height:92px;
+    border-bottom:none;
+}
+.logo.app-brand .brand-ministry{color:#dce8ff;}
+.logo.app-brand .brand-title{color:#fff;}
+.logo.app-brand .brand-subtitle{color:#c7d6f1;}
+.logo.app-brand .brand-mark{border-color:rgba(255,255,255,.35);}
+
+.sidebar li a{
+    min-height:39px;
+    padding:9px 12px;
+    border-radius:5px;
+    font-size:.86rem;
+}
+.sidebar li:hover a{
+    background:#dde5f0;
+    color:#294884;
+}
+.sidebar li.active{
+    border-color:#cbd6e5;
+    border-radius:5px;
+    box-shadow:0 1px 4px rgba(30,50,80,.06);
+}
+.sidebar li.active a,
+.sidebar li.active a i{
+    color:#294884;
+}
+
+/* Header halaman lebih compact */
+.content{padding-top:22px;}
+header{margin-bottom:16px;}
+header h2,.dashboard-header h2{font-size:1.75rem;}
+header p,.dashboard-header p{font-size:.88rem;}
+
+/* Tombol utama biru ala SAKTI */
+.content .btn-primary,
+.content .btn-success:not(.status-diblokir),
+.content button.btn-success{
+    background:var(--sakti-blue)!important;
+    border-color:var(--sakti-blue)!important;
+    color:#fff!important;
+}
+.content .btn-primary:hover,
+.content .btn-success:hover{
+    background:#416fd0!important;
+    border-color:#416fd0!important;
+}
+
+/* Form/filter lebih compact */
+.form-label,.filter-area label{font-size:.8rem;font-weight:700;margin-bottom:4px;}
+.form-control,.form-select{
+    min-height:36px;
+    padding-top:.38rem;
+    padding-bottom:.38rem;
+    font-size:.84rem;
+    border-radius:4px;
+}
+.form-control:focus,.form-select:focus{
+    border-color:#7fa1ec;
+    box-shadow:0 0 0 .14rem rgba(79,127,230,.12);
+}
+
+/* Card/panel lebih datar dan administratif */
+.content > .card,.monitoring-card,.chart-card,.dashboard-section,.dashboard-highlight,.component-card,.akun-chart-card{
+    border-radius:6px;
+    box-shadow:0 1px 5px rgba(31,41,55,.045);
+}
+.summary-card,.dashboard-card{
+    border-radius:6px;
+    box-shadow:0 1px 5px rgba(31,41,55,.045);
+}
+
+/* Tabel compact seperti layar monitoring */
+.table-responsive{border-radius:4px;}
+table.table{font-size:.78rem;margin-bottom:0;}
+table.table thead th{
+    background:#e5e7eb!important;
+    color:#4b5563!important;
+    padding:8px 8px!important;
+    line-height:1.2;
+    vertical-align:middle!important;
+}
+table.table tbody td{
+    padding:7px 8px!important;
+    line-height:1.35;
+    vertical-align:top;
+}
+
+/* DataTables controls */
+.dataTables_wrapper .dataTables_length,
+.dataTables_wrapper .dataTables_filter{font-size:.8rem;color:#4b5563;}
+.dataTables_wrapper .dataTables_length select,
+.dataTables_wrapper .dataTables_filter input{
+    min-height:32px;
+    font-size:.8rem;
+    border-radius:4px;
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button.current,
+.dataTables_wrapper .dataTables_paginate .paginate_button.current:hover{
+    background:var(--sakti-blue)!important;
+    border-color:var(--sakti-blue)!important;
+    color:#fff!important;
+}
+
+/* Filter/status panel */
+.filter-area{
+    background:#fafbfc;
+    border:1px solid #e1e5ea;
+    border-radius:5px;
+    padding:12px 10px 10px;
+}
+
+/* Badges/info dengan aksen biru administratif */
+.dashboard-badge,.section-count,.akun-chart-count{
+    background:var(--sakti-blue-soft);
+    color:#365da8;
+    border-color:#d4e0fa;
+}
+
+@media(max-width:1200px) and (min-width:992px){
+    body::before{left:235px;}
+}
+@media(max-width:991px){
+    body::before{left:0;}
+}
