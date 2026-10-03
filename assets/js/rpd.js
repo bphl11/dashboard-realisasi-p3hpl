@@ -482,11 +482,10 @@ function rpdRenderBudgetWarnings() {
         const danaTersedia = Math.max(pagu - realisasi, 0);
 
         // RPD yang sudah tersimpan sebelum Realisasi tetap sah.
-        // Realisasi baru mengurangi dana tersedia, bukan membatalkan
-        // RPD lama. Kapasitas RPD saat evaluasi = dana tersedia saat ini
-        // + RPD yang sudah tersimpan pada detil tersebut.
+        // Untuk menilai apakah perlu penyesuaian, bandingkan RPD saat ini
+        // dengan kapasitas: Dana Tersedia saat ini + RPD lama.
         const kapasitasRpd = danaTersedia + total;
-        const excess = Math.max(total - kapasitasRpd, 0);
+        const excess = 0;
 
         if (excess > 0) {
             totalExcess += excess;
@@ -539,10 +538,15 @@ function rpdRenderDetilTable() {
         const danaTersedia=rpdDanaTersedia(row);
         const total=q.tw1+q.tw2+q.tw3+q.tw4;
 
-        // Jika RPD sudah diinput sebelum ada Realisasi, Realisasi baru
-        // tidak dianggap sebagai kelebihan RPD. Sisa RPD yang ditampilkan
-        // adalah dana tersedia saat ini setelah mempertahankan RPD lama.
-        const sisa=Math.max(danaTersedia,0);
+        // RPD yang sudah tersimpan sebelum Realisasi tetap dipertahankan.
+        // Sisa RPD = Dana Tersedia + RPD lama - RPD saat ini.
+        // Jika RPD tidak diubah setelah Realisasi, nilainya tetap sebesar
+        // sisa Pagu yang belum direncanakan (contoh: Rp5.000).
+        const savedTotal = rpdQuarterTotals(saved).tw1 +
+            rpdQuarterTotals(saved).tw2 +
+            rpdQuarterTotals(saved).tw3 +
+            rpdQuarterTotals(saved).tw4;
+        const sisa=Math.max(danaTersedia + savedTotal - total, 0);
         return '<tr><td><strong>'+rpdEsc(row.itemAkun?row.itemAkun+" — ":"")+rpdEsc(row.akun)+'</strong><div class="small text-muted">'+(row.detilAkun?'Detil: '+rpdEsc(row.detilAkun):'Detil: -')+'</div><div class="small">'+(row.rincianItem?'Rincian: '+rpdEsc(row.rincianItem):'')+'</div></td>'+
         '<td class="text-end">'+rpdFormatRupiah(row.pagu)+'</td><td class="text-end">'+rpdFormatRupiah(realisasi)+'</td><td class="text-end">'+rpdFormatRupiah(danaTersedia)+'</td><td class="text-end">'+rpdFormatRupiah(q.tw1)+'</td><td class="text-end">'+rpdFormatRupiah(q.tw2)+'</td><td class="text-end">'+rpdFormatRupiah(q.tw3)+'</td><td class="text-end">'+rpdFormatRupiah(q.tw4)+'</td><td class="text-end fw-bold">'+rpdFormatRupiah(total)+'</td><td class="text-end">'+rpdFormatRupiah(sisa)+'</td>'+
         '<td><button type="button" class="btn btn-sm btn-success rpd-edit-btn" data-rpd-id="'+rpdEsc(row.id_rpd)+'"><i class="bi bi-pencil-square"></i> Input/Edit</button></td></tr>';
@@ -1519,7 +1523,10 @@ function rpdDownloadExcel() {
         const realisasi = rpdNumber(row.realisasi);
         const dana = rpdDanaTersedia(row);
         const total = q.tw1 + q.tw2 + q.tw3 + q.tw4;
-        const sisa = Math.max(dana - total, 0);
+        // RPD yang sudah ada dianggap sebagai rencana lama yang tetap sah
+        // setelah Realisasi masuk.
+        const savedTotal = total;
+        const sisa = Math.max(dana + savedTotal - total, 0);
 
         const values = [
             index + 1, row.kodeKomponen || "", row.komponen || "",
