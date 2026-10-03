@@ -602,18 +602,17 @@ document.addEventListener(
                 bulananAktual[bulanBerjalan] || 0
             );
 
-            // RPD bulan berjalan tidak ditambahkan lagi karena bulan berjalan
-            // sudah menggunakan realisasi aktual. Yang diproyeksikan hanya
-            // bulan setelah bulan berjalan sampai Desember.
+            // Prediksi akhir tahun menggunakan Realisasi s.d. bulan
+            // sebelum bulan berjalan + RPD mulai bulan berjalan sampai Desember.
+            // Untuk posisi Oktober: Realisasi s.d. September + RPD Oktober–Desember (TW IV).
             const rpdBulanBerikutnya = Array.isArray(grafikRpdBulanan)
                 ? grafikRpdBulanan
-                    .slice(bulanBerjalan + 1)
+                    .slice(bulanBerjalan)
                     .reduce((sum, value) => sum + (Number(value) || 0), 0)
                 : 0;
 
             const prediksiRaw =
                 realisasiSebelumBulanIni +
-                realisasiBulanIni +
                 rpdBulanBerikutnya;
 
             const paguGrafik = Number(totalData.pagu) || 0;
