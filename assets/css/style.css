@@ -458,3 +458,79 @@ padding:20px;
     .akun-chart-count{display:inline-block;margin-top:8px;}
     .akun-bar-row{grid-template-columns:110px 1fr;}
 }
+
+
+/* ==========================================================
+   STABILISASI LAYOUT DESKTOP 100%
+   Hanya tampilan/layout - tidak mengubah logika aplikasi
+   ========================================================== */
+html,
+body{
+    width:100%;
+    max-width:100%;
+    overflow-x:hidden;
+}
+
+.wrapper{
+    width:100%;
+    max-width:100%;
+    min-width:0;
+    overflow-x:hidden;
+}
+
+.sidebar{
+    flex:0 0 290px;
+    width:290px;
+    min-width:290px;
+    max-width:290px;
+    overflow:hidden;
+}
+
+.content{
+    flex:1 1 auto;
+    width:auto;
+    min-width:0;
+    max-width:calc(100% - 290px);
+    overflow-x:hidden;
+}
+
+.logo.app-brand{
+    min-width:0;
+}
+
+.brand-text{
+    min-width:0;
+    max-width:100%;
+    overflow:hidden;
+}
+
+.brand-ministry,
+.brand-title{
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+/* Tabel lebar tetap berada di dalam area konten */
+.table-responsive,
+.dataTables_wrapper{
+    max-width:100%;
+}
+
+@media(max-width:1100px) and (min-width:992px){
+    .sidebar{
+        flex-basis:250px;
+        width:250px;
+        min-width:250px;
+        max-width:250px;
+        padding-left:14px;
+        padding-right:14px;
+    }
+
+    .content{
+        max-width:calc(100% - 250px);
+        padding:24px 20px;
+    }
+
+    .brand-ministry{font-size:.52rem;}
+    .brand-title{font-size:.82rem;}
+}
