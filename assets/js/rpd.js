@@ -1007,11 +1007,26 @@ function rpdBuildMasterRows(rawData) {
     };
 
     const headerIndex = rawData.indexOf(headers);
+    const serverMasterRows =
+        Array.isArray(rawData.__anggaranMaster)
+            ? rawData.__anggaranMaster
+            : [];
+
     const serverMasterByRow = new Map(
-        (Array.isArray(rawData.__anggaranMaster) ? rawData.__anggaranMaster : [])
+        serverMasterRows
             .filter(item => item && item.rowIndex !== undefined)
             .map(item => [String(item.rowIndex), item])
     );
+
+    // ID_ANGGARAN menjadi relasi utama. Buat juga lookup berdasarkan ID
+    // agar realisasi final dari server tetap dapat diterapkan walaupun
+    // posisi/baris CSV berubah.
+    const serverMasterById = new Map(
+        serverMasterRows
+            .filter(item => item && item.id_anggaran)
+            .map(item => [String(item.id_anggaran).trim(), item])
+    );
+
     const out = [];
 
     let currentKodeKomponen = "";
@@ -1118,6 +1133,39 @@ function rpdBuildMasterRows(rawData) {
             pagu: pagu,
             realisasi: money(get(row, ["Realisasi", "Jumlah Realisasi"]))
         });
+
+        const last = out[out.length - 1];
+        const serverByRow = serverMasterByRow.get(String(i));
+        const serverById = serverMasterById.get(String(last.id_anggaran || "").trim());
+        const authoritativeMaster = serverByRow || serverById;
+
+        if (authoritativeMaster) {
+            // RPD harus memakai Realisasi Final:
+            // Realisasi Dasar DATA_APLIKASI + Input Realisasi aktif.
+            // Pagu tetap berasal dari baris DATA_APLIKASI terbaru.
+            last.realisasiDasar =
+                Number(authoritativeMaster.realisasiDasar) ||
+                Math.max(
+                    Number(last.realisasi) || 0,
+                    0
+                );
+
+            last.realisasiInput =
+                Number(authoritativeMaster.realisasiInput) || 0;
+
+            last.realisasi =
+                Number(authoritativeMaster.realisasi) ||
+                (
+                    last.realisasiDasar +
+                    last.realisasiInput
+                );
+
+            last.sisa =
+                Math.max(
+                    Number(last.pagu) - last.realisasi,
+                    0
+                );
+        }
     }
 
     console.log("RPD MASTER ROWS:", out.length);
