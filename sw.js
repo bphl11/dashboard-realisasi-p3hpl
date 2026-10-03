@@ -1,4 +1,4 @@
-const CACHE_NAME = "p3hpl-static-v4";
+const CACHE_NAME = "p3hpl-static-v5";
 
 const NAVIGATION_PAGES = [
   "index.html",
