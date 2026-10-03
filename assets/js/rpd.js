@@ -1452,6 +1452,106 @@ async function rpdInitData() {
     }
 }
 
+
+function rpdDownloadExcel() {
+    const rows = rpdGetPrintRows();
+    if (!rows.length) {
+        rpdSetStatus("Belum ada RPD yang terisi untuk diunduh.", "warning");
+        return;
+    }
+
+    const headers = [
+        "No", "Kode Komponen", "Komponen", "Kode Sub Komponen", "Sub Komponen",
+        "Akun Belanja", "Item Akun", "Detil Akun", "Rincian Item", "Pagu",
+        "Realisasi", "Dana Tersedia"
+    ];
+
+    RPD_MONTHS.forEach(month => {
+        for (let week = 1; week <= 4; week++) {
+            headers.push(month.label + " - Minggu " + week);
+        }
+        headers.push(month.label + " - Jumlah");
+    });
+
+    headers.push("TW I", "TW II", "TW III", "TW IV", "Total RPD", "Sisa RPD");
+
+    const esc = value => String(value ?? "")
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+    const number = value => Math.round(Number(value) || 0);
+
+    const headerCells = headers.map(value =>
+        '<Cell ss:StyleID="Header"><Data ss:Type="String">' + esc(value) + '</Data></Cell>'
+    ).join("");
+
+    const body = rows.map((row, index) => {
+        const q = rpdQuarterTotals(row);
+        const realisasi = rpdNumber(row.realisasi);
+        const dana = rpdDanaTersedia(row);
+        const total = q.tw1 + q.tw2 + q.tw3 + q.tw4;
+        const sisa = Math.max(dana - total, 0);
+
+        const values = [
+            index + 1, row.kodeKomponen || "", row.komponen || "",
+            row.kodeSubKomponen || "", row.subKomponen || "", row.akun || "",
+            row.itemAkun || "", row.detilAkun || "", row.rincianItem || "",
+            number(row.pagu), number(realisasi), number(dana)
+        ];
+
+        RPD_MONTHS.forEach(month => {
+            let monthTotal = 0;
+            for (let week = 1; week <= 4; week++) {
+                const v = rpdNumber(row[month.key + "_m" + week]);
+                values.push(v);
+                monthTotal += v;
+            }
+            values.push(monthTotal);
+        });
+
+        values.push(q.tw1, q.tw2, q.tw3, q.tw4, total, sisa);
+
+        return "<Row>" + values.map(value => {
+            const numeric = typeof value === "number";
+            return '<Cell' + (numeric ? ' ss:StyleID="Number"' : '') +
+                '><Data ss:Type="' + (numeric ? 'Number' : 'String') + '">' +
+                esc(value) + '</Data></Cell>';
+        }).join("") + "</Row>";
+    }).join("");
+
+    const yearSet = [...new Set(rows.map(row => String(row.tahun || "").trim()).filter(Boolean))];
+    const yearLabel = yearSet.join(", ") || String(new Date().getFullYear());
+    const colspan = headers.length - 1;
+
+    const xml =
+        '<?xml version="1.0"?>' +
+        '<?mso-application progid="Excel.Sheet"?>' +
+        '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" ' +
+        'xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">' +
+        '<Styles>' +
+        '<Style ss:ID="Header"><Font ss:Bold="1"/><Interior ss:Color="#D9E1F2" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:WrapText="1"/></Style>' +
+        '<Style ss:ID="Number"><NumberFormat ss:Format="#,##0"/></Style>' +
+        '</Styles>' +
+        '<Worksheet ss:Name="RPD"><Table>' +
+        '<Row><Cell ss:MergeAcross="' + colspan + '"><Data ss:Type="String">RENCANA PENARIKAN DANA (RPD) - P3HPL BPHL XI Banjarbaru</Data></Cell></Row>' +
+        '<Row><Cell ss:MergeAcross="' + colspan + '"><Data ss:Type="String">Tahun Anggaran: ' + esc(yearLabel) + '</Data></Cell></Row>' +
+        '<Row>' + headerCells + '</Row>' + body +
+        '</Table></Worksheet></Workbook>';
+
+    const blob = new Blob(["\\ufeff", xml], {
+        type: "application/vnd.ms-excel;charset=utf-8"
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "RPD_P3HPL_" + yearLabel.replace(/[^0-9,-]/g, "_") + ".xls";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    rpdSetStatus("File Excel RPD berhasil dibuat dan diunduh.", "success");
+}
+
 document.addEventListener("DOMContentLoaded", function () {
     RPD_WEEK_FIELDS.forEach(key => {
         document.getElementById("rpd_"+key)?.addEventListener("input", rpdUpdateEditorTotal);
@@ -1467,4 +1567,5 @@ document.addEventListener("DOMContentLoaded", function () {
     document.getElementById("rpdSaveButton")?.addEventListener("click", rpdSave);
     document.getElementById("rpdResetButton")?.addEventListener("click", rpdResetEditor);
     document.getElementById("rpdPrintButton")?.addEventListener("click", rpdPrintAll);
+    document.getElementById("rpdExcelButton")?.addEventListener("click", rpdDownloadExcel);
 });
