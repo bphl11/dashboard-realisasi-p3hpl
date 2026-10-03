@@ -1544,3 +1544,603 @@ function buatGrafikStatusAnggaran(
 
                             display:
                                 true,
+
+
+                            position:
+                                "top"
+
+                        },
+
+
+                        tooltip: {
+
+                            callbacks: {
+
+                                label:
+
+                                    function (
+                                        context
+                                    ) {
+
+                                        return (
+
+                                            context.dataset.label
+
+                                            +
+
+                                            ": "
+
+                                            +
+
+                                            formatRupiahGrafik(
+
+                                                context.raw
+
+                                            )
+
+                                        );
+
+                                    },
+
+
+                                afterBody:
+
+                                    function (
+                                        tooltipItems
+                                    ) {
+
+                                        if (
+                                            !tooltipItems ||
+                                            tooltipItems.length === 0
+                                        ) {
+
+                                            return "";
+
+                                        }
+
+
+                                        const index =
+
+                                            tooltipItems[0]
+                                                .dataIndex;
+
+
+                                        const statusData =
+
+                                            index === 0
+
+                                                ? data.normal
+
+                                                : data.diblokir;
+
+
+                                        return [
+
+                                            "Sisa: " +
+
+                                            formatRupiahGrafik(
+
+                                                statusData.sisa
+
+                                            ),
+
+
+                                            "Persentase: " +
+
+                                            formatPersenGrafik(
+
+                                                statusData.persen
+
+                                            )
+
+                                        ];
+
+                                    }
+
+                            }
+
+                        }
+
+                    },
+
+
+                    scales: {
+
+                        y: {
+
+                            beginAtZero:
+                                true,
+
+
+                            ticks: {
+
+                                callback:
+
+                                    function (
+                                        value
+                                    ) {
+
+                                        return (
+
+                                            formatSingkatRupiah(
+
+                                                value
+
+                                            )
+
+                                        );
+
+                                    }
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+        );
+
+}
+
+
+
+// ============================================================
+// GRAFIK PERBANDINGAN
+//
+// Pagu
+// Realisasi
+// Sisa Anggaran
+// ============================================================
+
+function buatGrafikPerbandingan(
+    data
+) {
+
+    const canvas =
+
+        document.getElementById(
+
+            "grafikPerbandingan"
+
+        );
+
+
+    if (!canvas) {
+
+        console.warn(
+
+            "Canvas grafikPerbandingan tidak ditemukan."
+
+        );
+
+
+        return;
+
+    }
+
+
+    if (
+        typeof Chart ===
+        "undefined"
+    ) {
+
+        return;
+
+    }
+
+
+    if (chartPerbandingan) {
+
+        chartPerbandingan.destroy();
+
+    }
+
+
+    chartPerbandingan =
+
+        new Chart(
+
+            canvas,
+
+            {
+
+                plugins: [directValueLabelsPlugin],
+
+                type:
+                    "bar",
+
+
+                data: {
+
+                    labels: [
+
+                        "Pagu",
+
+                        "Realisasi",
+
+                        "Sisa Anggaran"
+
+                    ],
+
+
+                    datasets: [
+
+                        {
+
+                            label:
+
+                                "Nilai Anggaran",
+
+
+                            data: [
+
+                                data.pagu,
+
+                                data.realisasi,
+
+                                data.sisa
+
+                            ],
+
+
+                            backgroundColor: [
+
+                                "rgba(13, 110, 253, 0.70)",
+
+                                "rgba(25, 135, 84, 0.70)",
+
+                                "rgba(108, 117, 125, 0.70)"
+
+                            ],
+
+
+                            borderWidth:
+
+                                1
+
+                        }
+
+                    ]
+
+                },
+
+
+                options: {
+
+                    responsive:
+                        true,
+
+
+            animation: {
+                duration: 0
+            },
+                    maintainAspectRatio:
+                        false,
+
+
+                    plugins: {
+
+                        legend: {
+
+                            display:
+                                false
+
+                        },
+
+
+                        tooltip: {
+
+                            callbacks: {
+
+                                label:
+
+                                    function (
+                                        context
+                                    ) {
+
+                                        return (
+
+                                            formatRupiahGrafik(
+
+                                                context.raw
+
+                                            )
+
+                                        );
+
+                                    }
+
+                            }
+
+                        }
+
+                    },
+
+
+                    scales: {
+
+                        y: {
+
+                            beginAtZero:
+                                true,
+
+
+                            ticks: {
+
+                                callback:
+
+                                    function (
+                                        value
+                                    ) {
+
+                                        return (
+
+                                            formatSingkatRupiah(
+
+                                                value
+
+                                            )
+
+                                        );
+
+                                    }
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+        );
+
+}
+
+
+
+// ============================================================
+// GRAFIK PERSENTASE PENYERAPAN
+//
+// Doughnut:
+// Realisasi
+// Sisa
+// ============================================================
+
+function buatGrafikPersentase(
+    data
+) {
+
+    const canvas =
+
+        document.getElementById(
+
+            "grafikPersentase"
+
+        );
+
+
+    if (!canvas) {
+
+        console.warn(
+
+            "Canvas grafikPersentase tidak ditemukan."
+
+        );
+
+
+        return;
+
+    }
+
+
+    if (
+        typeof Chart ===
+        "undefined"
+    ) {
+
+        return;
+
+    }
+
+
+    if (chartPersentase) {
+
+        chartPersentase.destroy();
+
+    }
+
+
+    chartPersentase =
+
+        new Chart(
+
+            canvas,
+
+            {
+
+                plugins: [directValueLabelsPlugin],
+
+                type:
+                    "doughnut",
+
+
+                data: {
+
+                    labels: [
+
+                        "Realisasi",
+
+                        "Sisa Anggaran"
+
+                    ],
+
+
+                    datasets: [
+
+                        {
+
+                            data: [
+
+                                data.realisasi,
+
+                                data.sisa
+
+                            ],
+
+
+                            backgroundColor: [
+
+                                "rgba(25, 135, 84, 0.80)",
+
+                                "rgba(222, 226, 230, 0.90)"
+
+                            ],
+
+
+                            borderWidth:
+
+                                1
+
+                        }
+
+                    ]
+
+                },
+
+
+                options: {
+
+                    responsive:
+                        true,
+
+
+            animation: {
+                duration: 0
+            },
+                    maintainAspectRatio:
+                        false,
+
+
+                    cutout:
+                        "65%",
+
+
+                    plugins: {
+
+                        legend: {
+
+                            position:
+                                "top"
+
+                        },
+
+
+                        tooltip: {
+
+                            callbacks: {
+
+                                label:
+
+                                    function (
+                                        context
+                                    ) {
+
+                                        const nilai =
+
+                                            context.raw || 0;
+
+
+                                        return (
+
+                                            context.label
+
+                                            +
+
+                                            ": "
+
+                                            +
+
+                                            formatRupiahGrafik(
+
+                                                nilai
+
+                                            )
+
+                                        );
+
+                                    }
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+        );
+
+}
+
+
+
+// ============================================================
+// PARSE NUMBER
+// ============================================================
+
+function parseNumberGrafik(
+    value
+) {
+
+    if (
+        value === null ||
+        value === undefined
+    ) {
+
+        return null;
+
+    }
+
+
+    let text =
+
+        String(
+
+            value
+
+        ).trim();
+
+
+    if (
+        text === "" ||
+        text === "-"
+    ) {
+
+        return null;
+
+    }
+
+
+    if (
+        text.includes(
+            "%"
+        )
+    ) {
+
+        return null;
+
+    }
+
+
+    // ========================================================
+    // HAPUS Rp
+    // ========================================================
