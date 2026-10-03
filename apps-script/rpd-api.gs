@@ -3583,29 +3583,19 @@ function listRpd_(
 // ============================================================
 
 function buildMasterFromDataAplikasi_() {
+  // DATA_APLIKASI adalah source of truth. RPD harus membaca langsung
+  // spreadsheet agar Pagu dan Realisasi sama persis dengan Dashboard/
+  // Monitoring dan langsung mengikuti Revisi Anggaran.
+  const ss = getSpreadsheet_();
+  const sheet = ss.getSheetByName("DATA_APLIKASI");
+
+  if (!sheet) {
+    throw new Error("Sheet DATA_APLIKASI tidak ditemukan.");
+  }
+
   ensureAnggaranIdSchema_();
 
-  if (!SOURCE_CSV_URL) {
-    throw new Error("SOURCE_CSV_URL belum diisi.");
-  }
-
-  const response = UrlFetchApp.fetch(
-    SOURCE_CSV_URL,
-    {
-      muteHttpExceptions: true,
-      followRedirects: true
-    }
-  );
-
-  if (response.getResponseCode() !== 200) {
-    throw new Error(
-      "DATA_APLIKASI tidak dapat dibaca dari sumber CSV."
-    );
-  }
-
-  const values = Utilities.parseCsv(
-    response.getContentText()
-  );
+  const values = sheet.getDataRange().getValues();
 
   if (values.length < 2) {
     return [];
@@ -3689,7 +3679,10 @@ function buildMasterFromDataAplikasi_() {
     const idAnggaran = headerValue_(
       row,
       context.map,
-      ["ID_ANGGARAN", "ID ANGGARAN"]
+      [
+        "ID_ANGGARAN",
+        "ID ANGGARAN"
+      ]
     );
 
     const pagu = parseAmount_(
@@ -3700,7 +3693,7 @@ function buildMasterFromDataAplikasi_() {
       )
     );
 
-    const realisasiKolom = parseAmount_(
+    let realisasiKolom = parseAmount_(
       headerValue_(
         row,
         context.map,
@@ -3740,6 +3733,8 @@ function buildMasterFromDataAplikasi_() {
         0
       );
 
+    // Jika kolom Realisasi sudah berisi nilai positif, gunakan nilai
+    // resmi tersebut. Jika kosong/0, gunakan penjumlahan bulanan.
     const realisasi =
       realisasiKolom > 0
         ? realisasiKolom
@@ -3792,42 +3787,21 @@ function buildMasterFromDataAplikasi_() {
     );
 
     if (seen[id]) {
-      // Jika struktur DATA_APLIKASI memiliki duplikasi identitas,
-      // pertahankan satu master agar RPD tidak menjadi double counting.
       continue;
     }
 
     seen[id] = true;
 
     out.push({
-
-      rowIndex:
-        i,
-
-      id_rpd:
-        id,
-
-      tahun:
-        String(tahun),
-
-      kodeSubKomponen:
-        kodeSubKomponen || "",
-
-      subKomponen:
-        subKomponen,
-
-      akun:
-        akun,
-
-      itemAkun:
-        itemAkun || "",
-
-      detilAkun:
-        detilAkun || "",
-
-      rincianItem:
-        rincianItem || "",
-
+      rowIndex: i,
+      id_rpd: id,
+      tahun: String(tahun),
+      kodeSubKomponen: kodeSubKomponen || "",
+      subKomponen: subKomponen,
+      akun: akun,
+      itemAkun: itemAkun || "",
+      detilAkun: detilAkun || "",
+      rincianItem: rincianItem || "",
       id_anggaran:
         idAnggaran ||
         makeStableRpdId_(
@@ -3839,13 +3813,8 @@ function buildMasterFromDataAplikasi_() {
           detilAkun,
           rincianItem
         ),
-
-      pagu:
-        pagu,
-
-      realisasi:
-        realisasi
-
+      pagu: pagu,
+      realisasi: realisasi
     });
   }
 
