@@ -372,23 +372,10 @@ function rpdNormalizeSavedRow(row) {
         normalized[key] = rpdNumber(source[key] ?? source[key.toUpperCase()] ?? 0);
     });
 
-    // Hanya record yang benar-benar tidak mempunyai field mingguan
-    // yang menjalankan migrasi kompatibilitas TW1-TW4.
-    if (!sourceHasWeeklyFields) {
-        const legacyQuarterMap = [
-            ["tw1", "mar_m4"],
-            ["tw2", "jun_m4"],
-            ["tw3", "sep_m4"],
-            ["tw4", "okt_m4"]
-        ];
-        legacyQuarterMap.forEach(([quarter, weekField]) => {
-            const value = rpdNumber(normalized[quarter]);
-            if (value > 0) normalized[weekField] = value;
-        });
-        normalized._legacyQuarterMapped = true;
-    } else {
-        normalized._legacyQuarterMapped = false;
-    }
+    // Jangan pernah mengarang posisi minggu dari subtotal TW1-TW4.
+    // Posisi 48 minggu hanya boleh berasal dari field JAN_M1 ... DES_M4
+    // yang benar-benar dikirim server/client.
+    normalized._legacyQuarterMapped = false;
 
     const q=rpdQuarterTotals(normalized);
     normalized.tw1=q.tw1; normalized.tw2=q.tw2; normalized.tw3=q.tw3; normalized.tw4=q.tw4;
@@ -718,14 +705,16 @@ async function rpdSave() {
         const result=await rpdApiRequest("save",{id_token:rpdUser.id_token,row:payload});
         if(!result.ok)throw new Error(result.message||"Data RPD gagal disimpan.");
 
-        // API boleh mengembalikan record tersimpan; jika API lama hanya
-        // mengembalikan TW1-TW4, rpdMergeSavedRows() menjaga posisi
-        // 48-minggu yang sudah tersimpan di cache lokal.
-        const serverSavedRows = rpdNormalizeExistingRows(result.data??result.rpd??result).map(item => ({
-            ...item,
+        // Konfirmasi server tetap memakai 48 minggu yang benar-benar
+        // dikirim pada transaksi ini. Response save server berisi subtotal
+        // TW1-TW4, sehingga jangan menafsirkan subtotal tersebut sebagai
+        // posisi minggu tertentu.
+        const serverSavedRow = rpdNormalizeSavedRow({
+            ...(result.data && typeof result.data === "object" ? result.data : {}),
+            ...payload,
             _localPendingSync: false
-        }));
-        rpdMergeSavedRows(serverSavedRows);
+        });
+        rpdMergeSavedRows([serverSavedRow]);
         rpdRenderDetilTable();
         rpdOriginalWeekly = Object.fromEntries(RPD_WEEK_FIELDS.map(key => [key, rpdNumber(localSaved?.[key])]));
         rpdOriginalCatatan = String(localSaved?.catatan || "");
@@ -1375,117 +1364,89 @@ function rpdApplyServerSnapshot(rows) {
 async function rpdInitData() {
     rpdUser = rpdGetStoredUser();
 
-    // Reset cache generasi lama sebelum membaca master/RPD.
+    // Cache lama hanya boleh dibersihkan sebagai housekeeping.
+    // Master dan RPD tidak lagi dibangun dari DATA_APLIKASI CSV/cache umum.
     rpdClearLegacyCaches();
 
     if (!rpdUser) return;
 
-    if (!RPD_CONFIG.RPD_API_URL) {
-        rpdSetStatus("RPD_API_URL belum dikonfigurasi.", "warning");
+    if (!RPD_CONFIG.RPD_API_URL && !RPD_CONFIG.RPD_PROXY_URL) {
+        rpdSetStatus("RPD_API_URL / RPD_PROXY_URL belum dikonfigurasi.", "warning");
         return;
     }
 
-    rpdSetLoading(true);
+    rpdSetLoading(true, "Mengambil MASTER + RPD langsung dari server...");
 
     try {
-        // MASTER RPD mengikuti DATA_APLIKASI, tetapi gunakan cache master
-        // terlebih dahulu agar halaman langsung tampil. DATA_APLIKASI tetap
-        // diperbarui di background untuk menjaga data tetap mutakhir.
-        let builtMaster = rpdLoadMasterCache();
-        let rawData = null;
+        // ========================================================
+        // SATU SUMBER KEBENARAN UNTUK HALAMAN RPD
+        // ========================================================
+        // Bootstrap RPD dibangun server langsung dari DATA_APLIKASI
+        // dan INPUT_REALISASI, bukan dari CSV/cache Dashboard.
+        // Dengan demikian Pagu, Realisasi Final, ID_ANGGARAN, dan
+        // RPD 48 minggu berasal dari snapshot server yang sama.
+        const result = await rpdApiRequest("bootstrap", {
+            id_token: rpdUser.id_token
+        });
 
-        if (Array.isArray(builtMaster) && builtMaster.length) {
-            rpdMasterRows = builtMaster;
-        } else {
-            rawData = await getSheetData();
-            builtMaster = rpdBuildMasterRows(rawData);
+        if (!result?.ok) {
+            throw new Error(result?.message || "Bootstrap RPD gagal.");
         }
 
-        // Fallback ke parser utama jika format sheet sudah flat.
-        if (!builtMaster.length) {
-            const parsed = typeof parseDataAplikasi === "function"
-                ? (parseDataAplikasi(rawData) || [])
-                : [];
+        const serverMaster = Array.isArray(result.master)
+            ? result.master
+            : [];
 
-            builtMaster = parsed
-                .filter(row => row && row.statusPagu !== "Diblokir")
-                .filter(row => row.subKomponen && row.subKomponen !== "-")
-                .filter(row => row.akun && row.akun !== "-")
-                .filter(row => row.detilAkun && row.detilAkun !== "-")
-                .map(row => ({
-                    ...row,
-                    id_rpd: rpdStableId({ tahun: row.tahun || new Date().getFullYear(), kodeSubKomponen: row.kodeSubKomponen || row.subKomponen, subKomponen: row.subKomponen, akun: row.akun, itemAkun: row.itemAkun || "", detilAkun: row.detilAkun, rincianItem: row.rincianItem || "", pagu: Number(row.pagu) || 0 }),
-                    tahun: row.tahun || new Date().getFullYear(),
-                    kodeSubKomponen: row.kodeSubKomponen || row.subKomponen,
-                    subKomponen: row.subKomponen,
-                    akun: row.akun,
-                    itemAkun: row.itemAkun || "",
-                    detilAkun: row.detilAkun,
-                    pagu: Number(row.pagu) || 0,
-                    realisasi: Number(row.realisasi) || 0
-                }));
-        }
+        const serverRpd = Array.isArray(result.rpd)
+            ? result.rpd
+            : [];
 
-        rpdMasterRows = builtMaster;
+        rpdMasterRows = serverMaster.map(row => ({
+            ...row,
+            id_rpd: String(row.id_rpd || "").trim(),
+            id_anggaran: String(row.id_anggaran || row.ID_ANGGARAN || "").trim(),
+            pagu: rpdNumber(row.pagu),
+            realisasi: rpdNumber(row.realisasi)
+        }));
+
+        // Snapshot server menggantikan cache lama. Hanya pending lokal
+        // yang belum dikonfirmasi yang dipertahankan.
+        rpdApplyServerSnapshot(serverRpd);
+
         rpdSaveMasterCache(rpdMasterRows);
-
-        // Jangan hidupkan kembali cache RPD lama.
-        // Hanya perubahan lokal yang belum tersinkron yang boleh ditampilkan
-        // sebelum snapshot server berhasil dimuat.
-        rpdExisting = rpdLoadLocalCache().filter(
-            item => item && item._localPendingSync === true
-        );
         rpdRefreshFilters({ keepAkun: false });
         rpdRenderDetilTable();
 
-        // Jika master berasal dari cache, refresh DATA_APLIKASI di background.
-        // Kegagalan refresh tidak mengganggu tampilan yang sudah tersedia.
-        if (rawData === null) {
-            getSheetData().then(freshRaw => {
-                const freshMaster = rpdBuildMasterRows(freshRaw);
-                if (freshMaster.length) {
-                    rpdMasterRows = freshMaster;
-                    rpdSaveMasterCache(freshMaster);
-                    rpdRefreshFilters({ keepAkun: true });
-                    rpdRenderDetilTable();
-                    document.getElementById("rpdTotalDetil").textContent =
-                        rpdMasterRows.length.toLocaleString("id-ID");
-                }
-            }).catch(error => console.warn("Refresh master RPD background gagal:", error));
-        }
-
-        // Ambil RPD tersimpan dari API secara background. API tidak lagi
-        // membangun MASTER dari DATA_APLIKASI sehingga jauh lebih ringan.
-        try {
-            const result = await rpdApiRequest("list", { id_token: rpdUser.id_token });
-            // Setelah list server berhasil, snapshot server menggantikan
-            // cache lama. Hanya pending lokal yang belum terkonfirmasi
-            // yang dipertahankan.
-            rpdApplyServerSnapshot(result.rpd ?? result.data ?? result);
-            rpdRenderDetilTable();
-        } catch (apiError) {
-            console.warn("List RPD dari API gagal:", apiError);
-            if (rpdExisting.length) {
-                rpdSetStatus("Server RPD belum dapat diakses. Hanya perubahan lokal yang belum tersinkron yang ditampilkan.", "warning");
-            } else {
-                rpdSetStatus("Server RPD belum dapat diakses. Data RPD tersimpan di server tidak ditampilkan sampai sinkronisasi berhasil.", "warning");
-            }
-        }
-
         document.getElementById("rpdTotalDetil").textContent =
             rpdMasterRows.length.toLocaleString("id-ID");
-
         document.getElementById("rpdTotalTerisi").textContent =
             rpdCountTerisi().toLocaleString("id-ID");
 
         if (!rpdMasterRows.length) {
-            rpdSetStatus("DATA_APLIKASI tidak menghasilkan Detil Akun yang dapat digunakan untuk RPD. Periksa kolom Sub Komponen, Akun Belanja, dan Detil Akun.", "warning");
+            rpdSetStatus(
+                "DATA_APLIKASI tidak menghasilkan Detil Akun yang dapat digunakan untuk RPD.",
+                "warning"
+            );
         } else {
             rpdHideStatus();
         }
     } catch (error) {
-        console.error(error);
-        rpdSetStatus(error.message || "Data RPD gagal dimuat.", "danger");
+        console.error("Bootstrap RPD gagal:", error);
+
+        // Untuk menjaga integritas, jangan menampilkan master/RPD lama
+        // seolah-olah itu snapshot terbaru ketika server gagal.
+        rpdMasterRows = [];
+        rpdExisting = [];
+        rpdRefreshFilters({ keepAkun: false });
+        rpdRenderDetilTable();
+        document.getElementById("rpdTotalDetil").textContent = "0";
+        document.getElementById("rpdTotalTerisi").textContent = "0";
+
+        rpdSetStatus(
+            "Data RPD belum dapat disinkronkan dari server: " +
+            (error.message || "Bootstrap RPD gagal."),
+            "danger"
+        );
     } finally {
         rpdSetLoading(false);
     }
