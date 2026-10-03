@@ -119,16 +119,36 @@ function rpdSaveLocalCache(rows) {
 }
 
 function rpdMergeSavedRows(rows) {
-    const byId = new Map(
-        rpdExisting.map(item => [String(item.id_rpd || ""), item])
-    );
+    const byId = new Map();
+    const byPermanentId = new Map();
+    const byIdentity = new Map();
+
+    rpdExisting.forEach(item => {
+        const id = String(item.id_rpd || item.ID_RPD || "").trim();
+        const permanentId = String(item.id_anggaran || item.ID_ANGGARAN || "").trim();
+        const identity = rpdIdentityKey(item);
+
+        if (id) byId.set(id, item);
+        if (permanentId) byPermanentId.set(permanentId, item);
+        if (identity) byIdentity.set(identity, item);
+    });
 
     (rows || []).forEach(item => {
         const normalized = rpdNormalizeSavedRow(item);
         if (!normalized.id_rpd) return;
 
         const key = String(normalized.id_rpd);
-        const existing = byId.get(key);
+        const permanentId = String(normalized.id_anggaran || normalized.ID_ANGGARAN || "").trim();
+        const identity = rpdIdentityKey(normalized);
+
+        // Cari record lama dengan ID permanen, ID_RPD, atau identitas
+        // yang sama. Dengan demikian cache lama tidak membuat duplikasi
+        // ketika server mengembalikan ID generasi terbaru.
+        const existing =
+            (permanentId && byPermanentId.get(permanentId)) ||
+            byId.get(key) ||
+            (identity && byIdentity.get(identity)) ||
+            null;
 
         if (!existing) {
             byId.set(key, normalized);
@@ -200,9 +220,30 @@ function rpdMergeSavedRows(rows) {
 
         normalized._localPendingSync = false;
         byId.set(key, normalized);
+
+        if (permanentId) byPermanentId.set(permanentId, normalized);
+        if (identity) byIdentity.set(identity, normalized);
     });
 
-    rpdExisting = [...byId.values()];
+    // Jika ada record lama dengan ID berbeda tetapi identitas sama, hapus
+    // duplikatnya dan pertahankan satu record server terbaru.
+    const unique = [];
+    const seenPermanent = new Set();
+    const seenIdentity = new Set();
+
+    [...byId.values()].forEach(item => {
+        const permanentId = String(item.id_anggaran || item.ID_ANGGARAN || "").trim();
+        const identity = rpdIdentityKey(item);
+
+        if (permanentId && seenPermanent.has(permanentId)) return;
+        if (identity && seenIdentity.has(identity)) return;
+
+        if (permanentId) seenPermanent.add(permanentId);
+        if (identity) seenIdentity.add(identity);
+        unique.push(item);
+    });
+
+    rpdExisting = unique;
     rpdSaveLocalCache(rpdExisting);
 }
 
@@ -501,6 +542,33 @@ function rpdRenderDetilTable() {
     rpdRenderBudgetWarnings();
 }
 
+function rpdIdentityKey(row) {
+    const source = row && typeof row === "object" ? row : {};
+
+    const clean = value => {
+        let text = String(value ?? "")
+            .trim()
+            .toUpperCase()
+            .replace(/\s+/g, " ");
+
+        // Pada DATA_APLIKASI, nilai kosong dan tanda "-" kadang dipakai
+        // bergantian. Keduanya harus dianggap identitas yang sama.
+        if (text === "-" || text === "—") text = "";
+
+        return text;
+    };
+
+    return [
+        source.tahun ?? source.TAHUN,
+        source.kode_sub_komponen ?? source.kodeSubKomponen ?? source.KODE_SUB_KOMPONEN,
+        source.sub_komponen ?? source.subKomponen ?? source.SUB_KOMPONEN,
+        source.akun ?? source.AKUN,
+        source.item_akun ?? source.itemAkun ?? source.ITEM_AKUN,
+        source.detil_akun ?? source.detilAkun ?? source.DETIL_AKUN,
+        source.rincian_item ?? source.rincianItem ?? source.RINCIAN_ITEM
+    ].map(clean).join("|");
+}
+
 function rpdFindSavedForMaster(masterRow) {
     const permanentId = String(
         masterRow?.id_anggaran ||
@@ -515,22 +583,25 @@ function rpdFindSavedForMaster(masterRow) {
         if (byPermanentId) return byPermanentId;
     }
 
-    // ID_RPD tetap dipakai untuk kompatibilitas.
-    const exact = rpdExisting.find(item =>
-        String(item.id_rpd || "").trim() === String(masterRow.id_rpd || "").trim()
-    );
-    if (exact) return exact;
+    // ID_RPD dipakai sebagai relasi utama bila sama.
+    const masterRpdId = String(masterRow?.id_rpd || "").trim();
+    if (masterRpdId) {
+        const exact = rpdExisting.find(item =>
+            String(item.id_rpd || item.ID_RPD || "").trim() === masterRpdId
+        );
+        if (exact) return exact;
+    }
 
-    // Kompatibilitas hanya untuk record lama: seluruh identitas baris harus cocok.
+    // Fallback identitas yang dinormalisasi. Ini penting setelah Revisi
+    // Anggaran/cache karena ID_ANGGARAN atau ID_RPD dapat berasal dari
+    // generasi berbeda, sedangkan identitas detil anggarannya tetap sama.
+    const targetKey = rpdIdentityKey(masterRow);
+    if (!targetKey || targetKey.replace(/\|/g, "") === "") return null;
+
     const same = rpdExisting.filter(item =>
-        String(item.tahun ?? "") === String(masterRow.tahun ?? "") &&
-        String(item.kode_sub_komponen ?? "").trim() === String(masterRow.kodeSubKomponen ?? "").trim() &&
-        String(item.sub_komponen ?? "").trim() === String(masterRow.subKomponen ?? "").trim() &&
-        String(item.akun ?? item.AKUN ?? "").trim() === String(masterRow.akun ?? "").trim() &&
-        String(item.item_akun ?? "").trim() === String(masterRow.itemAkun ?? "").trim() &&
-        String(item.detil_akun ?? "").trim() === String(masterRow.detilAkun ?? "").trim() &&
-        String(item.rincian_item ?? "").trim() === String(masterRow.rincianItem ?? "").trim()
+        rpdIdentityKey(item) === targetKey
     );
+
     return same.length === 1 ? same[0] : null;
 }
 
@@ -571,7 +642,7 @@ function rpdUpdateEditorTotal() {
     const valid=!negative;
     ["rpdTw1Summary","rpdTw2Summary","rpdTw3Summary","rpdTw4Summary"].forEach((id,i)=>document.getElementById(id).textContent=rpdFormatRupiah(q[i+1]));
     document.getElementById("rpdEditTotal").textContent=rpdFormatRupiah(total);
-    document.getElementById("rpdEditSisa").textContent=rpdFormatRupiah(Math.max(danaTersedia-total,0));
+    document.getElementById("rpdEditSisa").textContent=rpdFormatRupiah(Math.max(total-realisasi,0));
     const state=document.getElementById("rpdEditValidation");
     state.className="small mt-2 "+(valid?"text-success":"text-danger");
     state.className="small mt-2 "+(negative?"text-danger":(excess>0?"text-warning":"text-success"));
