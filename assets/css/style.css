@@ -534,3 +534,291 @@ body{
     .brand-ministry{font-size:.52rem;}
     .brand-title{font-size:.82rem;}
 }
+
+
+/* ==========================================================
+   MODERN ENTERPRISE UI - gaya aplikasi pemerintahan modern
+   VISUAL ONLY: tidak mengubah struktur, data, API, atau logika
+   ========================================================== */
+:root{
+    --ui-green:#2f6b2f;
+    --ui-green-dark:#245526;
+    --ui-green-soft:#edf5ed;
+    --ui-border:#dfe4e8;
+    --ui-text:#27313d;
+    --ui-muted:#6f7a86;
+    --ui-bg:#f5f7f9;
+    --ui-white:#ffffff;
+    --ui-radius:10px;
+}
+
+body{
+    background:var(--ui-bg);
+    color:var(--ui-text);
+    font-size:14px;
+}
+
+.wrapper{
+    background:var(--ui-bg);
+}
+
+/* Sidebar: lebih compact, bersih dan bergaya enterprise */
+.sidebar{
+    flex:0 0 250px;
+    width:250px;
+    min-width:250px;
+    max-width:250px;
+    min-height:100vh;
+    padding:14px 12px 18px;
+    background:#eef2f4;
+    color:#33404c;
+    border-right:1px solid #d9e0e4;
+    box-shadow:2px 0 8px rgba(31,41,55,.04);
+}
+
+.logo.app-brand{
+    min-height:86px;
+    padding:8px 8px 14px;
+    margin-bottom:12px;
+    border-bottom:1px solid #d6dde1;
+}
+
+.brand-mark{
+    width:52px;
+    height:52px;
+    flex-basis:52px;
+    border-radius:11px;
+    background:#fff;
+    border:1px solid #dce3e7;
+    box-shadow:none;
+}
+
+.brand-ministry{
+    color:#5d6873;
+    font-size:.55rem;
+}
+
+.brand-title{
+    color:var(--ui-green-dark);
+    font-size:.82rem;
+}
+
+.brand-subtitle{
+    color:#7a858f;
+    font-size:.68rem;
+}
+
+.sidebar ul{
+    margin:0;
+}
+
+.sidebar li{
+    padding:0;
+    margin:3px 0;
+    border-radius:8px;
+    overflow:hidden;
+}
+
+.sidebar li a{
+    min-height:43px;
+    display:flex;
+    align-items:center;
+    gap:11px;
+    padding:11px 13px;
+    color:#46515d;
+    font-size:.91rem;
+    font-weight:500;
+    border:1px solid transparent;
+    transition:background .18s ease,color .18s ease,border-color .18s ease;
+}
+
+.sidebar li a i{
+    width:20px;
+    text-align:center;
+    font-size:1rem;
+    color:#60707c;
+}
+
+.sidebar li:hover a{
+    background:#e4ece6;
+    color:var(--ui-green-dark);
+}
+
+.sidebar li:hover a i{
+    color:var(--ui-green);
+}
+
+.sidebar li.active{
+    background:#fff;
+    color:var(--ui-green-dark);
+    border:1px solid #d8e3da;
+    box-shadow:0 2px 7px rgba(31,41,55,.05);
+}
+
+.sidebar li.active a{
+    color:var(--ui-green-dark);
+    font-weight:700;
+}
+
+.sidebar li.active a i{
+    color:var(--ui-green);
+}
+
+/* Area utama */
+.content{
+    max-width:calc(100% - 250px);
+    padding:24px 30px 35px;
+}
+
+header{
+    margin-bottom:20px;
+    padding:0 2px;
+}
+
+header h2,
+.dashboard-header h2{
+    color:#202a35;
+    font-weight:750;
+    letter-spacing:-.025em;
+}
+
+header p,
+.dashboard-header p{
+    color:#77818c;
+}
+
+/* Panel dan card */
+.content > .card,
+.monitoring-card,
+.chart-card,
+.dashboard-section,
+.dashboard-highlight,
+.component-card,
+.akun-chart-card{
+    border:1px solid var(--ui-border);
+    border-radius:11px;
+    box-shadow:0 3px 12px rgba(31,41,55,.045);
+}
+
+.card{
+    border-color:var(--ui-border);
+}
+
+.card-header{
+    background:#fff;
+    border-bottom:1px solid var(--ui-border);
+}
+
+/* Form controls: tampilan lebih rapi seperti aplikasi enterprise */
+.form-label,
+label{
+    color:#3f4b57;
+    font-weight:600;
+    font-size:.86rem;
+    margin-bottom:6px;
+}
+
+.form-control,
+.form-select,
+input,
+select,
+textarea{
+    border-color:#cfd7dd;
+    border-radius:7px;
+    min-height:40px;
+    color:#303b46;
+    box-shadow:none;
+}
+
+.form-control:focus,
+.form-select:focus,
+input:focus,
+select:focus,
+textarea:focus{
+    border-color:#79a17e;
+    box-shadow:0 0 0 .18rem rgba(63,122,81,.10);
+}
+
+/* Tombol tetap mempertahankan warna/status aplikasinya */
+.btn{
+    border-radius:7px;
+    font-weight:600;
+    box-shadow:none;
+}
+
+.btn-success{
+    background:#4f8a5d;
+    border-color:#4f8a5d;
+}
+
+.btn-success:hover{
+    background:#43794f;
+    border-color:#43794f;
+}
+
+/* Tabel: header enterprise, baris lebih ringan */
+table thead th{
+    background:#f1f4f6!important;
+    color:#3f4a55!important;
+    border-color:#dce2e6!important;
+    font-weight:700;
+}
+
+table tbody td{
+    border-color:#e5e9ec!important;
+}
+
+table.table-striped > tbody > tr:nth-of-type(odd) > *{
+    background-color:#fafbfc;
+}
+
+table.table-hover > tbody > tr:hover > *{
+    background-color:#f1f6f2;
+}
+
+/* Kartu ringkasan */
+.summary-card,
+.dashboard-card{
+    border:1px solid var(--ui-border);
+    box-shadow:0 3px 12px rgba(31,41,55,.05);
+    border-radius:11px;
+}
+
+/* DataTables */
+.dataTables_wrapper .dataTables_length select,
+.dataTables_wrapper .dataTables_filter input{
+    border:1px solid #cfd7dd;
+    border-radius:6px;
+    min-height:36px;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button{
+    border-radius:6px!important;
+}
+
+/* Panel status/informasi */
+.alert{
+    border-radius:8px;
+}
+
+/* Desktop ukuran menengah */
+@media(max-width:1200px) and (min-width:992px){
+    .sidebar{
+        flex-basis:235px;
+        width:235px;
+        min-width:235px;
+        max-width:235px;
+    }
+    .content{
+        max-width:calc(100% - 235px);
+        padding-left:22px;
+        padding-right:22px;
+    }
+    .brand-title{font-size:.76rem;}
+    .sidebar li a{font-size:.86rem;padding-left:10px;padding-right:10px;}
+}
+
+@media(max-width:991px){
+    .sidebar{display:none;}
+    .content{max-width:100%;width:100%;padding:18px;}
+}
