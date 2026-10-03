@@ -586,6 +586,18 @@ document.addEventListener(
 
             totalData.selisihRpd = sisaBelumDirealisasikan - grafikRpdTotal;
 
+            // Total capaian = Realisasi Aktual + RPD Terisi.
+            // Persentase menunjukkan bagian Pagu yang sudah terealisasi
+            // atau sudah direncanakan melalui RPD.
+            totalData.realisasiPlusRpd =
+                (Number(totalData.realisasi) || 0) +
+                (Number(totalData.rpdTerisi) || 0);
+
+            totalData.persentaseRealisasiPlusRpd =
+                Number(totalData.pagu) > 0
+                    ? (totalData.realisasiPlusRpd / Number(totalData.pagu)) * 100
+                    : 0;
+
             totalData.persen = Number(totalData.pagu) > 0
                 ? ((Number(totalData.realisasi) || 0) / Number(totalData.pagu)) * 100
                 : 0;
@@ -878,6 +890,16 @@ function tampilkanCardGrafik(data) {
     setTextGrafik(
         "sisaAnggaran",
         formatRupiahGrafik(data.sisaRpd)
+    );
+
+    setTextGrafik(
+        "totalRealisasiRpd",
+        formatRupiahGrafik(data.realisasiPlusRpd || 0)
+    );
+
+    setTextGrafik(
+        "persentaseRealisasiRpd",
+        formatPersenGrafik(data.persentaseRealisasiPlusRpd || 0)
     );
 }
 
