@@ -54,7 +54,7 @@ let grafikRpdTotal = 0;
 // Cache RPD khusus halaman Grafik.
 // Grafik boleh menampilkan cache terlebih dahulu, lalu menyegarkan RPD
 // di belakang layar agar perpindahan menu tidak menunggu request API.
-const GRAFIK_RPD_CACHE_KEY = "p3hpl_grafik_rpd_cache_v3";
+const GRAFIK_RPD_CACHE_KEY = "p3hpl_grafik_rpd_cache_v4";
 const GRAFIK_RPD_CACHE_TTL = 2 * 60 * 1000;
 let grafikRpdRefreshPromise = null;
 
