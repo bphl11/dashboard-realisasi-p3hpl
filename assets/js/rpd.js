@@ -480,7 +480,13 @@ function rpdRenderBudgetWarnings() {
         const pagu = rpdNumber(row.pagu);
         const realisasi = rpdNumber(row.realisasi);
         const danaTersedia = Math.max(pagu - realisasi, 0);
-        const excess = total - danaTersedia;
+
+        // RPD yang sudah tersimpan sebelum Realisasi tetap sah.
+        // Realisasi baru mengurangi dana tersedia, bukan membatalkan
+        // RPD lama. Kapasitas RPD saat evaluasi = dana tersedia saat ini
+        // + RPD yang sudah tersimpan pada detil tersebut.
+        const kapasitasRpd = danaTersedia + total;
+        const excess = Math.max(total - kapasitasRpd, 0);
 
         if (excess > 0) {
             totalExcess += excess;
@@ -531,7 +537,12 @@ function rpdRenderDetilTable() {
         const saved=rpdFindSavedForMaster(row)||RPD_EMPTY, q=rpdQuarterTotals(saved);
         const realisasi=rpdNumber(row.realisasi);
         const danaTersedia=rpdDanaTersedia(row);
-        const total=q.tw1+q.tw2+q.tw3+q.tw4, sisa=Math.max(danaTersedia-total,0);
+        const total=q.tw1+q.tw2+q.tw3+q.tw4;
+
+        // Jika RPD sudah diinput sebelum ada Realisasi, Realisasi baru
+        // tidak dianggap sebagai kelebihan RPD. Sisa RPD yang ditampilkan
+        // adalah dana tersedia saat ini setelah mempertahankan RPD lama.
+        const sisa=Math.max(danaTersedia,0);
         return '<tr><td><strong>'+rpdEsc(row.itemAkun?row.itemAkun+" — ":"")+rpdEsc(row.akun)+'</strong><div class="small text-muted">'+(row.detilAkun?'Detil: '+rpdEsc(row.detilAkun):'Detil: -')+'</div><div class="small">'+(row.rincianItem?'Rincian: '+rpdEsc(row.rincianItem):'')+'</div></td>'+
         '<td class="text-end">'+rpdFormatRupiah(row.pagu)+'</td><td class="text-end">'+rpdFormatRupiah(realisasi)+'</td><td class="text-end">'+rpdFormatRupiah(danaTersedia)+'</td><td class="text-end">'+rpdFormatRupiah(q.tw1)+'</td><td class="text-end">'+rpdFormatRupiah(q.tw2)+'</td><td class="text-end">'+rpdFormatRupiah(q.tw3)+'</td><td class="text-end">'+rpdFormatRupiah(q.tw4)+'</td><td class="text-end fw-bold">'+rpdFormatRupiah(total)+'</td><td class="text-end">'+rpdFormatRupiah(sisa)+'</td>'+
         '<td><button type="button" class="btn btn-sm btn-success rpd-edit-btn" data-rpd-id="'+rpdEsc(row.id_rpd)+'"><i class="bi bi-pencil-square"></i> Input/Edit</button></td></tr>';
@@ -634,21 +645,30 @@ function rpdUpdateEditorTotal() {
     const q={1:0,2:0,3:0,4:0};
     let total=0, negative=false;
     RPD_MONTHS.forEach(month=>{for(let week=1;week<=4;week++){const v=rpdNumber(document.getElementById("rpd_"+month.key+"_m"+week)?.value);q[month.tw]+=v;total+=v;if(v<0)negative=true;}});
-    const excess=Math.max(total-danaTersedia,0);
-    // Kelebihan RPD tetap boleh disimpan agar operator dapat memperbaikinya
-    // setelah Revisi Anggaran; sistem hanya memberi peringatan.
+    const savedExisting = rpdFindSavedForMaster(rpdCurrentSelection) || RPD_EMPTY;
+    const savedTotal = rpdQuarterTotals(savedExisting).tw1 +
+        rpdQuarterTotals(savedExisting).tw2 +
+        rpdQuarterTotals(savedExisting).tw3 +
+        rpdQuarterTotals(savedExisting).tw4;
+
+    // RPD lama tetap menjadi hak rencana. Realisasi setelah RPD
+    // mengurangi Dana Tersedia, tetapi tidak membuat RPD lama menjadi
+    // "kelebihan". Yang diuji adalah tambahan/perubahan RPD.
+    const kapasitasRpd = danaTersedia + savedTotal;
+    const excess=Math.max(total-kapasitasRpd,0);
+
     const valid=!negative;
     ["rpdTw1Summary","rpdTw2Summary","rpdTw3Summary","rpdTw4Summary"].forEach((id,i)=>document.getElementById(id).textContent=rpdFormatRupiah(q[i+1]));
     document.getElementById("rpdEditTotal").textContent=rpdFormatRupiah(total);
-    document.getElementById("rpdEditSisa").textContent=rpdFormatRupiah(Math.max(danaTersedia-total,0));
+    document.getElementById("rpdEditSisa").textContent=rpdFormatRupiah(Math.max(kapasitasRpd-total,0));
     const state=document.getElementById("rpdEditValidation");
     state.className="small mt-2 "+(valid?"text-success":"text-danger");
     state.className="small mt-2 "+(negative?"text-danger":(excess>0?"text-warning":"text-success"));
     state.textContent=negative
         ? "Tidak valid: nilai mingguan tidak boleh negatif."
         : (excess>0
-            ? "Peringatan: RPD melebihi dana tersedia sebesar " + rpdFormatRupiah(excess) + ". Nilai tetap dapat disimpan dan dapat disesuaikan kembali."
-            : "Valid: RPD sesuai dengan dana tersedia setelah Realisasi.");
+            ? "Peringatan: tambahan/perubahan RPD melebihi kapasitas yang tersedia sebesar " + rpdFormatRupiah(excess) + ". RPD yang sudah tersimpan sebelumnya tetap diperhitungkan."
+            : "Valid: RPD sesuai. Realisasi setelah RPD tidak dianggap sebagai kelebihan RPD.");
     document.getElementById("rpdSaveButton").disabled=negative;
 }
 
@@ -680,7 +700,16 @@ async function rpdSave() {
     if(RPD_WEEK_FIELDS.some(key=>payload[key]<0)){rpdSetStatus("Nilai RPD mingguan tidak boleh negatif.","danger");return;}
     const realisasiTerkini=rpdNumber(rpdCurrentSelection?.realisasi);
     const danaTersedia=Math.max(rpdNumber(payload.pagu_detil)-realisasiTerkini,0);
-    const rpdExcess=Math.max(total-danaTersedia,0);
+
+    const savedBeforeSave = rpdFindSavedForMaster(rpdCurrentSelection) || RPD_EMPTY;
+    const savedTotalBeforeSave = rpdQuarterTotals(savedBeforeSave).tw1 +
+        rpdQuarterTotals(savedBeforeSave).tw2 +
+        rpdQuarterTotals(savedBeforeSave).tw3 +
+        rpdQuarterTotals(savedBeforeSave).tw4;
+
+    // Realisasi yang masuk setelah RPD tidak menghapus kapasitas RPD lama.
+    const kapasitasRpd = danaTersedia + savedTotalBeforeSave;
+    const rpdExcess=Math.max(total-kapasitasRpd,0);
     const q={1:0,2:0,3:0,4:0};
     RPD_MONTHS.forEach(month=>{for(let week=1;week<=4;week++)q[month.tw]+=payload[month.key+"_m"+week];});
     payload.tw1=q[1];payload.tw2=q[2];payload.tw3=q[3];payload.tw4=q[4];payload.total_rpd=total;
