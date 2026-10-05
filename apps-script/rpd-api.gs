@@ -5107,6 +5107,123 @@ function tuRealisasiDelete_(token,req){const user=tuAuthorize_(token),year=tuYea
 function tuRpdList_(token,p){const user=tuAuthorize_(token),year=tuYear_(p.tahun),id=tuText_(p.id_tu),masters=tuMasters_(year).filter(m=>!id||tuText_(m.ID_TU)===id),rpd=tuRpdRows_(year,id),by={};rpd.forEach(r=>by[tuText_(r.ID_TU)]=r);const months=["JAN","FEB","MAR","APR","MEI","JUN","JUL","AGU","SEP","OKT","NOV","DES"],data=masters.map(m=>{const r=by[tuText_(m.ID_TU)],real=tuFinal_(m,tuActiveReal_(year,m.ID_TU)),total=r?tuNum_(r.TOTAL_RPD):0,o={id_rpd_tu:r?tuText_(r.ID_RPD_TU):"TU-RPD-"+tuText_(m.ID_TU),id_tu:tuText_(m.ID_TU),tahun:year,pagu_revisi:tuNum_(m.PAGU_REVISI),realisasi_dasar:real.dasar,realisasi_input:real.input,realisasi_final:real.final,dana_tersedia:Math.max(tuNum_(m.PAGU_REVISI)-real.final,0),total_rpd:total,sisa_rpd:Math.max(tuNum_(m.PAGU_REVISI)-real.final-total,0),tw1:r?tuNum_(r.TW1):0,tw2:r?tuNum_(r.TW2):0,tw3:r?tuNum_(r.TW3):0,tw4:r?tuNum_(r.TW4):0,catatan:r?tuText_(r.CATATAN):"",updated_at:r?r.UPDATED_AT:"",updated_by:r?tuText_(r.UPDATED_BY):""};months.forEach(mon=>{for(let w=1;w<=4;w++)o[mon.toLowerCase()+"_m"+w]=r?tuNum_(r[mon+"_M"+w]):0;});return o;});return{ok:true,user,tahun:year,data};}
 function tuRpdSave_(token,req){const user=tuAuthorize_(token),year=tuYear_(req.tahun),id=tuText_(req.id_tu),m=tuFindMaster_(id,year);tuAssert_(m);const w=tuWeekly_(req),total=w.list.reduce((a,b)=>a+b,0),real=tuFinal_(m,tuActiveReal_(year,id)),pagu=tuNum_(m.PAGU_REVISI),oldRows=tuRpdRows_(year,id),old=oldRows.length?oldRows[0]:null,oldTotal=old?tuNum_(old.TOTAL_RPD):0,additional=Math.max(total-oldTotal,0),available=Math.max(pagu-real.final,0);if(total>pagu)throw new Error("TOTAL RPD TU tidak boleh melebihi Pagu Revisi.");if(additional>available)throw new Error("RPD tambahan melebihi Dana Tersedia.");const s=tuSheet_(TU_SHEETS_.RPD,TU_RPD_HEADERS_),mp=tuMap_(s.getRange(1,1,1,s.getLastColumn()).getValues()[0]),out=new Array(s.getLastColumn()).fill(""),now=new Date(),rid=old?tuText_(old.ID_RPD_TU):tuNextId_(s,"RPD-TU-",year,"ID_RPD_TU");out[mp.ID_RPD_TU]=rid;out[mp.ID_TU]=id;out[mp.TAHUN]=year;out[mp.TW1]=w.tw1;out[mp.TW2]=w.tw2;out[mp.TW3]=w.tw3;out[mp.TW4]=w.tw4;out[mp.TOTAL_RPD]=total;Object.keys(w.out).forEach(k=>out[mp[k.toUpperCase()]]=w.out[k]);out[mp.CATATAN]=tuText_(req.catatan);out[mp.UPDATED_AT]=now;out[mp.UPDATED_BY]=user.email;if(old)s.getRange(old.__row,1,1,s.getLastColumn()).setValues([out]);else s.appendRow(out);return{ok:true,message:"RPD TU tersimpan.",id_rpd_tu:rid,total_rpd:total,dana_tersedia:available,sisa_rpd:Math.max(pagu-real.final-total,0),tw1:w.tw1,tw2:w.tw2,tw3:w.tw3,tw4:w.tw4};}
 function tuRevisiList_(token,p){const user=tuAuthorize_(token),year=tuYear_(p.tahun),id=tuText_(p.id_tu);return{ok:true,user,tahun:year,data:tuRevisionRows_(year,id).map(r=>({id_revisi_tu:tuText_(r.ID_REVISI_TU),id_tu:tuText_(r.ID_TU),tahun:Number(r.TAHUN),pagu_lama:tuNum_(r.PAGU_LAMA),pagu_baru:tuNum_(r.PAGU_BARU),selisih_pagu:tuNum_(r.SELISIH_PAGU),jenis_revisi:tuText_(r.JENIS_REVISI),tanggal_revisi:r.TANGGAL_REVISI,alasan:tuText_(r.ALASAN),status:tuStatus_(r.STATUS,"AKTIF"),created_at:r.CREATED_AT,created_by:tuText_(r.CREATED_BY)}))};}
-function tuRevisiSave_(token,req){const user=tuAuthorize_(token),year=tuYear_(req.tahun),id=tuText_(req.id_tu),m=tuFindMaster_(id,year);tuAssert_(m);const newPagu=tuNN_(req.pagu_baru,"Pagu Baru"),oldPagu=tuNum_(m.PAGU_REVISI),real=tuFinal_(m,tuActiveReal_(year,id)),rr=tuRpdRows_(year,id),rpdTotal=rr.length?tuNum_(rr[0].TOTAL_RPD):0;const minimum=Math.max(real.final,rpdTotal);if(newPagu<minimum)throw new Error("Pagu Baru tidak boleh lebih kecil dari Realisasi Final ("+formatRevisionRupiah_(real.final)+") maupun Total RPD Existing ("+formatRevisionRupiah_(rpdTotal)+").");const ds=tuSheet_(TU_SHEETS_.DATA,TU_DATA_HEADERS_),dm=tuMap_(ds.getRange(1,1,1,ds.getLastColumn()).getValues()[0]),now=new Date();ds.getRange(m.__row,dm.PAGU_REVISI+1).setValue(newPagu);ds.getRange(m.__row,dm.UPDATED_AT+1).setValue(now);ds.getRange(m.__row,dm.UPDATED_BY+1).setValue(user.email);const rs=tuSheet_(TU_SHEETS_.REVISI,TU_REVISI_HEADERS_),rid=tuNextId_(rs,"REV-TU-",year,"ID_REVISI_TU");rs.appendRow([rid,id,year,oldPagu,newPagu,newPagu-oldPagu,tuText_(req.jenis_revisi),tuDate_(req.tanggal_revisi),tuText_(req.alasan),"AKTIF",now,user.email]);return{ok:true,message:"Revisi Pagu TU tersimpan.",id_revisi_tu:rid,pagu_lama:oldPagu,pagu_baru:newPagu,selisih_pagu:newPagu-oldPagu,realisasi_final:real.final,total_rpd_existing:rpdTotal};}
-function tuMonitoring_(token,p){const user=tuAuthorize_(token),year=tuYear_(p.tahun),id=tuText_(p.id_tu),masters=tuMasters_(year).filter(m=>!id||tuText_(m.ID_TU)===id),rpd=tuRpdRows_(year,id),by={};rpd.forEach(r=>by[tuText_(r.ID_TU)]=r);const real=tuRealisasiRows_(year,id,true),rb={};real.forEach(r=>{const k=tuText_(r.ID_TU);(rb[k]||(rb[k]=[])).push(r);});let tp=0,td=0,ti=0,tf=0,ts=0,tr=0,tsr=0;const detail=masters.map(m=>{const a=rb[tuText_(m.ID_TU)]||[],s=tuSummary_(m,a,by[tuText_(m.ID_TU)]);tp+=s.pagu_revisi;td+=s.realisasi_dasar;ti+=s.realisasi_input;tf+=s.realisasi_final;ts+=s.dana_tersedia;tr+=s.total_rpd;tsr+=s.sisa_rpd;return tuMasterOut_(m);});const monthly={};real.forEach(r=>{const mo=Number(r.BULAN_REALISASI);monthly[mo]=(monthly[mo]||0)+tuNum_(r.NOMINAL_REALISASI);});return{ok:true,user,tahun:year,summary:{total_pagu:tp,realisasi_dasar:td,realisasi_input:ti,realisasi_final:tf,sisa_anggaran:ts,persentase:tp>0?tf/tp*100:0,total_rpd:tr,total_sisa_rpd:tsr},monthly,detail};}
+function tuRevisiSave_(token,req){
+  const user=tuAuthorize_(token),year=tuYear_(req.tahun),id=tuText_(req.id_tu),m=tuFindMaster_(id,year);
+  tuAssert_(m);
+  const newPagu=tuNN_(req.pagu_baru,"Pagu Baru");
+  const oldPagu=tuNum_(m.PAGU_REVISI);
+  const real=tuFinal_(m,tuActiveReal_(year,id));
+  const rr=tuRpdRows_(year,id);
+  const rpdTotal=rr.length?tuNum_(rr[0].TOTAL_RPD):0;
+  const minimum=Math.max(real.final,rpdTotal);
+
+  if(newPagu<minimum){
+    throw new Error("Pagu Baru tidak boleh lebih kecil dari Realisasi Final ("+
+      formatRevisionRupiah_(real.final)+") maupun Total RPD Existing ("+
+      formatRevisionRupiah_(rpdTotal)+").");
+  }
+
+  const ds=tuSheet_(TU_SHEETS_.DATA,TU_DATA_HEADERS_);
+  const dm=tuMap_(ds.getRange(1,1,1,ds.getLastColumn()).getValues()[0]);
+  const rs=tuSheet_(TU_SHEETS_.REVISI,TU_REVISI_HEADERS_);
+  const rid=tuNextId_(rs,"REV-TU-",year,"ID_REVISI_TU");
+  const now=new Date();
+
+  // Simpan nilai lama agar perubahan Pagu dapat di-rollback
+  // apabila penulisan history revisi gagal.
+  ds.getRange(m.__row,dm.PAGU_REVISI+1).setValue(newPagu);
+  ds.getRange(m.__row,dm.UPDATED_AT+1).setValue(now);
+  ds.getRange(m.__row,dm.UPDATED_BY+1).setValue(user.email);
+  SpreadsheetApp.flush();
+
+  try{
+    rs.appendRow([
+      rid,id,year,oldPagu,newPagu,newPagu-oldPagu,
+      tuText_(req.jenis_revisi),tuDate_(req.tanggal_revisi),
+      tuText_(req.alasan),"AKTIF",now,user.email
+    ]);
+    SpreadsheetApp.flush();
+  }catch(error){
+    ds.getRange(m.__row,dm.PAGU_REVISI+1).setValue(oldPagu);
+    ds.getRange(m.__row,dm.UPDATED_AT+1).setValue(m.UPDATED_AT||"");
+    ds.getRange(m.__row,dm.UPDATED_BY+1).setValue(m.UPDATED_BY||"");
+    SpreadsheetApp.flush();
+    throw new Error("Revisi Pagu TU gagal dicatat. Perubahan Pagu dibatalkan: "+error.message);
+  }
+
+  return{
+    ok:true,message:"Revisi Pagu TU tersimpan.",id_revisi_tu:rid,
+    pagu_lama:oldPagu,pagu_baru:newPagu,selisih_pagu:newPagu-oldPagu,
+    realisasi_final:real.final,total_rpd_existing:rpdTotal
+  };
+}
+function tuMonitoring_(token,p){
+  const user=tuAuthorize_(token),year=tuYear_(p.tahun),id=tuText_(p.id_tu);
+  const masters=tuMasters_(year).filter(m=>!id||tuText_(m.ID_TU)===id);
+  const rpd=tuRpdRows_(year,id),by={};
+  rpd.forEach(r=>by[tuText_(r.ID_TU)]=r);
+  const real=tuRealisasiRows_(year,id,true),rb={};
+  real.forEach(r=>{const k=tuText_(r.ID_TU);(rb[k]||(rb[k]=[])).push(r);});
+
+  let tp=0,td=0,ti=0,tf=0,ts=0,tr=0,tsr=0;
+  const detail=masters.map(m=>{
+    const a=rb[tuText_(m.ID_TU)]||[],s=tuSummary_(m,a,by[tuText_(m.ID_TU)]);
+    tp+=s.pagu_revisi;td+=s.realisasi_dasar;ti+=s.realisasi_input;tf+=s.realisasi_final;
+    ts+=s.dana_tersedia;tr+=s.total_rpd;tsr+=s.sisa_rpd;
+    return tuMasterOut_(m);
+  });
+
+  const monthly={};
+  real.forEach(r=>{
+    const mo=Number(r.BULAN_REALISASI);
+    monthly[mo]=(monthly[mo]||0)+tuNum_(r.NOMINAL_REALISASI);
+  });
+
+  const programMap={},kegiatanMap={};
+  detail.forEach(d=>{
+    const pk=tuText_(d.kode_program)||"(TANPA PROGRAM)";
+    const kk=tuText_(d.kode_kegiatan)||"(TANPA KEGIATAN)";
+    if(!programMap[pk])programMap[pk]={
+      kode_program:d.kode_program,program:d.program,pagu_revisi:0,
+      realisasi_dasar:0,realisasi_input:0,realisasi_final:0,
+      sisa_anggaran:0,total_rpd:0,total_sisa_rpd:0
+    };
+    if(!kegiatanMap[kk])kegiatanMap[kk]={
+      kode_kegiatan:d.kode_kegiatan,kegiatan:d.kegiatan,
+      kode_program:d.kode_program,program:d.program,pagu_revisi:0,
+      realisasi_dasar:0,realisasi_input:0,realisasi_final:0,
+      sisa_anggaran:0,total_rpd:0,total_sisa_rpd:0
+    };
+    const pRow=programMap[pk],kRow=kegiatanMap[kk];
+    [pRow,kRow].forEach(x=>{
+      x.pagu_revisi+=d.pagu_revisi;
+      x.realisasi_dasar+=d.realisasi_dasar;
+      x.realisasi_input+=d.realisasi_input;
+      x.realisasi_final+=d.realisasi_final;
+      x.sisa_anggaran+=d.dana_tersedia;
+      x.total_rpd+=d.total_rpd;
+      x.total_sisa_rpd+=d.sisa_rpd;
+    });
+  });
+
+  Object.values(programMap).forEach(x=>{
+    x.persentase=x.pagu_revisi>0?x.realisasi_final/x.pagu_revisi*100:0;
+  });
+  Object.values(kegiatanMap).forEach(x=>{
+    x.persentase=x.pagu_revisi>0?x.realisasi_final/x.pagu_revisi*100:0;
+  });
+
+  return{
+    ok:true,user,tahun:year,
+    summary:{
+      total_pagu:tp,realisasi_dasar:td,realisasi_input:ti,
+      realisasi_final:tf,sisa_anggaran:ts,
+      persentase:tp>0?tf/tp*100:0,total_rpd:tr,total_sisa_rpd:tsr
+    },
+    monthly,
+    program:Object.values(programMap),
+    kegiatan:Object.values(kegiatanMap),
+    detail
+  };
+}
 
