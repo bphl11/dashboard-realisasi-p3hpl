@@ -5051,7 +5051,7 @@ const TU_REALISASI_HEADERS_=["ID_REALISASI_TU","ID_TU","TAHUN","TANGGAL_REALISAS
 const TU_RPD_HEADERS_=["ID_RPD_TU","ID_TU","TAHUN","TW1","TW2","TW3","TW4","TOTAL_RPD","JAN_M1","JAN_M2","JAN_M3","JAN_M4","FEB_M1","FEB_M2","FEB_M3","FEB_M4","MAR_M1","MAR_M2","MAR_M3","MAR_M4","APR_M1","APR_M2","APR_M3","APR_M4","MEI_M1","MEI_M2","MEI_M3","MEI_M4","JUN_M1","JUN_M2","JUN_M3","JUN_M4","JUL_M1","JUL_M2","JUL_M3","JUL_M4","AGU_M1","AGU_M2","AGU_M3","AGU_M4","SEP_M1","SEP_M2","SEP_M3","SEP_M4","OKT_M1","OKT_M2","OKT_M3","OKT_M4","NOV_M1","NOV_M2","NOV_M3","NOV_M4","DES_M1","DES_M2","DES_M3","DES_M4","CATATAN","UPDATED_AT","UPDATED_BY"];
 const TU_REVISI_HEADERS_=["ID_REVISI_TU","ID_TU","TAHUN","PAGU_LAMA","PAGU_BARU","SELISIH_PAGU","JENIS_REVISI","TANGGAL_REVISI","ALASAN","STATUS","CREATED_AT","CREATED_BY"];
 
-function tuAuthorize_(idToken){const a=authenticate_(idToken);if(String(a.user.role||"").toUpperCase()!=="OPERATOR")throw new Error("Hak akses TU hanya untuk Operator.");return a.user;}
+function tuAuthorize_(idToken){const a=authenticate_(idToken);const user=a.user||{};if(String(user.role||"").toUpperCase()!=="OPERATOR")throw new Error("Hak akses TU hanya untuk Operator.");return {email:user.email||"",name:user.name||"",role:user.role||"OPERATOR"};}
 function tuText_(v){return String(v==null?"":v).trim();}
 function tuYear_(v){const n=Number(v);if(!Number.isInteger(n)||n<2000||n>2100)throw new Error("Tahun TU tidak valid.");return n;}
 function tuNum_(v){const n=parseAmount_(v);return Number.isFinite(n)?n:0;}
