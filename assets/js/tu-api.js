@@ -27,16 +27,6 @@ function tuGetApiUrl() {
     return url;
 }
 
-function tuGetIdToken() {
-    try {
-        return String(
-            sessionStorage.getItem("p3hpl_tu_id_token_v1") || ""
-        ).trim();
-    } catch (e) {
-        return "";
-    }
-}
-
 function tuHandleAuthExpired() {
     if (typeof tuClearSession === "function") {
         tuClearSession();
