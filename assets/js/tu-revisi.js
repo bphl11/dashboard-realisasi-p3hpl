@@ -24,6 +24,8 @@ let tuRevisiState = {
     masters: [],
     masterById: Object.create(null),
     revisions: [],
+    rpdRows: [],
+    rpdByIdTu: Object.create(null),
     selectedMaster: null,
     busy: false
 };
@@ -1049,6 +1051,95 @@ async function tuRevLoadRevisions() {
     return result;
 }
 
+async function tuRevLoadRpd() {
+    const result =
+        await tuApiRequest(
+            "tu_rpd_list",
+            {
+                tahun:
+                    tuRevYear()
+            }
+        );
+
+    const rows =
+        Array.isArray(
+            result?.data
+        )
+            ? result.data
+            : [];
+
+    tuRevisiState.rpdRows =
+        rows;
+
+    tuRevisiState.rpdByIdTu =
+        Object.create(null);
+
+    rows.forEach(
+        function (row) {
+            const idTu =
+                String(
+                    row?.id_tu ||
+                    ""
+                ).trim();
+
+            if (idTu) {
+                tuRevisiState.rpdByIdTu[idTu] =
+                    row;
+            }
+        }
+    );
+
+    // Lengkapi master dengan Total RPD dari endpoint resmi
+    // tu_rpd_list. Tidak mengubah backend maupun data.
+    tuRevisiState.masters.forEach(
+        function (master) {
+            const idTu =
+                String(
+                    master?.id_tu ||
+                    ""
+                ).trim();
+
+            const rpd =
+                tuRevisiState.rpdByIdTu[
+                    idTu
+                ];
+
+            master.total_rpd =
+                Number(
+                    rpd?.total_rpd ||
+                    0
+                );
+
+            master.rpd_sisa =
+                Number(
+                    rpd?.sisa_rpd ||
+                    0
+                );
+        }
+    );
+
+    tuRevisiState.masterById =
+        Object.create(null);
+
+    tuRevisiState.masters.forEach(
+        function (master) {
+            const idTu =
+                String(
+                    master?.id_tu ||
+                    ""
+                ).trim();
+
+            if (idTu) {
+                tuRevisiState.masterById[idTu] =
+                    master;
+            }
+        }
+    );
+
+    return result;
+}
+
+
 function tuRevRenderRevisions() {
     const rows =
         tuRevisiState.revisions;
@@ -1164,7 +1255,7 @@ function tuRevRenderRevisions() {
 
 async function tuRevLoadAll() {
     tuRevSetStatus(
-        "Memuat master TU dan riwayat revisi...",
+        "Memuat master TU, RPD, dan riwayat revisi...",
         "info"
     );
 
@@ -1201,25 +1292,36 @@ async function tuRevLoadAll() {
         bootstrap
     );
 
+    // RPD dibaca read-only untuk menentukan minimum Pagu Baru
+    // (minimum = max(Realisasi Final, Total RPD existing)).
+    await tuRevLoadRpd();
+
     await tuRevLoadRevisions();
 
     tuRevSetStatus(
         master.length.toLocaleString("id-ID") +
-        " Rincian Item dan riwayat revisi berhasil dimuat.",
+        " Rincian Item, " +
+        tuRevisiState.rpdRows.length.toLocaleString("id-ID") +
+        " RPD, dan " +
+        tuRevisiState.revisions.length.toLocaleString("id-ID") +
+        " riwayat revisi berhasil dimuat.",
         "success"
     );
 
     tuRevOutput(
-        "tu_bootstrap + tu_revisi_list",
+        "tu_bootstrap + tu_rpd_list + tu_revisi_list",
         {
             ok: true,
             master_count:
                 master.length,
+            rpd_count:
+                tuRevisiState.rpdRows.length,
             revisi_count:
                 tuRevisiState.revisions.length
         }
     );
 }
+
 
 async function tuRevisiSave() {
     if (tuRevisiState.busy) {
