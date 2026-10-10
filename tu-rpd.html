@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RPD TU</title>
+
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
+    <link rel="stylesheet"
+          href="assets/css/style.css">
+
+    <link rel="stylesheet"
+          href="assets/css/tu.css">
+
+    <style>
+        .tu-rpd-filter {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .tu-rpd-field label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #475467;
+        }
+
+        .tu-rpd-field select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d0d5dd;
+            border-radius: 9px;
+            background: #fff;
+        }
+
+        .tu-rpd-field select:disabled {
+            background: #f2f4f7;
+            color: #98a2b3;
+        }
+
+        .tu-rpd-selected {
+            margin-top: 14px;
+            padding: 12px 14px;
+            border: 1px solid #dbeafe;
+            background: #eff6ff;
+            border-radius: 10px;
+            color: #1e3a8a;
+            font-size: 13px;
+        }
+
+        .tu-rpd-summary {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        .tu-rpd-stat {
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 12px;
+            background: #fbfcfe;
+        }
+
+        .tu-rpd-stat-label {
+            color: #667085;
+            font-size: 12px;
+        }
+
+        .tu-rpd-stat-value {
+            margin-top: 5px;
+            font-weight: 700;
+        }
+
+        .tu-rpd-editor {
+            margin-top: 18px;
+        }
+
+        .tu-rpd-quarter {
+            border: 1px solid #eaecf0;
+            border-radius: 12px;
+            margin-bottom: 14px;
+            overflow: hidden;
+        }
+
+        .tu-rpd-quarter-title {
+            padding: 11px 14px;
+            background: #f8fafc;
+            font-weight: 700;
+        }
+
+        .tu-rpd-month {
+            padding: 12px 14px 14px;
+            border-top: 1px solid #eef0f3;
+        }
+
+        .tu-rpd-month-title {
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        .tu-rpd-week-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .tu-rpd-week label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 11px;
+            color: #667085;
+        }
+
+        .tu-rpd-week input {
+            width: 100%;
+            padding: 9px 10px;
+            border: 1px solid #d0d5dd;
+            border-radius: 8px;
+        }
+
+        .tu-rpd-quarter-total {
+            padding: 10px 14px;
+            border-top: 1px solid #eef0f3;
+            text-align: right;
+            font-size: 13px;
+        }
+
+        .tu-rpd-total-box {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        .tu-rpd-total-card {
+            border: 1px solid #dbeafe;
+            border-radius: 10px;
+            padding: 13px;
+            background: #eff6ff;
+        }
+
+        .tu-rpd-total-card.warn {
+            border-color: #fed7aa;
+            background: #fff7ed;
+            color: #9a3412;
+        }
+
+        .tu-rpd-existing {
+            margin-top: 12px;
+            padding: 10px 12px;
+            border: 1px solid #eaecf0;
+            border-radius: 9px;
+            font-size: 12px;
+            color: #667085;
+        }
+
+        .tu-rpd-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 14px;
+        }
+
+        @media (max-width: 1000px) {
+            .tu-rpd-summary,
+            .tu-rpd-total-box {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 800px) {
+            .tu-rpd-filter {
+                grid-template-columns: 1fr;
+            }
+
+            .tu-rpd-week-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 520px) {
+            .tu-rpd-summary,
+            .tu-rpd-total-box,
+            .tu-rpd-week-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body class="tu-page">
+
+<div class="tu-shell">
+
+    <header class="tu-header">
+        <div>
+            <h2>
+                <i class="bi bi-calendar3"></i>
+                RPD TU
+            </h2>
+            <p>
+                Pilih Komponen sampai Rincian Item, lalu isi
+                RPD mingguan selama 48 minggu.
+            </p>
+        </div>
+
+        <div>
+            <span class="tu-status-pill tu-status-ok">
+                TARGET V5 PRODUKSI
+            </span>
+        </div>
+    </header>
+
+    <section class="tu-card">
+
+        <div class="tu-login-grid">
+
+            <div id="tuLoginPanel"
+                 class="tu-login-box">
+
+                <h4>Login Operator</h4>
+
+                <p class="text-muted mb-2">
+                    Gunakan akun Google yang terdaftar sebagai
+                    Operator TU.
+                </p>
+
+                <div id="googleSignInButton"></div>
+
+                <div id="tuLoginLoading"
+                     class="text-muted mt-2 d-none">
+                    Memverifikasi login...
+                </div>
+
+                <div id="tuAuthMessage"
+                     class="tu-alert tu-alert-danger d-none">
+                </div>
+
+            </div>
+
+            <div id="tuUserBox"
+                 class="tu-user-box">
+
+                <div class="tu-user-name"
+                     id="tuUserName">-</div>
+
+                <div class="tu-user-email"
+                     id="tuUserEmail">-</div>
+
+                <span id="tuUserRole"
+                      class="tu-role">
+                    OPERATOR
+                </span>
+
+                <div class="mt-3">
+                    <button id="tuLogoutButton"
+                            type="button"
+                            class="tu-btn secondary">
+                        Keluar
+                    </button>
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+    <div id="tuAppPanel" class="d-none">
+
+        <div id="tuPageStatus"
+             class="tu-alert tu-alert-success d-none">
+        </div>
+
+        <section class="tu-card">
+
+            <div class="tu-status-line">
+                <div>
+                    <h3>Pilih Rincian Item</h3>
+                    <div class="tu-rpd-muted">
+                        Urutan:
+                        <strong>Komponen → Sub Komponen → Akun → Rincian Item</strong>.
+                    </div>
+                </div>
+
+                <span class="tu-status-pill tu-status-ok">
+                    OPERATOR SAJA
+                </span>
+            </div>
+
+            <div class="tu-rpd-filter mt-3">
+
+                <div class="tu-rpd-field">
+                    <label for="tuRpdKomponen">
+                        Komponen
+                    </label>
+                    <select id="tuRpdKomponen">
+                        <option value="">
+                            Pilih Komponen
+                        </option>
+                    </select>
+                </div>
+
+                <div class="tu-rpd-field">
+                    <label for="tuRpdSubKomponen">
+                        Sub Komponen
+                    </label>
+                    <select id="tuRpdSubKomponen"
+                            disabled>
+                        <option value="">
+                            Pilih Komponen terlebih dahulu
+                        </option>
+                    </select>
+                </div>
+
+                <div class="tu-rpd-field">
+                    <label for="tuRpdAkun">
+                        Akun
+                    </label>
+                    <select id="tuRpdAkun"
+                            disabled>
+                        <option value="">
+                            Pilih Sub Komponen terlebih dahulu
+                        </option>
+                    </select>
+                </div>
+
+                <div class="tu-rpd-field">
+                    <label for="tuRpdRincianItem">
+                        Rincian Item
+                    </label>
+                    <select id="tuRpdRincianItem"
+                            disabled>
+                        <option value="">
+                            Pilih Akun terlebih dahulu
+                        </option>
+                    </select>
+                </div>
+
+            </div>
+
+            <div id="tuRpdSelected"
+                 class="tu-rpd-selected d-none">
+            </div>
+
+            <div id="tuRpdSummary"
+                 class="tu-rpd-summary d-none">
+
+                <div class="tu-rpd-stat">
+                    <div class="tu-rpd-stat-label">
+                        Pagu Revisi
+                    </div>
+                    <div id="tuRpdPagu"
+                         class="tu-rpd-stat-value">
+                        Rp0
+                    </div>
+                </div>
+
+                <div class="tu-rpd-stat">
+                    <div class="tu-rpd-stat-label">
+                        Realisasi Final
+                    </div>
+                    <div id="tuRpdRealisasi"
+                         class="tu-rpd-stat-value">
+                        Rp0
+                    </div>
+                </div>
+
+                <div class="tu-rpd-stat">
+                    <div class="tu-rpd-stat-label">
+                        Dana Tersedia
+                    </div>
+                    <div id="tuRpdDana"
+                         class="tu-rpd-stat-value">
+                        Rp0
+                    </div>
+                </div>
+
+                <div class="tu-rpd-stat">
+                    <div class="tu-rpd-stat-label">
+                        Total RPD Tersimpan
+                    </div>
+                    <div id="tuRpdExistingTotal"
+                         class="tu-rpd-stat-value">
+                        Rp0
+                    </div>
+                </div>
+
+                <div class="tu-rpd-stat">
+                    <div class="tu-rpd-stat-label">
+                        Sisa RPD Saat Ini
+                    </div>
+                    <div id="tuRpdExistingSisa"
+                         class="tu-rpd-stat-value">
+                        Rp0
+                    </div>
+                </div>
+
+            </div>
+
+        </section>
+
+        <section id="tuRpdEditorSection"
+                 class="tu-card d-none">
+
+            <div class="tu-status-line">
+                <div>
+                    <h3>RPD Mingguan</h3>
+                    <div class="tu-rpd-muted">
+                        12 bulan × 4 minggu = 48 minggu.
+                        Nilai yang sudah tersimpan akan dimuat kembali.
+                    </div>
+                </div>
+            </div>
+
+            <div id="tuRpdExistingNotice"
+                 class="tu-rpd-existing">
+                Belum ada RPD tersimpan untuk Rincian Item ini.
+            </div>
+
+            <div id="tuRpdEditor"
+                 class="tu-rpd-editor">
+            </div>
+
+            <div class="tu-rpd-total-box">
+
+                <div class="tu-rpd-total-card">
+                    <div class="tu-rpd-muted">
+                        Total RPD Baru
+                    </div>
+                    <strong id="tuRpdNewTotal">
+                        Rp0
+                    </strong>
+                </div>
+
+                <div class="tu-rpd-total-card">
+                    <div class="tu-rpd-muted">
+                        Batas Maksimal
+                    </div>
+                    <strong id="tuRpdMaxAllowed">
+                        Rp0
+                    </strong>
+                </div>
+
+                <div id="tuRpdValidationCard"
+                     class="tu-rpd-total-card">
+                    <div class="tu-rpd-muted">
+                        Status Validasi
+                    </div>
+                    <strong id="tuRpdValidation">
+                        Belum dihitung
+                    </strong>
+                </div>
+
+            </div>
+
+            <div class="mt-3">
+                <label for="tuRpdCatatan"
+                       class="form-label fw-semibold">
+                    Catatan
+                </label>
+
+                <textarea id="tuRpdCatatan"
+                          class="form-control"
+                          rows="3"
+                          placeholder="Catatan RPD"></textarea>
+            </div>
+
+            <div class="tu-rpd-actions">
+
+                <button id="tuRpdSaveButton"
+                        type="button"
+                        class="tu-btn">
+                    <i class="bi bi-save"></i>
+                    Simpan RPD
+                </button>
+
+                <button id="tuRpdResetButton"
+                        type="button"
+                        class="tu-btn secondary">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                    Reset
+                </button>
+
+                <button id="tuRpdReloadButton"
+                        type="button"
+                        class="tu-btn secondary">
+                    <i class="bi bi-arrow-clockwise"></i>
+                    Muat Ulang
+                </button>
+
+            </div>
+
+        </section>
+
+        <section class="tu-card">
+
+            <div class="tu-status-line">
+                <div>
+                    <h3>Response</h3>
+                    <div class="tu-rpd-muted">
+                        Informasi teknis terakhir.
+                        Token tidak ditampilkan.
+                    </div>
+                </div>
+            </div>
+
+            <pre id="tuRpdOutput"
+                 class="tu-result">Belum ada pengujian.</pre>
+
+        </section>
+
+    </div>
+
+</div>
+
+<script src="https://accounts.google.com/gsi/client"
+        async defer></script>
+
+<script src="assets/js/tu-config.js"></script>
+<script src="assets/js/tu-api.js"></script>
+<script src="assets/js/tu-auth.js"></script>
+<script src="assets/js/tu-rpd.js"></script>
+
+</body>
+</html>
