@@ -1,187 +1,33 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Revisi Pagu TU</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Revisi Anggaran TU</title>
 
-    <link rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/tu.css">
+<link rel="stylesheet" href="assets/css/tu-revisi.css?v=20261010-tu-revisi-full-01">
 
-    <link rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-
-    <link rel="stylesheet"
-          href="assets/css/style.css">
-
-    <link rel="stylesheet"
-          href="assets/css/tu.css">
-
-    <style>
-        .tu-rev-filter {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 14px;
-        }
-
-        .tu-rev-field label {
-            display: block;
-            margin-bottom: 6px;
-            font-size: 13px;
-            font-weight: 600;
-            color: #475467;
-        }
-
-        .tu-rev-field select,
-        .tu-rev-field input,
-        .tu-rev-field textarea {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #d0d5dd;
-            border-radius: 9px;
-            background: #fff;
-        }
-
-        .tu-rev-field select:disabled {
-            background: #f2f4f7;
-            color: #98a2b3;
-        }
-
-        .tu-rev-selected {
-            margin-top: 14px;
-            padding: 12px 14px;
-            border: 1px solid #dbeafe;
-            background: #eff6ff;
-            border-radius: 10px;
-            color: #1e3a8a;
-            font-size: 13px;
-        }
-
-        .tu-rev-summary {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 10px;
-            margin-top: 14px;
-        }
-
-        .tu-rev-stat {
-            border: 1px solid #e5e7eb;
-            border-radius: 10px;
-            padding: 12px;
-            background: #fbfcfe;
-        }
-
-        .tu-rev-stat-label {
-            color: #667085;
-            font-size: 12px;
-        }
-
-        .tu-rev-stat-value {
-            margin-top: 5px;
-            font-weight: 700;
-        }
-
-        .tu-rev-form {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 14px;
-            margin-top: 14px;
-        }
-
-        .tu-rev-warning {
-            margin-top: 14px;
-            padding: 12px 14px;
-            border: 1px solid #fed7aa;
-            background: #fff7ed;
-            border-radius: 10px;
-            color: #9a3412;
-            font-size: 13px;
-        }
-
-        .tu-rev-actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 14px;
-        }
-
-        .tu-rev-log-table {
-            width: 100%;
-            min-width: 1100px;
-            border-collapse: collapse;
-            font-size: 12px;
-        }
-
-        .tu-rev-log-table th,
-        .tu-rev-log-table td {
-            padding: 10px;
-            border-bottom: 1px solid #eef0f3;
-            vertical-align: top;
-        }
-
-        .tu-rev-log-table th {
-            background: #f8fafc;
-            white-space: nowrap;
-            text-align: left;
-        }
-
-        .tu-rev-log-empty {
-            text-align: center;
-            color: #667085;
-            padding: 28px 12px !important;
-        }
-
-        .tu-rev-muted {
-            color: #667085;
-            font-size: 13px;
-        }
-
-        .tu-rev-note {
-            margin-top: 10px;
-            color: #667085;
-            font-size: 12px;
-        }
-
-        @media (max-width: 1000px) {
-            .tu-rev-summary {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
-        }
-
-        @media (max-width: 800px) {
-            .tu-rev-filter,
-            .tu-rev-form {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        @media (max-width: 520px) {
-            .tu-rev-summary {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
 </head>
-
 <body class="tu-page">
 
-<div class="tu-shell">
+<div class="tu-shell tu-rev-page">
 
     <header class="tu-header">
         <div>
-            <h2>
-                <i class="bi bi-arrow-repeat"></i>
-                Revisi Pagu TU
-            </h2>
+            <h2><i class="bi bi-arrow-left-right"></i> Revisi Anggaran TU</h2>
             <p>
-                Pilih Rincian Item, periksa Pagu Lama,
-                lalu isi Pagu Baru, Jenis Revisi, Tanggal, dan Alasan.
+                Draft perubahan anggaran TU dengan pola <strong>SEBELUM → SESUDAH</strong>,
+                validasi global dan per Komponen seperti modul Revisi Anggaran P3HPHL.
             </p>
         </div>
 
         <div>
             <span class="tu-status-pill tu-status-ok">
-                TARGET V5 PRODUKSI
+                DRAFT / VALIDASI — TIDAK MENULIS SERVER
             </span>
         </div>
     </header>
@@ -190,13 +36,10 @@
 
         <div class="tu-login-grid">
 
-            <div id="tuLoginPanel"
-                 class="tu-login-box">
-
+            <div id="tuLoginPanel" class="tu-login-box">
                 <h4>Login Operator</h4>
-
-                <p class="text-muted mb-2">
-                    Gunakan akun Google yang terdaftar sebagai Operator TU.
+                <p class="tu-rev-subtitle">
+                    Modul hanya dapat digunakan oleh Operator TU.
                 </p>
 
                 <div id="googleSignInButton"></div>
@@ -209,11 +52,9 @@
                 <div id="tuAuthMessage"
                      class="tu-alert tu-alert-danger d-none">
                 </div>
-
             </div>
 
-            <div id="tuUserBox"
-                 class="tu-user-box">
+            <div id="tuUserBox" class="tu-user-box">
 
                 <div class="tu-user-name"
                      id="tuUserName">-</div>
@@ -221,8 +62,7 @@
                 <div class="tu-user-email"
                      id="tuUserEmail">-</div>
 
-                <span id="tuUserRole"
-                      class="tu-role">
+                <span id="tuUserRole" class="tu-role">
                     OPERATOR
                 </span>
 
@@ -240,292 +80,386 @@
 
     </section>
 
-    <div id="tuAppPanel"
-         class="d-none">
+    <div id="tuAppPanel" class="d-none">
 
         <div id="tuPageStatus"
-             class="tu-alert tu-alert-success d-none">
+             class="tu-alert tu-alert-info d-none">
         </div>
 
         <section class="tu-card">
 
-            <div class="tu-status-line">
+            <div class="tu-rev-title-row">
+
                 <div>
-                    <h3>Pilih Rincian Item</h3>
-                    <div class="tu-rev-muted">
-                        Urutan:
-                        <strong>Komponen → Sub Komponen → Akun → Rincian Item</strong>.
-                    </div>
+                    <h3>Pilih Anggaran TU</h3>
+                    <p class="tu-rev-subtitle">
+                        Filter hierarkis mengikuti pola P3HPHL:
+                        Tahun → Komponen → Sub Komponen → Akun.
+                    </p>
                 </div>
 
                 <span class="tu-status-pill tu-status-ok">
-                    OPERATOR SAJA
+                    DATA TU READ-ONLY
                 </span>
+
             </div>
 
-            <div class="tu-rev-filter mt-3">
+            <div class="tu-rev-grid">
 
                 <div class="tu-rev-field">
-                    <label for="tuRevKomponen">
+                    <label for="tuRevFilterTahun">
+                        Tahun Anggaran
+                    </label>
+                    <select id="tuRevFilterTahun">
+                        <option value="2026">2026</option>
+                    </select>
+                </div>
+
+                <div class="tu-rev-field">
+                    <label for="tuRevFilterKomponen">
                         Komponen
                     </label>
-                    <select id="tuRevKomponen">
-                        <option value="">
-                            Pilih Komponen
-                        </option>
+                    <select id="tuRevFilterKomponen">
+                        <option value="">-- Semua Komponen --</option>
                     </select>
                 </div>
 
                 <div class="tu-rev-field">
-                    <label for="tuRevSubKomponen">
+                    <label for="tuRevFilterSub">
                         Sub Komponen
                     </label>
-                    <select id="tuRevSubKomponen"
-                            disabled>
-                        <option value="">
-                            Pilih Komponen terlebih dahulu
-                        </option>
+                    <select id="tuRevFilterSub" disabled>
+                        <option value="">-- Semua Sub Komponen --</option>
                     </select>
                 </div>
 
                 <div class="tu-rev-field">
-                    <label for="tuRevAkun">
-                        Akun
+                    <label for="tuRevFilterAkun">
+                        Akun Belanja
                     </label>
-                    <select id="tuRevAkun"
-                            disabled>
-                        <option value="">
-                            Pilih Sub Komponen terlebih dahulu
-                        </option>
-                    </select>
-                </div>
-
-                <div class="tu-rev-field">
-                    <label for="tuRevRincianItem">
-                        Rincian Item
-                    </label>
-                    <select id="tuRevRincianItem"
-                            disabled>
-                        <option value="">
-                            Pilih Akun terlebih dahulu
-                        </option>
+                    <select id="tuRevFilterAkun" disabled>
+                        <option value="">-- Semua Akun Belanja --</option>
                     </select>
                 </div>
 
             </div>
 
-            <div id="tuRevSelected"
-                 class="tu-rev-selected d-none">
+            <div id="tuRevFilterInfo"
+                 class="tu-rev-selected">
+                Belum ada data yang dipilih.
             </div>
 
         </section>
 
-        <section id="tuRevFormSection"
-                 class="tu-card d-none">
+        <section class="tu-card">
 
-            <div class="tu-status-line">
+            <div class="tu-rev-title-row">
                 <div>
-                    <h3>Form Revisi Pagu</h3>
-                    <div class="tu-rev-muted">
-                        Pagu Lama diambil otomatis dari master TU.
-                        Pagu Baru akan divalidasi sebelum dikirim ke server.
-                    </div>
+                    <h3>Informasi Revisi</h3>
+                    <p class="tu-rev-subtitle">
+                        Metadata disimpan sebagai draft lokal.
+                        Tidak dikirim ke server pada tahap ini.
+                    </p>
                 </div>
+
+                <span id="tuRevValidationStatus"
+                      class="tu-status-pill tu-status-wait">
+                    DRAFT
+                </span>
             </div>
 
-            <div class="tu-rev-summary">
-
-                <div class="tu-rev-stat">
-                    <div class="tu-rev-stat-label">
-                        Pagu Lama
-                    </div>
-                    <div id="tuRevPaguLama"
-                         class="tu-rev-stat-value">
-                        Rp0
-                    </div>
-                </div>
-
-                <div class="tu-rev-stat">
-                    <div class="tu-rev-stat-label">
-                        Realisasi Final
-                    </div>
-                    <div id="tuRevRealisasi"
-                         class="tu-rev-stat-value">
-                        Rp0
-                    </div>
-                </div>
-
-                <div class="tu-rev-stat">
-                    <div class="tu-rev-stat-label">
-                        Total RPD Existing
-                    </div>
-                    <div id="tuRevRpd"
-                         class="tu-rev-stat-value">
-                        Rp0
-                    </div>
-                </div>
-
-                <div class="tu-rev-stat">
-                    <div class="tu-rev-stat-label">
-                        Minimum Pagu Baru
-                    </div>
-                    <div id="tuRevMinimum"
-                         class="tu-rev-stat-value">
-                        Rp0
-                    </div>
-                </div>
-
-            </div>
-
-            <div class="tu-rev-form">
+            <div class="tu-rev-meta">
 
                 <div class="tu-rev-field">
-                    <label for="tuRevPaguBaru">
-                        Pagu Baru
+                    <label for="tuRevNomor">
+                        Nomor Revisi
                     </label>
-                    <input id="tuRevPaguBaru"
-                           type="number"
-                           min="0"
-                           step="1"
-                           placeholder="Masukkan pagu baru">
-                </div>
-
-                <div class="tu-rev-field">
-                    <label for="tuRevJenis">
-                        Jenis Revisi
-                    </label>
-                    <select id="tuRevJenis">
-                        <option value="PENAMBAHAN_PAGU">
-                            PENAMBAHAN_PAGU
-                        </option>
-                        <option value="PENGURANGAN_PAGU">
-                            PENGURANGAN_PAGU
-                        </option>
-                    </select>
+                    <input id="tuRevNomor"
+                           placeholder="REV-TU-001">
                 </div>
 
                 <div class="tu-rev-field">
                     <label for="tuRevTanggal">
-                        Tanggal Revisi
+                        Tanggal
                     </label>
-                    <input id="tuRevTanggal"
-                           type="date">
+                    <input id="tuRevTanggal" type="date">
+                </div>
+
+                <div class="tu-rev-field">
+                    <label for="tuRevPembuat">
+                        Pembuat
+                    </label>
+                    <input id="tuRevPembuat"
+                           placeholder="Nama pembuat">
                 </div>
 
                 <div class="tu-rev-field">
                     <label for="tuRevAlasan">
-                        Alasan
+                        Alasan Revisi
                     </label>
                     <textarea id="tuRevAlasan"
-                              rows="3"
-                              placeholder="Alasan revisi pagu"></textarea>
+                              rows="1"
+                              placeholder="Contoh: penyesuaian kebutuhan kegiatan"></textarea>
                 </div>
 
             </div>
 
-            <div id="tuRevPreview"
-                 class="tu-rev-selected d-none">
-            </div>
-
-            <div class="tu-rev-warning">
-                <strong>Perhatian:</strong>
-                transaksi revisi akan langsung mengubah
-                Pagu Revisi pada master TU dan mencatat log revisi.
-                Pastikan Pagu Baru dan Alasan sudah benar sebelum
-                menekan Simpan Revisi.
-            </div>
-
-            <div class="tu-rev-actions">
-
-                <button id="tuRevSaveButton"
-                        type="button"
-                        class="tu-btn">
-                    <i class="bi bi-save"></i>
-                    Simpan Revisi
-                </button>
-
-                <button id="tuRevResetButton"
-                        type="button"
-                        class="tu-btn secondary">
-                    <i class="bi bi-arrow-counterclockwise"></i>
-                    Reset
-                </button>
-
-                <button id="tuRevReloadButton"
-                        type="button"
-                        class="tu-btn secondary">
-                    <i class="bi bi-arrow-clockwise"></i>
-                    Muat Ulang
-                </button>
-
+            <div id="tuRevValidationBox"
+                 class="tu-rev-validation">
+                Validasi belum dijalankan.
             </div>
 
         </section>
 
         <section class="tu-card">
 
-            <div class="tu-status-line">
+            <div class="tu-rev-summary">
+                <div class="tu-rev-stat">
+                    <span>Jumlah Sebelum</span>
+                    <strong id="tuRevSummaryBefore">Rp0</strong>
+                </div>
+
+                <div class="tu-rev-stat">
+                    <span>Jumlah Sesudah</span>
+                    <strong id="tuRevSummaryAfter">Rp0</strong>
+                </div>
+
+                <div class="tu-rev-stat">
+                    <span>Selisih</span>
+                    <strong id="tuRevSummaryDiff">Rp0</strong>
+                </div>
+
+                <div class="tu-rev-stat">
+                    <span>Status</span>
+                    <strong id="tuRevSummaryStatus">
+                        DRAFT
+                    </strong>
+                </div>
+            </div>
+
+        </section>
+
+        <section class="tu-card">
+
+            <div class="tu-rev-section-head">
+
                 <div>
-                    <h3>Riwayat Revisi</h3>
-                    <div class="tu-rev-muted">
-                        Data dibaca melalui <code>tu_revisi_list</code>.
+                    <h3>Perbandingan Anggaran</h3>
+                    <p class="tu-rev-subtitle">
+                        Ubah hanya nilai <strong>SESUDAH</strong>.
+                        Nilai <strong>SEBELUM</strong> berasal dari master TU dan tidak dapat diedit.
+                    </p>
+                </div>
+
+                <div class="tu-rev-toolbar tu-rev-no-print">
+
+                    <button id="tuRevPrint"
+                            type="button"
+                            class="tu-btn secondary">
+                        <i class="bi bi-printer"></i>
+                        Cetak
+                    </button>
+
+                    <button id="tuRevExcel"
+                            type="button"
+                            class="tu-btn secondary">
+                        <i class="bi bi-file-earmark-excel"></i>
+                        Download Excel
+                    </button>
+
+                    <button id="tuRevAddButton"
+                            type="button"
+                            class="tu-btn secondary"
+                            disabled
+                            title="Penambahan master TU belum didukung oleh API TU.">
+                        <i class="bi bi-plus-circle"></i>
+                        Tambah Item
+                    </button>
+
+                    <button id="tuRevSaveDraft"
+                            type="button"
+                            class="tu-btn">
+                        <i class="bi bi-save"></i>
+                        Simpan Draft
+                    </button>
+
+                    <button id="tuRevValidate"
+                            type="button"
+                            class="tu-btn"
+                            style="background:#d99b13;">
+                        <i class="bi bi-check2-circle"></i>
+                        Validasi
+                    </button>
+
+                    <button id="tuRevServerTest"
+                            type="button"
+                            class="tu-btn secondary"
+                            disabled
+                            title="Belum ada endpoint dry-run revisi TU.">
+                        <i class="bi bi-shield-check"></i>
+                        UJI SERVER
+                    </button>
+
+                    <button id="tuRevApply"
+                            type="button"
+                            class="tu-btn secondary"
+                            disabled
+                            title="Menunggu API revisi TU versi penuh.">
+                        <i class="bi bi-cloud-arrow-up"></i>
+                        Terapkan Revisi
+                    </button>
+
+                    <button id="tuRevReset"
+                            type="button"
+                            class="tu-btn secondary">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                        Reset Draft
+                    </button>
+
+                </div>
+
+            </div>
+
+            <div class="tu-rev-compare">
+
+                <div class="tu-rev-side">
+                    <div class="tu-rev-side-head">
+                        <span class="tu-rev-label-before">
+                            SEBELUM
+                        </span>
+                        <span id="tuRevBeforeCount">
+                            0 item
+                        </span>
+                    </div>
+
+                    <div class="tu-rev-table-wrap">
+
+                        <table class="tu-rev-table">
+
+                            <thead>
+                                <tr>
+                                    <th>No</th>
+                                    <th>ID TU</th>
+                                    <th>Komponen</th>
+                                    <th>Sub Komponen</th>
+                                    <th>Akun</th>
+                                    <th>Rincian Item</th>
+                                    <th class="money">Pagu</th>
+                                </tr>
+                            </thead>
+
+                            <tbody id="tuRevBeforeBody">
+                                <tr>
+                                    <td colspan="7"
+                                        class="center">
+                                        Memuat data...
+                                    </td>
+                                </tr>
+                            </tbody>
+
+                        </table>
+
                     </div>
                 </div>
 
-                <span id="tuRevCount"
-                      class="tu-status-pill tu-status-ok">
-                    0 data
+                <div class="tu-rev-side">
+                    <div class="tu-rev-side-head">
+                        <span class="tu-rev-label-after">
+                            SESUDAH
+                        </span>
+                        <span id="tuRevAfterCount">
+                            0 item
+                        </span>
+                    </div>
+
+                    <div class="tu-rev-table-wrap">
+
+                        <table class="tu-rev-table">
+
+                            <thead>
+                                <tr>
+                                    <th>No</th>
+                                    <th>ID TU</th>
+                                    <th>Komponen</th>
+                                    <th>Sub Komponen</th>
+                                    <th>Akun</th>
+                                    <th>Rincian Item</th>
+                                    <th class="money">Pagu</th>
+                                    <th class="center">Aksi</th>
+                                </tr>
+                            </thead>
+
+                            <tbody id="tuRevAfterBody">
+                                <tr>
+                                    <td colspan="8"
+                                        class="center">
+                                        Memuat data...
+                                    </td>
+                                </tr>
+                            </tbody>
+
+                        </table>
+
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="tu-rev-actionbar tu-rev-no-print">
+
+                <div class="tu-note">
+                    <strong>Tahap aman:</strong>
+                    Draft dan Validasi berjalan lokal.
+                    Tombol <strong>UJI SERVER</strong> dan
+                    <strong>Terapkan Revisi</strong> dikunci
+                    karena API TU saat ini baru mendukung revisi Pagu per ID TU,
+                    belum payload revisi anggaran penuh seperti P3HPHL.
+                </div>
+
+            </div>
+
+        </section>
+
+        <section class="tu-card tu-rev-history-section">
+
+            <div class="tu-rev-section-head">
+
+                <div>
+                    <h3>Riwayat Draft & Validasi</h3>
+                    <p class="tu-rev-subtitle">
+                        Riwayat tersimpan di browser.
+                        Tidak menulis DATA TU.
+                    </p>
+                </div>
+
+                <span class="tu-status-pill tu-status-wait">
+                    LOKAL
                 </span>
+
             </div>
 
-            <div class="tu-table-wrap mt-3">
-
-                <table class="tu-rev-log-table">
-
-                    <thead>
-                        <tr>
-                            <th>No</th>
-                            <th>ID Revisi</th>
-                            <th>ID TU</th>
-                            <th>Pagu Lama</th>
-                            <th>Pagu Baru</th>
-                            <th>Selisih</th>
-                            <th>Jenis</th>
-                            <th>Tanggal</th>
-                            <th>Alasan</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-
-                    <tbody id="tuRevBody">
-                        <tr>
-                            <td colspan="10"
-                                class="tu-rev-log-empty">
-                                Belum ada data revisi yang dimuat.
-                            </td>
-                        </tr>
-                    </tbody>
-
-                </table>
-
+            <div id="tuRevHistory"
+                 class="tu-rev-history">
+                Belum ada riwayat.
             </div>
 
         </section>
 
         <section class="tu-card">
 
-            <div class="tu-status-line">
+            <div class="tu-rev-section-head">
+
                 <div>
-                    <h3>Response</h3>
-                    <div class="tu-rev-muted">
-                        Informasi teknis terakhir.
+                    <h3>Response / Status Teknis</h3>
+                    <p class="tu-rev-subtitle">
                         Token tidak ditampilkan.
-                    </div>
+                    </p>
                 </div>
+
             </div>
 
             <pre id="tuRevOutput"
-                 class="tu-result">Belum ada pengujian.</pre>
+                 class="tu-result">Belum ada pemuatan.</pre>
 
         </section>
 
@@ -536,10 +470,12 @@
 <script src="https://accounts.google.com/gsi/client"
         async defer></script>
 
-<script src="assets/js/tu-config.js"></script>
-<script src="assets/js/tu-api.js"></script>
-<script src="assets/js/tu-auth.js"></script>
-<script src="assets/js/tu-revisi.js?v=20261010-tu-revisi-02"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+
+<script src="assets/js/tu-config.js?v=20261010-tu-config-01"></script>
+<script src="assets/js/tu-api.js?v=20261010-tu-api-01"></script>
+<script src="assets/js/tu-auth.js?v=20261010-tu-auth-01"></script>
+<script src="assets/js/tu-revisi.js?v=20261010-tu-revisi-full-01"></script>
 
 </body>
 </html>
