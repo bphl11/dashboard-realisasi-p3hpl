@@ -874,9 +874,9 @@ function tuRpdGenerateEditor() {
                 tuRpdEscape(
                     month.label
                 ) +
-                ": <strong id="tuRpdMonthTotal_" +
+                ': <strong id="tuRpdMonthTotal_' +
                 month.key +
-                "">Rp0</strong>";
+                '">Rp0</strong>';
 
             monthBox.appendChild(
                 total
