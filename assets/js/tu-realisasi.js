@@ -653,6 +653,86 @@ function tuRealSyncRincianItem() {
     );
 }
 
+function tuRealActiveInputTotal(
+    idTu,
+    excludeId = ""
+) {
+    const target =
+        String(idTu || "").trim();
+
+    const excluded =
+        String(excludeId || "").trim();
+
+    return tuRealisasiState.rows.reduce(
+        function (total, row) {
+            const rowIdTu =
+                String(
+                    row?.id_tu || ""
+                ).trim();
+
+            const rowId =
+                String(
+                    row?.id_realisasi_tu || ""
+                ).trim();
+
+            const status =
+                String(
+                    row?.status || "AKTIF"
+                ).trim().toUpperCase();
+
+            if (
+                rowIdTu === target &&
+                status === "AKTIF" &&
+                rowId !== excluded
+            ) {
+                return (
+                    total +
+                    (
+                        Number(
+                            row?.nominal_realisasi
+                        ) || 0
+                    )
+                );
+            }
+
+            return total;
+        },
+        0
+    );
+}
+
+function tuRealAvailableAmount(
+    master,
+    excludeId = ""
+) {
+    if (!master) {
+        return 0;
+    }
+
+    const pagu =
+        Number(
+            master?.pagu_revisi
+        ) || 0;
+
+    const dasar =
+        Number(
+            master?.realisasi_dasar
+        ) || 0;
+
+    const activeInput =
+        tuRealActiveInputTotal(
+            master?.id_tu,
+            excludeId
+        );
+
+    return Math.max(
+        pagu -
+        dasar -
+        activeInput,
+        0
+    );
+}
+
 function tuRealShowItemInfo() {
     const master =
         tuRealSelectedMaster();
@@ -674,13 +754,24 @@ function tuRealShowItemInfo() {
     }
 
     const pagu =
-        tuRealEl("tuRealPagu");
+        tuRealEl(
+            "tuRealPagu"
+        );
 
     const dasar =
-        tuRealEl("tuRealDasar");
+        tuRealEl(
+            "tuRealDasar"
+        );
+
+    const sisa =
+        tuRealEl(
+            "tuRealSisa"
+        );
 
     const idInfo =
-        tuRealEl("tuRealIdTuInfo");
+        tuRealEl(
+            "tuRealIdTuInfo"
+        );
 
     if (pagu) {
         pagu.textContent =
@@ -693,6 +784,16 @@ function tuRealShowItemInfo() {
         dasar.textContent =
             tuRealFormatRupiah(
                 master.realisasi_dasar
+            );
+    }
+
+    if (sisa) {
+        sisa.textContent =
+            tuRealFormatRupiah(
+                tuRealAvailableAmount(
+                    master,
+                    tuRealisasiState.editingId
+                )
             );
     }
 
@@ -763,6 +864,20 @@ function tuRealValidateForm() {
         );
     }
 
+    const sisa =
+        tuRealAvailableAmount(
+            master,
+            tuRealisasiState.editingId
+        );
+
+    if (nominal > sisa) {
+        throw new Error(
+            "Nominal melebihi sisa anggaran Rincian Item. Sisa tersedia: " +
+            tuRealFormatRupiah(sisa) +
+            "."
+        );
+    }
+
     if (!keterangan) {
         throw new Error(
             "Keterangan wajib diisi."
@@ -774,6 +889,7 @@ function tuRealValidateForm() {
             String(
                 master.id_tu || ""
             ).trim(),
+
         tanggal_realisasi:
             String(
                 tuRealEl(
@@ -781,10 +897,13 @@ function tuRealValidateForm() {
                 )?.value ||
                 tuRealToday()
             ),
+
         bulan_realisasi:
             bulan,
+
         nominal_realisasi:
             nominal,
+
         keterangan
     };
 }
@@ -888,6 +1007,10 @@ async function tuRealisasiList(
         tuRenderList(
             tuRealisasiState.rows
         );
+
+        if (tuRealSelectedMaster()) {
+            tuRealShowItemInfo();
+        }
 
         if (showStatus) {
             tuRealSetStatus(
