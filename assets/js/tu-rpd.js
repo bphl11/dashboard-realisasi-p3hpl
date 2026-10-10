@@ -214,19 +214,29 @@ function tuRpdOptions(
 function tuRpdLoadMasters(
     result
 ) {
+    // Backend TU V5 mengembalikan master pada result.master.
+    // Fallback result.data dipertahankan agar UI tidak gagal diam-diam
+    // bila gateway/versi respons membungkus data berbeda.
+    const raw =
+        Array.isArray(result?.master)
+            ? result.master
+            : Array.isArray(result?.data)
+                ? result.data
+                : Array.isArray(result?.data?.master)
+                    ? result.data.master
+                    : [];
+
     const rows =
-        Array.isArray(
-            result?.master
-        )
-            ? result.master.filter(
-                function (m) {
-                    return String(
-                        m?.status || "AKTIF"
-                    ).toUpperCase() ===
-                    "AKTIF";
-                }
-            )
-            : [];
+        raw.filter(function (m) {
+            return (
+                String(
+                    m?.status ?? "AKTIF"
+                )
+                .trim()
+                .toUpperCase() ===
+                "AKTIF"
+            );
+        });
 
     tuRpdState.masters =
         rows;
@@ -303,6 +313,19 @@ function tuRpdLoadMasters(
     );
 
     tuRpdClearSelected();
+
+    if (rows.length === 0) {
+        tuRpdSetStatus(
+            "Master RPD TU kosong. Respons tu_bootstrap tidak berisi master yang dapat digunakan.",
+            "danger"
+        );
+    } else {
+        tuRpdSetStatus(
+            rows.length.toLocaleString("id-ID") +
+            " Rincian Item berhasil dimuat. Silakan pilih Komponen.",
+            "success"
+        );
+    }
 }
 
 function tuRpdClearSelected() {
@@ -1228,6 +1251,11 @@ async function tuRpdList() {
 }
 
 async function tuRpdLoadAll() {
+    tuRpdSetStatus(
+        "Memuat master RPD TU dari server...",
+        "info"
+    );
+
     const bootstrap =
         await tuApiRequest(
             "tu_bootstrap",
@@ -1237,14 +1265,52 @@ async function tuRpdLoadAll() {
             }
         );
 
+    if (!bootstrap?.ok) {
+        throw new Error(
+            bootstrap?.message ||
+            "tu_bootstrap gagal."
+        );
+    }
+
+    const master =
+        Array.isArray(bootstrap?.master)
+            ? bootstrap.master
+            : [];
+
+    if (!master.length) {
+        throw new Error(
+            "tu_bootstrap berhasil tetapi master TU kosong."
+        );
+    }
+
     tuRpdLoadMasters(
         bootstrap
     );
 
-    await tuRpdList();
+    const rpdResult =
+        await tuRpdList();
+
+    const rpdRows =
+        Array.isArray(
+            rpdResult?.data
+        )
+            ? rpdResult.data
+            : [];
+
+    tuRpdOutput(
+        "tu_bootstrap + tu_rpd_list",
+        {
+            ok: true,
+            master_count: master.length,
+            rpd_count: rpdRows.length,
+            tahun: tuRpdYear()
+        }
+    );
 
     tuRpdSetStatus(
-        "Login Operator dan data master/RPD berhasil dimuat.",
+        "Master RPD TU berhasil dimuat: " +
+        master.length.toLocaleString("id-ID") +
+        " Rincian Item. Silakan pilih Komponen.",
         "success"
     );
 }
