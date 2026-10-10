@@ -1,0 +1,295 @@
+/* ============================================================
+   TU MODULE
+   CSS khusus halaman TU.
+   Tidak mengubah style Dashboard/P3HPHL/RPD.
+   ============================================================ */
+
+.tu-page {
+    min-height: 100vh;
+    background: #f4f6f8;
+    color: #202938;
+}
+
+.tu-shell {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 28px 20px 40px;
+}
+
+.tu-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    align-items: flex-start;
+    margin-bottom: 18px;
+}
+
+.tu-header h2 {
+    margin: 0 0 6px;
+    font-weight: 700;
+}
+
+.tu-header p {
+    margin: 0;
+    color: #667085;
+}
+
+.tu-card {
+    background: #fff;
+    border: 1px solid #dfe4ea;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 18px;
+    box-shadow: 0 3px 16px rgba(16,24,40,.04);
+}
+
+.tu-card h3,
+.tu-card h4 {
+    margin-top: 0;
+}
+
+.tu-login-grid {
+    display: grid;
+    grid-template-columns: minmax(0,1.3fr) minmax(280px,.7fr);
+    gap: 18px;
+}
+
+.tu-login-box,
+.tu-user-box {
+    border-radius: 12px;
+    padding: 18px;
+}
+
+.tu-login-box {
+    border: 1px dashed #c7d2fe;
+    background: #f8faff;
+}
+
+.tu-user-box {
+    border: 1px solid #dbe2ea;
+    background: #fff;
+}
+
+.tu-user-name {
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.tu-user-email {
+    color: #667085;
+    word-break: break-word;
+}
+
+.tu-role,
+.tu-status-pill {
+    display: inline-block;
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.tu-role,
+.tu-status-ok {
+    background: #ecfdf3;
+    color: #166534;
+}
+
+.tu-status-wait {
+    background: #fffbeb;
+    color: #92400e;
+}
+
+.tu-alert {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-size: 13px;
+}
+
+.tu-alert-success {
+    background: #ecfdf3;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+}
+
+.tu-alert-warning {
+    background: #fffbeb;
+    color: #92400e;
+    border: 1px solid #fde68a;
+}
+
+.tu-alert-danger {
+    background: #fef2f2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+
+.tu-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: end;
+}
+
+.tu-field {
+    min-width: 180px;
+}
+
+.tu-field label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    color: #667085;
+}
+
+.tu-field input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #d0d5dd;
+    border-radius: 9px;
+    background: #fff;
+}
+
+.tu-btn {
+    border: 0;
+    border-radius: 9px;
+    padding: 10px 14px;
+    background: #3158a6;
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.tu-btn.secondary {
+    background: #667085;
+}
+
+.tu-btn:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+.tu-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4,minmax(0,1fr));
+    gap: 12px;
+}
+
+.tu-metric {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 14px;
+    background: #fbfcfe;
+}
+
+.tu-metric-label {
+    color: #667085;
+    font-size: 13px;
+}
+
+.tu-metric-value {
+    margin-top: 6px;
+    font-size: 21px;
+    font-weight: 700;
+}
+
+.tu-status-line {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.tu-table-wrap {
+    overflow: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+}
+
+.tu-table {
+    width: 100%;
+    min-width: 1100px;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.tu-table th,
+.tu-table td {
+    padding: 9px 10px;
+    border-bottom: 1px solid #eef0f3;
+    vertical-align: top;
+}
+
+.tu-table th {
+    position: sticky;
+    top: 0;
+    background: #f8fafc;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.tu-table td.num {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.tu-result {
+    margin: 0;
+    background: #111827;
+    color: #e5e7eb;
+    border-radius: 12px;
+    padding: 16px;
+    min-height: 220px;
+    white-space: pre-wrap;
+    overflow: auto;
+    font: 12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+
+.tu-note {
+    margin-top: 12px;
+    padding: 11px 13px;
+    border-radius: 10px;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1e3a8a;
+    font-size: 13px;
+}
+
+@media (max-width: 1000px) {
+    .tu-login-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .tu-summary-grid {
+        grid-template-columns: repeat(2,minmax(0,1fr));
+    }
+}
+
+@media (max-width: 620px) {
+    .tu-shell {
+        padding: 16px 12px 28px;
+    }
+
+    .tu-card {
+        padding: 16px;
+    }
+
+    .tu-summary-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .tu-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .tu-field {
+        min-width: 0;
+    }
+
+    .tu-btn {
+        width: 100%;
+    }
+}
