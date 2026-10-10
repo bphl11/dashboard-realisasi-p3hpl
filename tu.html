@@ -118,6 +118,42 @@
                 </span>
             </div>
 
+            <style>
+                .tu-filter-grid {
+                    display: grid;
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                    gap: 12px;
+                    margin-top: 14px;
+                }
+
+                .tu-filter-grid .tu-field select {
+                    width: 100%;
+                }
+
+                .tu-filter-actions {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 10px;
+                    margin-top: 12px;
+                }
+
+                .tu-filter-selected {
+                    margin-top: 10px;
+                    padding: 10px 12px;
+                    border: 1px solid #dbeafe;
+                    background: #eff6ff;
+                    border-radius: 9px;
+                    color: #1e3a8a;
+                    font-size: 13px;
+                }
+
+                @media (max-width: 900px) {
+                    .tu-filter-grid {
+                        grid-template-columns: 1fr;
+                    }
+                }
+            </style>
+
             <div class="tu-controls mt-3">
 
                 <div class="tu-field">
@@ -131,19 +167,72 @@
                            value="2026">
                 </div>
 
+            </div>
+
+            <div class="tu-filter-grid">
+
                 <div class="tu-field">
-                    <label for="tuIdTu">
-                        ID TU untuk list
+                    <label for="tuFilterKomponen">
+                        Komponen
                     </label>
-                    <input id="tuIdTu"
-                           type="text"
-                           value="TU-2026-000356">
+                    <select id="tuFilterKomponen">
+                        <option value="">
+                            Pilih Komponen
+                        </option>
+                    </select>
                 </div>
+
+                <div class="tu-field">
+                    <label for="tuFilterSubKomponen">
+                        Sub Komponen
+                    </label>
+                    <select id="tuFilterSubKomponen" disabled>
+                        <option value="">
+                            Pilih Komponen terlebih dahulu
+                        </option>
+                    </select>
+                </div>
+
+                <div class="tu-field">
+                    <label for="tuFilterAkun">
+                        Akun
+                    </label>
+                    <select id="tuFilterAkun" disabled>
+                        <option value="">
+                            Pilih Sub Komponen terlebih dahulu
+                        </option>
+                    </select>
+                </div>
+
+                <div class="tu-field">
+                    <label for="tuFilterRincianItem">
+                        Rincian Item
+                    </label>
+                    <select id="tuFilterRincianItem" disabled>
+                        <option value="">
+                            Pilih Akun terlebih dahulu
+                        </option>
+                    </select>
+                </div>
+
+            </div>
+
+            <div id="tuFilterSelected"
+                 class="tu-filter-selected d-none">
+            </div>
+
+            <div class="tu-filter-actions">
 
                 <button id="tuBtnMonitoring"
                         type="button"
                         class="tu-btn">
                     Monitoring FULL
+                </button>
+
+                <button id="tuBtnMonitoringFilter"
+                        type="button"
+                        class="tu-btn secondary">
+                    Monitoring FILTER
                 </button>
 
                 <button id="tuBtnRealisasi"
@@ -177,6 +266,7 @@
                         Snapshot dari
                         <code>tu_bootstrap</code> /
                         <code>tu_monitoring</code>.
+                        Filter mengikuti Komponen → Sub Komponen → Akun → Rincian Item.
                     </div>
                 </div>
 
