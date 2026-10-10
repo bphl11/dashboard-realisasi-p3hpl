@@ -1,46 +1,115 @@
 // ============================================================
 // TU REALISASI — TRANSACTION UI
 //
-// Fase: UI transaksi Realisasi TU.
-// Tidak melakukan request write otomatis saat halaman dibuka.
-// Semua SAVE / UPDATE / NONAKTIF hanya berjalan setelah tombol
-// diklik dan dikonfirmasi user.
+// Form visible:
+//   Komponen
+//   Sub Komponen
+//   Akun
+//   Rincian Item
+//   Bulan Realisasi
+//   Nominal
+//   Keterangan
+//
+// ID TU dan ID Realisasi tidak diisi operator.
+// ID TU diambil dari Rincian Item.
+// ID Realisasi dibuat otomatis oleh backend.
+//
+// Tanggal realisasi dipakai internal oleh API dan tidak ditampilkan.
+// Tidak ada SAVE/UPDATE/DELETE otomatis saat halaman dibuka.
 // ============================================================
 
 let tuRealisasiState = {
+    masters: [],
+    masterById: Object.create(null),
     rows: [],
     editingId: null,
+    editingOriginalDate: "",
     busy: false
 };
 
-function tuRealGetTahun() {
+function tuRealEl(id) {
+    return document.getElementById(id);
+}
+
+function tuRealTahun() {
     return Number(
-        document.getElementById("tuRealTahun")?.value ||
-        TU_CONFIG.TAHUN_DEFAULT
+        TU_CONFIG?.TAHUN_DEFAULT || 2026
     );
 }
 
-function tuRealGetIdTu() {
-    return String(
-        document.getElementById("tuRealIdTu")?.value ||
-        ""
-    ).trim();
+function tuRealFormatRupiah(value) {
+    return new Intl.NumberFormat(
+        "id-ID",
+        {
+            style: "currency",
+            currency: "IDR",
+            maximumFractionDigits: 0
+        }
+    ).format(Number(value) || 0);
 }
 
-function tuRealShowStatus(
+function tuRealEscapeHtml(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function tuRealToday() {
+    const now = new Date();
+
+    return [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, "0"),
+        String(now.getDate()).padStart(2, "0")
+    ].join("-");
+}
+
+function tuRealToInputDate(value) {
+    if (!value) return "";
+
+    const text = String(value);
+
+    const match = text.match(
+        /^(\d{4})-(\d{2})-(\d{2})/
+    );
+
+    if (match) {
+        return (
+            match[1] +
+            "-" +
+            match[2] +
+            "-" +
+            match[3]
+        );
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return "";
+    }
+
+    return [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, "0"),
+        String(date.getDate()).padStart(2, "0")
+    ].join("-");
+}
+
+function tuRealSetStatus(
     message,
     type = "info"
 ) {
     const el =
-        document.getElementById(
-            "tuPageStatus"
-        );
+        tuRealEl("tuPageStatus");
 
     if (!el) return;
 
     el.className =
-        "tu-alert tu-alert-" +
-        type;
+        "tu-alert tu-alert-" + type;
 
     el.textContent =
         message || "";
@@ -53,9 +122,7 @@ function tuRealSetOutput(
     data
 ) {
     const output =
-        document.getElementById(
-            "tuRealOutput"
-        );
+        tuRealEl("tuRealOutput");
 
     if (!output) return;
 
@@ -69,343 +136,611 @@ function tuRealSetOutput(
         );
 }
 
-function tuRealFormatRupiah(value) {
-    return new Intl.NumberFormat(
-        "id-ID",
-        {
-            style: "currency",
-            currency: "IDR",
-            maximumFractionDigits: 0
-        }
-    ).format(
-        Number(value) || 0
-    );
-}
-
-function tuRealFormatDate(value) {
-    if (!value) return "";
-
-    const date =
-        new Date(value);
-
-    if (Number.isNaN(
-        date.getTime()
-    )) {
-        return String(value);
-    }
-
-    return new Intl.DateTimeFormat(
-        "id-ID",
-        {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric"
-        }
-    ).format(date);
-}
-
-function tuRealEscapeHtml(value) {
-    return String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
-
 function tuRealSetBusy(
     busy,
-    buttonText = "Memproses..."
+    text = "Memproses..."
 ) {
-    tuRealisasiState.busy =
-        busy;
+    tuRealisasiState.busy = busy;
 
     const ids = [
         "tuRealSaveButton",
         "tuRealUpdateButton",
         "tuRealCancelButton",
-        "tuRealRefreshButton"
+        "tuRealRefreshButton",
+        "tuRealKomponen",
+        "tuRealSubKomponen",
+        "tuRealAkun",
+        "tuRealRincianItem",
+        "tuRealBulan",
+        "tuRealNominal",
+        "tuRealKeterangan"
     ];
 
-    ids.forEach(
-        function (id) {
-            const button =
-                document.getElementById(id);
-
-            if (button) {
-                button.disabled =
-                    busy;
-            }
+    ids.forEach(function (id) {
+        const el = tuRealEl(id);
+        if (el) {
+            el.disabled = busy;
         }
-    );
+    });
 
     if (busy) {
         const output =
-            document.getElementById(
-                "tuRealOutput"
-            );
+            tuRealEl("tuRealOutput");
 
         if (output) {
             output.textContent =
-                buttonText;
+                text;
         }
     }
 }
 
-function tuRealSetEditing(
-    row
+function tuRealResetSelect(
+    id,
+    placeholder,
+    disabled = true
 ) {
-    tuRealisasiState.editingId =
+    const select =
+        tuRealEl(id);
+
+    if (!select) return;
+
+    select.innerHTML =
+        "";
+
+    const option =
+        document.createElement(
+            "option"
+        );
+
+    option.value = "";
+    option.textContent =
+        placeholder;
+
+    select.appendChild(
+        option
+    );
+
+    select.disabled =
+        disabled;
+}
+
+function tuRealSetOptions(
+    id,
+    rows,
+    valueKey,
+    labelFn,
+    placeholder
+) {
+    const select =
+        tuRealEl(id);
+
+    if (!select) return;
+
+    select.innerHTML =
+        "";
+
+    const first =
+        document.createElement(
+            "option"
+        );
+
+    first.value = "";
+    first.textContent =
+        placeholder;
+
+    select.appendChild(
+        first
+    );
+
+    rows.forEach(function (row) {
+        const option =
+            document.createElement(
+                "option"
+            );
+
+        option.value =
+            String(
+                row[valueKey] ?? ""
+            );
+
+        option.textContent =
+            labelFn(row);
+
+        select.appendChild(
+            option
+        );
+    });
+
+    select.disabled =
+        rows.length === 0;
+}
+
+function tuRealUniqueBy(
+    rows,
+    keyFn
+) {
+    const map =
+        new Map();
+
+    rows.forEach(function (row) {
+        const key =
+            String(
+                keyFn(row) ?? ""
+            );
+
+        if (!map.has(key)) {
+            map.set(key, row);
+        }
+    });
+
+    return Array.from(
+        map.values()
+    );
+}
+
+function tuRealLoadMasters(
+    masters
+) {
+    const valid =
+        Array.isArray(masters)
+            ? masters.filter(function (m) {
+                return (
+                    String(
+                        m?.status || "AKTIF"
+                    ).toUpperCase() ===
+                    "AKTIF"
+                );
+            })
+            : [];
+
+    tuRealisasiState.masters =
+        valid;
+
+    tuRealisasiState.masterById =
+        Object.create(null);
+
+    valid.forEach(function (m) {
+        const id =
+            String(
+                m?.id_tu || ""
+            ).trim();
+
+        if (id) {
+            tuRealisasiState.masterById[id] =
+                m;
+        }
+    });
+
+    const components =
+        tuRealUniqueBy(
+            valid,
+            function (m) {
+                return (
+                    String(
+                        m?.kode_komponen || ""
+                    ).trim() +
+                    "|" +
+                    String(
+                        m?.komponen || ""
+                    ).trim()
+                );
+            }
+        );
+
+    tuRealSetOptions(
+        "tuRealKomponen",
+        components,
+        "kode_komponen",
+        function (m) {
+            const code =
+                String(
+                    m?.kode_komponen || ""
+                ).trim();
+
+            const name =
+                String(
+                    m?.komponen || ""
+                ).trim();
+
+            return code
+                ? code +
+                    " — " +
+                    name
+                : name;
+        },
+        "Pilih Komponen"
+    );
+
+    tuRealResetSelect(
+        "tuRealSubKomponen",
+        "Pilih Komponen terlebih dahulu",
+        true
+    );
+
+    tuRealResetSelect(
+        "tuRealAkun",
+        "Pilih Sub Komponen terlebih dahulu",
+        true
+    );
+
+    tuRealResetSelect(
+        "tuRealRincianItem",
+        "Pilih Akun terlebih dahulu",
+        true
+    );
+
+    tuRealHideItemInfo();
+}
+
+function tuRealComponentRows() {
+    return tuRealisasiState.masters;
+}
+
+function tuRealSelectedMaster() {
+    const idTu =
+        tuRealSelectedIdTu();
+
+    return idTu
+        ? tuRealisasiState.masterById[idTu] || null
+        : null;
+}
+
+function tuRealSelectedIdTu() {
+    const select =
+        tuRealEl(
+            "tuRealRincianItem"
+        );
+
+    return String(
+        select?.value || ""
+    ).trim();
+}
+
+function tuRealSyncSubKomponen() {
+    const komponenSelect =
+        tuRealEl("tuRealKomponen");
+
+    const kodeKomponen =
         String(
-            row?.id_realisasi_tu ||
-            ""
+            komponenSelect?.value || ""
         ).trim();
 
-    document.getElementById(
-        "tuRealIdTu"
-    ).value =
-        row?.id_tu || "";
+    tuRealResetSelect(
+        "tuRealSubKomponen",
+        "Pilih Sub Komponen terlebih dahulu",
+        true
+    );
 
-    document.getElementById(
-        "tuRealTanggal"
-    ).value =
-        tuRealToInputDate(
-            row?.tanggal_realisasi
+    tuRealResetSelect(
+        "tuRealAkun",
+        "Pilih Akun terlebih dahulu",
+        true
+    );
+
+    tuRealResetSelect(
+        "tuRealRincianItem",
+        "Pilih Rincian Item terlebih dahulu",
+        true
+    );
+
+    tuRealHideItemInfo();
+
+    if (!kodeKomponen) {
+        return;
+    }
+
+    const rows =
+        tuRealComponentRows().filter(
+            function (m) {
+                return String(
+                    m?.kode_komponen || ""
+                ).trim() ===
+                kodeKomponen;
+            }
         );
 
-    document.getElementById(
-        "tuRealBulan"
-    ).value =
-        Number(
-            row?.bulan_realisasi ||
-            0
+    const unique =
+        tuRealUniqueBy(
+            rows,
+            function (m) {
+                return (
+                    String(
+                        m?.kode_sub_komponen || ""
+                    ).trim() +
+                    "|" +
+                    String(
+                        m?.sub_komponen || ""
+                    ).trim()
+                );
+            }
         );
 
-    document.getElementById(
-        "tuRealNominal"
-    ).value =
-        Number(
-            row?.nominal_realisasi ||
-            0
+    tuRealSetOptions(
+        "tuRealSubKomponen",
+        unique,
+        "kode_sub_komponen",
+        function (m) {
+            const code =
+                String(
+                    m?.kode_sub_komponen || ""
+                ).trim();
+
+            const name =
+                String(
+                    m?.sub_komponen || ""
+                ).trim();
+
+            return code
+                ? code +
+                    " — " +
+                    name
+                : name;
+        },
+        "Pilih Sub Komponen"
+    );
+}
+
+function tuRealSyncAkun() {
+    const kodeKomponen =
+        String(
+            tuRealEl(
+                "tuRealKomponen"
+            )?.value || ""
+        ).trim();
+
+    const kodeSub =
+        String(
+            tuRealEl(
+                "tuRealSubKomponen"
+            )?.value || ""
+        ).trim();
+
+    tuRealResetSelect(
+        "tuRealAkun",
+        "Pilih Akun terlebih dahulu",
+        true
+    );
+
+    tuRealResetSelect(
+        "tuRealRincianItem",
+        "Pilih Akun terlebih dahulu",
+        true
+    );
+
+    tuRealHideItemInfo();
+
+    if (!kodeKomponen || !kodeSub) {
+        return;
+    }
+
+    const rows =
+        tuRealisasiState.masters.filter(
+            function (m) {
+                return (
+                    String(
+                        m?.kode_komponen || ""
+                    ).trim() ===
+                    kodeKomponen &&
+                    String(
+                        m?.kode_sub_komponen || ""
+                    ).trim() ===
+                    kodeSub
+                );
+            }
         );
 
-    document.getElementById(
-        "tuRealKeterangan"
-    ).value =
-        row?.keterangan || "";
-
-    const editing =
-        document.getElementById(
-            "tuRealEditing"
+    const unique =
+        tuRealUniqueBy(
+            rows,
+            function (m) {
+                return (
+                    String(
+                        m?.kode_akun || ""
+                    ).trim() +
+                    "|" +
+                    String(
+                        m?.akun || ""
+                    ).trim()
+                );
+            }
         );
 
-    if (editing) {
-        editing.textContent =
-            "Mode EDIT aktif untuk " +
-            tuRealisasiState.editingId +
-            ". Ubah data yang diperlukan lalu klik Simpan Perubahan.";
-        editing.classList.remove(
+    tuRealSetOptions(
+        "tuRealAkun",
+        unique,
+        "kode_akun",
+        function (m) {
+            const code =
+                String(
+                    m?.kode_akun || ""
+                ).trim();
+
+            const name =
+                String(
+                    m?.akun || ""
+                ).trim();
+
+            return code
+                ? code +
+                    " — " +
+                    name
+                : name;
+        },
+        "Pilih Akun"
+    );
+}
+
+function tuRealSyncRincianItem() {
+    const kodeKomponen =
+        String(
+            tuRealEl(
+                "tuRealKomponen"
+            )?.value || ""
+        ).trim();
+
+    const kodeSub =
+        String(
+            tuRealEl(
+                "tuRealSubKomponen"
+            )?.value || ""
+        ).trim();
+
+    const kodeAkun =
+        String(
+            tuRealEl(
+                "tuRealAkun"
+            )?.value || ""
+        ).trim();
+
+    tuRealResetSelect(
+        "tuRealRincianItem",
+        "Pilih Rincian Item",
+        true
+    );
+
+    tuRealHideItemInfo();
+
+    if (
+        !kodeKomponen ||
+        !kodeSub ||
+        !kodeAkun
+    ) {
+        return;
+    }
+
+    const rows =
+        tuRealisasiState.masters.filter(
+            function (m) {
+                return (
+                    String(
+                        m?.kode_komponen || ""
+                    ).trim() ===
+                    kodeKomponen &&
+                    String(
+                        m?.kode_sub_komponen || ""
+                    ).trim() ===
+                    kodeSub &&
+                    String(
+                        m?.kode_akun || ""
+                    ).trim() ===
+                    kodeAkun
+                );
+            }
+        );
+
+    tuRealSetOptions(
+        "tuRealRincianItem",
+        rows,
+        "id_tu",
+        function (m) {
+            const code =
+                String(
+                    m?.kode_item || ""
+                ).trim();
+
+            const name =
+                String(
+                    m?.rincian_item || ""
+                ).trim();
+
+            return code
+                ? code +
+                    " — " +
+                    name
+                : name;
+        },
+        "Pilih Rincian Item"
+    );
+}
+
+function tuRealShowItemInfo() {
+    const master =
+        tuRealSelectedMaster();
+
+    const box =
+        tuRealEl(
+            "tuRealItemInfo"
+        );
+
+    if (!master) {
+        tuRealHideItemInfo();
+        return;
+    }
+
+    if (box) {
+        box.classList.remove(
             "d-none"
         );
     }
 
-    document.getElementById(
-        "tuRealSaveButton"
-    )?.classList.add(
-        "d-none"
-    );
+    const pagu =
+        tuRealEl("tuRealPagu");
 
-    document.getElementById(
-        "tuRealUpdateButton"
-    )?.classList.remove(
-        "d-none"
-    );
+    const dasar =
+        tuRealEl("tuRealDasar");
 
-    document.getElementById(
-        "tuRealCancelButton"
-    )?.classList.remove(
-        "d-none"
-    );
+    const idInfo =
+        tuRealEl("tuRealIdTuInfo");
 
-    document.getElementById(
-        "tuRealStatusReadonly"
-    ).value =
-        "EDIT — data lama";
-
-    window.scrollTo({
-        top: 0,
-        behavior: "smooth"
-    });
-}
-
-function tuRealResetForm() {
-    tuRealisasiState.editingId =
-        null;
-
-    document.getElementById(
-        "tuRealIdTu"
-    ).value =
-        "TU-2026-000356";
-
-    document.getElementById(
-        "tuRealTanggal"
-    ).value =
-        tuRealToday();
-
-    document.getElementById(
-        "tuRealBulan"
-    ).value =
-        new Date().getMonth() + 1;
-
-    document.getElementById(
-        "tuRealNominal"
-    ).value = "";
-
-    document.getElementById(
-        "tuRealKeterangan"
-    ).value = "";
-
-    document.getElementById(
-        "tuRealStatusReadonly"
-    ).value =
-        "AKTIF untuk transaksi baru";
-
-    document.getElementById(
-        "tuRealEditing"
-    )?.classList.add(
-        "d-none"
-    );
-
-    document.getElementById(
-        "tuRealSaveButton"
-    )?.classList.remove(
-        "d-none"
-    );
-
-    document.getElementById(
-        "tuRealUpdateButton"
-    )?.classList.add(
-        "d-none"
-    );
-
-    document.getElementById(
-        "tuRealCancelButton"
-    )?.classList.add(
-        "d-none"
-    );
-}
-
-function tuRealToday() {
-    const now =
-        new Date();
-
-    const yyyy =
-        now.getFullYear();
-
-    const mm =
-        String(
-            now.getMonth() + 1
-        ).padStart(2, "0");
-
-    const dd =
-        String(
-            now.getDate()
-        ).padStart(2, "0");
-
-    return (
-        yyyy +
-        "-" +
-        mm +
-        "-" +
-        dd
-    );
-}
-
-function tuRealToInputDate(
-    value
-) {
-    if (!value) return "";
-
-    const s =
-        String(value);
-
-    const match =
-        s.match(
-            /^(\d{4})-(\d{2})-(\d{2})/
-        );
-
-    if (match) {
-        return (
-            match[1] +
-            "-" +
-            match[2] +
-            "-" +
-            match[3]
-        );
+    if (pagu) {
+        pagu.textContent =
+            tuRealFormatRupiah(
+                master.pagu_revisi
+            );
     }
 
-    const date =
-        new Date(value);
-
-    if (Number.isNaN(
-        date.getTime()
-    )) {
-        return "";
+    if (dasar) {
+        dasar.textContent =
+            tuRealFormatRupiah(
+                master.realisasi_dasar
+            );
     }
 
-    return (
-        date.getFullYear() +
-        "-" +
-        String(
-            date.getMonth() + 1
-        ).padStart(2, "0") +
-        "-" +
-        String(
-            date.getDate()
-        ).padStart(2, "0")
+    if (idInfo) {
+        idInfo.textContent =
+            String(
+                master.id_tu || "-"
+            );
+    }
+}
+
+function tuRealHideItemInfo() {
+    tuRealEl(
+        "tuRealItemInfo"
+    )?.classList.add(
+        "d-none"
     );
 }
 
 function tuRealValidateForm() {
-    const idTu =
-        tuRealGetIdTu();
-
-    const tanggal =
-        document.getElementById(
-            "tuRealTanggal"
-        ).value;
+    const master =
+        tuRealSelectedMaster();
 
     const bulan =
         Number(
-            document.getElementById(
+            tuRealEl(
                 "tuRealBulan"
-            ).value
+            )?.value
         );
 
     const nominal =
         Number(
-            document.getElementById(
+            tuRealEl(
                 "tuRealNominal"
-            ).value
+            )?.value
         );
 
     const keterangan =
         String(
-            document.getElementById(
+            tuRealEl(
                 "tuRealKeterangan"
-            ).value ||
+            )?.value ||
             ""
         ).trim();
 
-    if (!idTu) {
+    if (!master) {
         throw new Error(
-            "ID TU wajib diisi."
-        );
-    }
-
-    if (!tanggal) {
-        throw new Error(
-            "Tanggal realisasi wajib diisi."
+            "Rincian Item belum dipilih."
         );
     }
 
@@ -415,7 +750,7 @@ function tuRealValidateForm() {
         bulan > 12
     ) {
         throw new Error(
-            "Bulan realisasi harus 1 sampai 12."
+            "Bulan realisasi harus dipilih."
         );
     }
 
@@ -435,33 +770,111 @@ function tuRealValidateForm() {
     }
 
     return {
-        id_tu: idTu,
-        tanggal_realisasi: tanggal,
-        bulan_realisasi: bulan,
-        nominal_realisasi: nominal,
+        id_tu:
+            String(
+                master.id_tu || ""
+            ).trim(),
+        tanggal_realisasi:
+            String(
+                tuRealEl(
+                    "tuRealTanggal"
+                )?.value ||
+                tuRealToday()
+            ),
+        bulan_realisasi:
+            bulan,
+        nominal_realisasi:
+            nominal,
         keterangan
     };
 }
 
-async function tuRealisasiList(
-    options = {}
+function tuRealApplyMaster(
+    master
 ) {
-    if (tuRealisasiState.busy) {
-        return;
+    if (!master) {
+        throw new Error(
+            "Master Rincian Item tidak ditemukan."
+        );
     }
 
-    const year =
-        Number(
-            options.tahun ||
-            tuRealGetTahun()
+    const komponen =
+        String(
+            master.kode_komponen || ""
+        ).trim();
+
+    const sub =
+        String(
+            master.kode_sub_komponen || ""
+        ).trim();
+
+    const akun =
+        String(
+            master.kode_akun || ""
+        ).trim();
+
+    const idTu =
+        String(
+            master.id_tu || ""
+        ).trim();
+
+    const c =
+        tuRealEl(
+            "tuRealKomponen"
         );
+
+    c.value =
+        komponen;
+
+    tuRealSyncSubKomponen();
+
+    const s =
+        tuRealEl(
+            "tuRealSubKomponen"
+        );
+
+    s.value =
+        sub;
+
+    tuRealSyncAkun();
+
+    const a =
+        tuRealEl(
+            "tuRealAkun"
+        );
+
+    a.value =
+        akun;
+
+    tuRealSyncRincianItem();
+
+    const r =
+        tuRealEl(
+            "tuRealRincianItem"
+        );
+
+    r.value =
+        idTu;
+
+    tuRealShowItemInfo();
+}
+
+async function tuRealisasiList(
+    showStatus = true
+) {
+    if (
+        tuRealisasiState.busy
+    ) {
+        return;
+    }
 
     try {
         const result =
             await tuApiRequest(
                 "tu_realisasi_list",
                 {
-                    tahun: year
+                    tahun:
+                        tuRealTahun()
                 }
             );
 
@@ -476,11 +889,8 @@ async function tuRealisasiList(
             tuRealisasiState.rows
         );
 
-        if (
-            options.showStatus !==
-            false
-        ) {
-            tuRealShowStatus(
+        if (showStatus) {
+            tuRealSetStatus(
                 "Daftar realisasi berhasil dimuat.",
                 "success"
             );
@@ -493,7 +903,7 @@ async function tuRealisasiList(
 
         tuRenderList([]);
 
-        tuRealShowStatus(
+        tuRealSetStatus(
             error?.message ||
             "Gagal membaca daftar realisasi.",
             "danger"
@@ -517,12 +927,12 @@ function tuRenderList(
     rows
 ) {
     const body =
-        document.getElementById(
+        tuRealEl(
             "tuRealBody"
         );
 
     const count =
-        document.getElementById(
+        tuRealEl(
             "tuRealCount"
         );
 
@@ -538,7 +948,7 @@ function tuRenderList(
 
     if (!rows.length) {
         body.innerHTML =
-            '<tr><td colspan="9" class="tu-real-empty">' +
+            '<tr><td colspan="10" class="tu-real-empty">' +
             "Tidak ada realisasi untuk tahun yang dipilih." +
             "</td></tr>";
 
@@ -549,59 +959,90 @@ function tuRenderList(
         rows.map(
             function (row, index) {
                 const id =
-                    tuRealEscapeHtml(
-                        row.id_realisasi_tu
+                    String(
+                        row?.id_realisasi_tu ||
+                        ""
                     );
+
+                const master =
+                    tuRealisasiState.masterById[
+                        String(
+                            row?.id_tu || ""
+                        ).trim()
+                    ];
 
                 const status =
                     String(
-                        row.status ||
-                        ""
+                        row?.status ||
+                        "AKTIF"
                     ).toUpperCase();
 
                 const inactive =
                     status ===
                     "NONAKTIF";
 
+                const komponen =
+                    master?.komponen ||
+                    "-";
+
+                const sub =
+                    master?.sub_komponen ||
+                    "-";
+
+                const akun =
+                    master?.akun ||
+                    "-";
+
+                const rincian =
+                    master?.rincian_item ||
+                    "-";
+
                 return (
                     "<tr>" +
+
                     "<td>" +
                     (index + 1) +
                     "</td>" +
 
                     "<td>" +
-                    id +
-                    "</td>" +
-
-                    "<td>" +
                     tuRealEscapeHtml(
-                        row.id_tu
+                        komponen
                     ) +
                     "</td>" +
 
                     "<td>" +
                     tuRealEscapeHtml(
-                        tuRealFormatDate(
-                            row.tanggal_realisasi
-                        )
+                        sub
                     ) +
                     "</td>" +
 
                     "<td>" +
                     tuRealEscapeHtml(
-                        row.bulan_realisasi
+                        akun
+                    ) +
+                    "</td>" +
+
+                    "<td>" +
+                    tuRealEscapeHtml(
+                        rincian
+                    ) +
+                    "</td>" +
+
+                    "<td>" +
+                    tuRealEscapeHtml(
+                        row?.bulan_realisasi
                     ) +
                     "</td>" +
 
                     '<td class="num">' +
                     tuRealFormatRupiah(
-                        row.nominal_realisasi
+                        row?.nominal_realisasi
                     ) +
                     "</td>" +
 
                     "<td>" +
                     tuRealEscapeHtml(
-                        row.keterangan
+                        row?.keterangan
                     ) +
                     "</td>" +
 
@@ -614,8 +1055,7 @@ function tuRenderList(
                     ) +
                     '">' +
                     tuRealEscapeHtml(
-                        status ||
-                        "AKTIF"
+                        status
                     ) +
                     "</span>" +
                     "</td>" +
@@ -628,7 +1068,7 @@ function tuRenderList(
                             ? ""
                             :
                               '<button type="button" class="tu-btn secondary" data-real-edit="' +
-                              id +
+                              tuRealEscapeHtml(id) +
                               '">Edit</button>'
                     ) +
 
@@ -637,7 +1077,7 @@ function tuRenderList(
                             ? ""
                             :
                               '<button type="button" class="tu-btn tu-real-danger" data-real-delete="' +
-                              id +
+                              tuRealEscapeHtml(id) +
                               '">Nonaktifkan</button>'
                     ) +
 
@@ -653,23 +1093,200 @@ function tuRenderList(
 function tuFindRow(
     id
 ) {
-    const key =
+    return (
+        tuRealisasiState.rows.find(
+            function (row) {
+                return String(
+                    row?.id_realisasi_tu ||
+                    ""
+                ) ===
+                String(id || "");
+            }
+        ) ||
+        null
+    );
+}
+
+function tuRealStartEdit(
+    row
+) {
+    const master =
+        tuRealisasiState.masterById[
+            String(
+                row?.id_tu || ""
+            ).trim()
+        ];
+
+    if (!master) {
+        tuRealSetStatus(
+            "Master Rincian Item untuk transaksi tidak ditemukan.",
+            "danger"
+        );
+        return;
+    }
+
+    tuRealisasiState.editingId =
         String(
-            id || ""
+            row?.id_realisasi_tu || ""
+        ).trim();
+
+    tuRealisasiState.editingOriginalDate =
+        tuRealToInputDate(
+            row?.tanggal_realisasi
         );
 
-    return tuRealisasiState.rows.find(
-        function (row) {
-            return String(
-                row?.id_realisasi_tu ||
-                ""
-            ) === key;
-        }
-    ) || null;
+    tuRealApplyMaster(
+        master
+    );
+
+    tuRealEl(
+        "tuRealBulan"
+    ).value =
+        String(
+            row?.bulan_realisasi ||
+            ""
+        );
+
+    tuRealEl(
+        "tuRealNominal"
+    ).value =
+        Number(
+            row?.nominal_realisasi ||
+            0
+        );
+
+    tuRealEl(
+        "tuRealKeterangan"
+    ).value =
+        row?.keterangan ||
+        "";
+
+    tuRealEl(
+        "tuRealTanggal"
+    ).value =
+        tuRealisasiState.editingOriginalDate ||
+        tuRealToday();
+
+    const editing =
+        tuRealEl(
+            "tuRealEditing"
+        );
+
+    if (editing) {
+        editing.textContent =
+            "Mode EDIT aktif untuk " +
+            tuRealisasiState.editingId +
+            ". Rincian Item dipertahankan dari transaksi lama.";
+        editing.classList.remove(
+            "d-none"
+        );
+    }
+
+    tuRealEl(
+        "tuRealSaveButton"
+    )?.classList.add(
+        "d-none"
+    );
+
+    tuRealEl(
+        "tuRealUpdateButton"
+    )?.classList.remove(
+        "d-none"
+    );
+
+    tuRealEl(
+        "tuRealCancelButton"
+    )?.classList.remove(
+        "d-none"
+    );
+
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+}
+
+function tuRealResetForm() {
+    tuRealisasiState.editingId =
+        null;
+
+    tuRealisasiState.editingOriginalDate =
+        "";
+
+    tuRealEl(
+        "tuRealKomponen"
+    ).value =
+        "";
+
+    tuRealResetSelect(
+        "tuRealSubKomponen",
+        "Pilih Komponen terlebih dahulu",
+        true
+    );
+
+    tuRealResetSelect(
+        "tuRealAkun",
+        "Pilih Sub Komponen terlebih dahulu",
+        true
+    );
+
+    tuRealResetSelect(
+        "tuRealRincianItem",
+        "Pilih Akun terlebih dahulu",
+        true
+    );
+
+    tuRealEl(
+        "tuRealBulan"
+    ).value =
+        "";
+
+    tuRealEl(
+        "tuRealNominal"
+    ).value =
+        "";
+
+    tuRealEl(
+        "tuRealKeterangan"
+    ).value =
+        "";
+
+    tuRealEl(
+        "tuRealTanggal"
+    ).value =
+        tuRealToday();
+
+    tuRealHideItemInfo();
+
+    tuRealEl(
+        "tuRealEditing"
+    )?.classList.add(
+        "d-none"
+    );
+
+    tuRealEl(
+        "tuRealSaveButton"
+    )?.classList.remove(
+        "d-none"
+    );
+
+    tuRealEl(
+        "tuRealUpdateButton"
+    )?.classList.add(
+        "d-none"
+    );
+
+    tuRealEl(
+        "tuRealCancelButton"
+    )?.classList.add(
+        "d-none"
+    );
 }
 
 async function tuSaveRealisasi() {
-    if (tuRealisasiState.busy) {
+    if (
+        tuRealisasiState.busy
+    ) {
         return;
     }
 
@@ -679,18 +1296,25 @@ async function tuSaveRealisasi() {
         fields =
             tuRealValidateForm();
     } catch (error) {
-        tuRealShowStatus(
-            error.message,
+        tuRealSetStatus(
+            error?.message ||
+            String(error),
             "danger"
         );
         return;
     }
 
+    const master =
+        tuRealSelectedMaster();
+
     const confirmed =
         window.confirm(
             "Simpan realisasi TU ini?\n\n" +
-            "ID TU: " +
-            fields.id_tu +
+            "Rincian Item: " +
+            (
+                master?.rincian_item ||
+                "-"
+            ) +
             "\n" +
             "Nominal: " +
             tuRealFormatRupiah(
@@ -713,7 +1337,7 @@ async function tuSaveRealisasi() {
                 "tu_realisasi_save",
                 {
                     tahun:
-                        tuRealGetTahun(),
+                        tuRealTahun(),
                     ...fields
                 }
             );
@@ -723,7 +1347,7 @@ async function tuSaveRealisasi() {
             result
         );
 
-        tuRealShowStatus(
+        tuRealSetStatus(
             result?.message ||
             "Realisasi berhasil disimpan.",
             "success"
@@ -731,10 +1355,9 @@ async function tuSaveRealisasi() {
 
         tuRealResetForm();
 
-        await tuRealisasiList({
-            showStatus:
-                false
-        });
+        await tuRealisasiList(
+            false
+        );
     } catch (error) {
         tuRealSetOutput(
             "tu_realisasi_save",
@@ -746,7 +1369,7 @@ async function tuSaveRealisasi() {
             }
         );
 
-        tuRealShowStatus(
+        tuRealSetStatus(
             error?.message ||
             "Gagal menyimpan realisasi.",
             "danger"
@@ -759,7 +1382,9 @@ async function tuSaveRealisasi() {
 }
 
 async function tuUpdateRealisasi() {
-    if (tuRealisasiState.busy) {
+    if (
+        tuRealisasiState.busy
+    ) {
         return;
     }
 
@@ -767,7 +1392,7 @@ async function tuUpdateRealisasi() {
         tuRealisasiState.editingId;
 
     if (!id) {
-        tuRealShowStatus(
+        tuRealSetStatus(
             "Tidak ada transaksi yang sedang diedit.",
             "danger"
         );
@@ -780,8 +1405,9 @@ async function tuUpdateRealisasi() {
         fields =
             tuRealValidateForm();
     } catch (error) {
-        tuRealShowStatus(
-            error.message,
+        tuRealSetStatus(
+            error?.message ||
+            String(error),
             "danger"
         );
         return;
@@ -809,7 +1435,7 @@ async function tuUpdateRealisasi() {
                 "tu_realisasi_update",
                 {
                     tahun:
-                        tuRealGetTahun(),
+                        tuRealTahun(),
                     id_realisasi_tu:
                         id,
                     ...fields
@@ -821,7 +1447,7 @@ async function tuUpdateRealisasi() {
             result
         );
 
-        tuRealShowStatus(
+        tuRealSetStatus(
             result?.message ||
             "Realisasi berhasil diperbarui.",
             "success"
@@ -829,10 +1455,9 @@ async function tuUpdateRealisasi() {
 
         tuRealResetForm();
 
-        await tuRealisasiList({
-            showStatus:
-                false
-        });
+        await tuRealisasiList(
+            false
+        );
     } catch (error) {
         tuRealSetOutput(
             "tu_realisasi_update",
@@ -844,7 +1469,7 @@ async function tuUpdateRealisasi() {
             }
         );
 
-        tuRealShowStatus(
+        tuRealSetStatus(
             error?.message ||
             "Gagal memperbarui realisasi.",
             "danger"
@@ -870,7 +1495,7 @@ async function tuDeleteRealisasi(
         tuFindRow(id);
 
     if (!row) {
-        tuRealShowStatus(
+        tuRealSetStatus(
             "Data realisasi tidak ditemukan.",
             "danger"
         );
@@ -882,7 +1507,7 @@ async function tuDeleteRealisasi(
             "Nonaktifkan transaksi " +
             id +
             "?\n\n" +
-            "Data tidak dihapus dari sheet. Endpoint TU akan mengubah status menjadi NONAKTIF."
+            "Data tidak dihapus dari sheet; status akan menjadi NONAKTIF."
         );
 
     if (!confirmed) {
@@ -900,7 +1525,7 @@ async function tuDeleteRealisasi(
                 "tu_realisasi_delete",
                 {
                     tahun:
-                        tuRealGetTahun(),
+                        tuRealTahun(),
                     id_realisasi_tu:
                         id
                 }
@@ -911,7 +1536,7 @@ async function tuDeleteRealisasi(
             result
         );
 
-        tuRealShowStatus(
+        tuRealSetStatus(
             result?.message ||
             "Realisasi berhasil dinonaktifkan.",
             "success"
@@ -924,10 +1549,9 @@ async function tuDeleteRealisasi(
             tuRealResetForm();
         }
 
-        await tuRealisasiList({
-            showStatus:
-                false
-        });
+        await tuRealisasiList(
+            false
+        );
     } catch (error) {
         tuRealSetOutput(
             "tu_realisasi_delete",
@@ -939,7 +1563,7 @@ async function tuDeleteRealisasi(
             }
         );
 
-        tuRealShowStatus(
+        tuRealSetStatus(
             error?.message ||
             "Gagal menonaktifkan realisasi.",
             "danger"
@@ -954,37 +1578,39 @@ async function tuDeleteRealisasi(
 function tuRealHandleTableClick(
     event
 ) {
-    const editButton =
+    const edit =
         event.target.closest(
             "[data-real-edit]"
         );
 
-    if (editButton) {
+    if (edit) {
         const row =
             tuFindRow(
-                editButton.dataset.realEdit
+                edit.dataset.realEdit
             );
 
         if (row) {
-            tuRealSetEditing(row);
+            tuRealStartEdit(
+                row
+            );
         }
 
         return;
     }
 
-    const deleteButton =
+    const del =
         event.target.closest(
             "[data-real-delete]"
         );
 
-    if (deleteButton) {
+    if (del) {
         tuDeleteRealisasi(
-            deleteButton.dataset.realDelete
+            del.dataset.realDelete
         );
     }
 }
 
-function tuHandleRealisasiBootstrap(
+function tuHandleBootstrap(
     result
 ) {
     if (
@@ -999,10 +1625,25 @@ function tuHandleRealisasiBootstrap(
         return;
     }
 
-    tuRealisasiList({
-        showStatus:
-            false
-    }).catch(
+    const masters =
+        Array.isArray(
+            result?.master
+        )
+            ? result.master
+            : [];
+
+    tuRealLoadMasters(
+        masters
+    );
+
+    tuRealSetStatus(
+        "Login Operator dan tu_bootstrap berhasil. Pilihan Rincian Item siap digunakan.",
+        "success"
+    );
+
+    tuRealisasiList(
+        false
+    ).catch(
         function () {}
     );
 }
@@ -1019,106 +1660,115 @@ function tuInitData() {
         typeof tuShowApp ===
         "function"
     ) {
-        tuShowApp(user);
+        tuShowApp(
+            user
+        );
 
-        tuRealShowStatus(
-            "Sesi TU dipulihkan. Data realisasi siap dibaca.",
+        tuRealSetStatus(
+            "Sesi TU dipulihkan dari browser.",
             "success"
         );
 
-        tuRealisasiList({
-            showStatus:
-                false
-        }).catch(
-            function () {}
+        // Sesi yang dipulihkan perlu bootstrap lagi agar
+        // master Rincian Item tersedia.
+        tuApiRequest(
+            "tu_bootstrap",
+            {
+                tahun:
+                    tuRealTahun()
+            }
+        ).then(
+            function (result) {
+                tuHandleBootstrap(
+                    result
+                );
+            }
+        ).catch(
+            function (error) {
+                tuRealSetStatus(
+                    error?.message ||
+                    "Gagal memuat master TU.",
+                    "danger"
+                );
+            }
         );
     }
-}
-
-function tuHandleBootstrap(
-    result
-) {
-    tuHandleRealisasiBootstrap(
-        result
-    );
-
-    tuRealShowStatus(
-        "Login Operator dan tu_bootstrap berhasil.",
-        "success"
-    );
 }
 
 document.addEventListener(
     "DOMContentLoaded",
     function () {
-        const date =
-            document.getElementById(
-                "tuRealTanggal"
-            );
+        tuRealEl(
+            "tuRealTanggal"
+        ).value =
+            tuRealToday();
 
-        if (date) {
-            date.value =
-                tuRealToday();
-        }
+        tuRealEl(
+            "tuRealKomponen"
+        )?.addEventListener(
+            "change",
+            tuRealSyncSubKomponen
+        );
 
-        const month =
-            document.getElementById(
-                "tuRealBulan"
-            );
+        tuRealEl(
+            "tuRealSubKomponen"
+        )?.addEventListener(
+            "change",
+            tuRealSyncAkun
+        );
 
-        if (month) {
-            month.value =
-                new Date().getMonth() + 1;
-        }
+        tuRealEl(
+            "tuRealAkun"
+        )?.addEventListener(
+            "change",
+            tuRealSyncRincianItem
+        );
 
-        document
-            .getElementById(
-                "tuRealSaveButton"
-            )
-            ?.addEventListener(
-                "click",
-                tuSaveRealisasi
-            );
+        tuRealEl(
+            "tuRealRincianItem"
+        )?.addEventListener(
+            "change",
+            tuRealShowItemInfo
+        );
 
-        document
-            .getElementById(
-                "tuRealUpdateButton"
-            )
-            ?.addEventListener(
-                "click",
-                tuUpdateRealisasi
-            );
+        tuRealEl(
+            "tuRealSaveButton"
+        )?.addEventListener(
+            "click",
+            tuSaveRealisasi
+        );
 
-        document
-            .getElementById(
-                "tuRealCancelButton"
-            )
-            ?.addEventListener(
-                "click",
-                tuRealResetForm
-            );
+        tuRealEl(
+            "tuRealUpdateButton"
+        )?.addEventListener(
+            "click",
+            tuUpdateRealisasi
+        );
 
-        document
-            .getElementById(
-                "tuRealRefreshButton"
-            )
-            ?.addEventListener(
-                "click",
-                function () {
-                    tuRealisasiList()
-                        .catch(
-                            function () {}
-                        );
-                }
-            );
+        tuRealEl(
+            "tuRealCancelButton"
+        )?.addEventListener(
+            "click",
+            tuRealResetForm
+        );
 
-        document
-            .getElementById(
-                "tuRealBody"
-            )
-            ?.addEventListener(
-                "click",
-                tuRealHandleTableClick
-            );
+        tuRealEl(
+            "tuRealRefreshButton"
+        )?.addEventListener(
+            "click",
+            function () {
+                tuRealisasiList()
+                    .catch(
+                        function () {}
+                    );
+            }
+        );
+
+        tuRealEl(
+            "tuRealBody"
+        )?.addEventListener(
+            "click",
+            tuRealHandleTableClick
+        );
     }
 );
