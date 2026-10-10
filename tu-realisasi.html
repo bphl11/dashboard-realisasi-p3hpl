@@ -32,8 +32,8 @@
             display: block;
             margin-bottom: 6px;
             font-size: 13px;
-            color: #667085;
             font-weight: 600;
+            color: #475467;
         }
 
         .tu-real-field select,
@@ -46,16 +46,14 @@
             background: #fff;
         }
 
-        .tu-real-field select:disabled,
-        .tu-real-field input:disabled,
-        .tu-real-field textarea:disabled {
-            background: #f2f4f7;
-            color: #667085;
+        .tu-real-field textarea {
+            min-height: 90px;
+            resize: vertical;
         }
 
-        .tu-real-field textarea {
-            min-height: 92px;
-            resize: vertical;
+        .tu-real-field select:disabled {
+            background: #f2f4f7;
+            color: #98a2b3;
         }
 
         .tu-real-actions {
@@ -74,18 +72,23 @@
             font-size: 13px;
         }
 
-        .tu-real-selection {
+        .tu-real-muted {
+            color: #667085;
+            font-size: 13px;
+        }
+
+        .tu-real-item-info {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 10px;
             margin-top: 14px;
         }
 
-        .tu-real-info {
+        .tu-real-info-card {
             border: 1px solid #e5e7eb;
             border-radius: 10px;
-            padding: 11px 12px;
-            background: #f8fafc;
+            padding: 12px;
+            background: #fbfcfe;
         }
 
         .tu-real-info-label {
@@ -95,19 +98,12 @@
 
         .tu-real-info-value {
             margin-top: 4px;
-            font-size: 15px;
             font-weight: 700;
-            word-break: break-word;
-        }
-
-        .tu-real-muted {
-            color: #667085;
-            font-size: 13px;
         }
 
         .tu-real-table {
             width: 100%;
-            min-width: 1300px;
+            min-width: 1250px;
             border-collapse: collapse;
             font-size: 12px;
         }
@@ -141,35 +137,26 @@
             font-size: 11px;
         }
 
-        .tu-real-danger {
-            background: #b42318 !important;
-        }
-
         .tu-real-empty {
             text-align: center;
             padding: 28px 12px !important;
             color: #667085;
         }
 
-        @media (max-width: 1050px) {
-            .tu-real-selection {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
+        .tu-real-help {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #667085;
         }
 
         @media (max-width: 900px) {
-            .tu-real-form {
+            .tu-real-form,
+            .tu-real-item-info {
                 grid-template-columns: 1fr;
             }
 
             .tu-real-field-full {
                 grid-column: auto;
-            }
-        }
-
-        @media (max-width: 620px) {
-            .tu-real-selection {
-                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -186,7 +173,8 @@
                 Realisasi TU
             </h2>
             <p>
-                Komponen → Sub Komponen → Akun → Rincian Item → Bulan Realisasi → Nominal → Keterangan
+                Pilih Komponen sampai Rincian Item, lalu isi Bulan,
+                Nominal, dan Keterangan.
             </p>
         </div>
 
@@ -198,13 +186,17 @@
     </header>
 
     <section class="tu-card">
+
         <div class="tu-login-grid">
 
-            <div id="tuLoginPanel" class="tu-login-box">
+            <div id="tuLoginPanel"
+                 class="tu-login-box">
+
                 <h4>Login Operator</h4>
 
                 <p class="text-muted mb-2">
-                    Gunakan akun Google yang terdaftar sebagai Operator TU.
+                    Gunakan akun Google yang terdaftar sebagai
+                    Operator TU.
                 </p>
 
                 <div id="googleSignInButton"></div>
@@ -217,13 +209,20 @@
                 <div id="tuAuthMessage"
                      class="tu-alert tu-alert-danger d-none">
                 </div>
+
             </div>
 
-            <div id="tuUserBox" class="tu-user-box">
-                <div class="tu-user-name" id="tuUserName">-</div>
-                <div class="tu-user-email" id="tuUserEmail">-</div>
+            <div id="tuUserBox"
+                 class="tu-user-box">
 
-                <span id="tuUserRole" class="tu-role">
+                <div class="tu-user-name"
+                     id="tuUserName">-</div>
+
+                <div class="tu-user-email"
+                     id="tuUserEmail">-</div>
+
+                <span id="tuUserRole"
+                      class="tu-role">
                     OPERATOR
                 </span>
 
@@ -234,9 +233,11 @@
                         Keluar
                     </button>
                 </div>
+
             </div>
 
         </div>
+
     </section>
 
     <div id="tuAppPanel" class="d-none">
@@ -251,8 +252,8 @@
                 <div>
                     <h3>Form Realisasi</h3>
                     <div class="tu-real-muted">
-                        Pilih sampai <strong>Rincian Item</strong>.
-                        ID TU ditentukan otomatis dari pilihan tersebut.
+                        Urutan pilihan:
+                        <strong>Komponen → Sub Komponen → Akun → Rincian Item</strong>.
                     </div>
                 </div>
 
@@ -262,8 +263,7 @@
             </div>
 
             <div id="tuRealEditing"
-                 class="tu-real-editing d-none">
-            </div>
+                 class="tu-real-editing d-none"></div>
 
             <div class="tu-real-form mt-3">
 
@@ -271,7 +271,6 @@
                     <label for="tuRealKomponen">
                         Komponen
                     </label>
-
                     <select id="tuRealKomponen">
                         <option value="">
                             Pilih Komponen
@@ -283,11 +282,10 @@
                     <label for="tuRealSubKomponen">
                         Sub Komponen
                     </label>
-
                     <select id="tuRealSubKomponen"
                             disabled>
                         <option value="">
-                            Pilih Sub Komponen
+                            Pilih Komponen terlebih dahulu
                         </option>
                     </select>
                 </div>
@@ -296,11 +294,10 @@
                     <label for="tuRealAkun">
                         Akun
                     </label>
-
                     <select id="tuRealAkun"
                             disabled>
                         <option value="">
-                            Pilih Akun
+                            Pilih Sub Komponen terlebih dahulu
                         </option>
                     </select>
                 </div>
@@ -309,30 +306,20 @@
                     <label for="tuRealRincianItem">
                         Rincian Item
                     </label>
-
                     <select id="tuRealRincianItem"
                             disabled>
                         <option value="">
-                            Pilih Rincian Item
+                            Pilih Akun terlebih dahulu
                         </option>
                     </select>
                 </div>
 
             </div>
 
-            <div class="tu-real-selection">
+            <div id="tuRealItemInfo"
+                 class="tu-real-item-info d-none">
 
-                <div class="tu-real-info">
-                    <div class="tu-real-info-label">
-                        ID TU
-                    </div>
-                    <div id="tuRealSelectedIdTu"
-                         class="tu-real-info-value">
-                        -
-                    </div>
-                </div>
-
-                <div class="tu-real-info">
+                <div class="tu-real-info-card">
                     <div class="tu-real-info-label">
                         Pagu Revisi
                     </div>
@@ -342,21 +329,21 @@
                     </div>
                 </div>
 
-                <div class="tu-real-info">
+                <div class="tu-real-info-card">
                     <div class="tu-real-info-label">
-                        Realisasi
+                        ID TU
                     </div>
-                    <div id="tuRealRealisasi"
+                    <div id="tuRealIdTuInfo"
                          class="tu-real-info-value">
-                        Rp0
+                        -
                     </div>
                 </div>
 
-                <div class="tu-real-info">
+                <div class="tu-real-info-card">
                     <div class="tu-real-info-label">
-                        Sisa Pagu
+                        Realisasi Dasar
                     </div>
-                    <div id="tuRealSisa"
+                    <div id="tuRealDasar"
                          class="tu-real-info-value">
                         Rp0
                     </div>
@@ -370,7 +357,6 @@
                     <label for="tuRealBulan">
                         Bulan Realisasi
                     </label>
-
                     <select id="tuRealBulan">
                         <option value="">
                             Pilih Bulan
@@ -392,9 +378,8 @@
 
                 <div class="tu-real-field">
                     <label for="tuRealNominal">
-                        Nominal
+                        Nominal Realisasi
                     </label>
-
                     <input id="tuRealNominal"
                            type="number"
                            min="1"
@@ -406,11 +391,21 @@
                     <label for="tuRealKeterangan">
                         Keterangan
                     </label>
-
                     <textarea id="tuRealKeterangan"
-                              placeholder="Masukkan keterangan realisasi"></textarea>
+                              placeholder="Keterangan realisasi"></textarea>
                 </div>
 
+            </div>
+
+            <!-- Tanggal dipakai internal oleh API.
+                 Tidak ditampilkan sebagai field karena form TU
+                 disederhanakan sesuai kebutuhan pengguna. -->
+            <input id="tuRealTanggal"
+                   type="hidden">
+
+            <div class="tu-real-help">
+                ID Realisasi dibuat otomatis oleh server. ID TU juga
+                tidak perlu diketik; sistem mengambilnya dari Rincian Item.
             </div>
 
             <div class="tu-real-actions mt-3">
@@ -442,11 +437,6 @@
                     Muat Ulang
                 </button>
 
-            </div>
-
-            <div class="tu-note">
-                Mode transaksi TU. Endpoint write hanya dipanggil setelah Operator
-                menekan tombol Simpan dan menyetujui konfirmasi.
             </div>
 
         </section>
@@ -503,6 +493,7 @@
         </section>
 
         <section class="tu-card">
+
             <div class="tu-status-line">
                 <div>
                     <h3>Response</h3>
@@ -514,7 +505,8 @@
             </div>
 
             <pre id="tuRealOutput"
-                 class="tu-result">Belum ada transaksi.</pre>
+                 class="tu-result">Belum ada pengujian.</pre>
+
         </section>
 
     </div>
