@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>TU — Realisasi</title>
+
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
+    <link rel="stylesheet"
+          href="assets/css/style.css">
+
+    <link rel="stylesheet"
+          href="assets/css/tu.css">
+
+    <style>
+        .tu-real-form {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .tu-real-field-full {
+            grid-column: 1 / -1;
+        }
+
+        .tu-real-field label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 13px;
+            color: #667085;
+        }
+
+        .tu-real-field input,
+        .tu-real-field textarea,
+        .tu-real-field select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d0d5dd;
+            border-radius: 9px;
+            background: #fff;
+        }
+
+        .tu-real-field textarea {
+            min-height: 90px;
+            resize: vertical;
+        }
+
+        .tu-real-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .tu-real-editing {
+            border: 1px solid #bfdbfe;
+            background: #eff6ff;
+            color: #1e3a8a;
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-bottom: 14px;
+            font-size: 13px;
+        }
+
+        .tu-real-danger {
+            background: #b42318 !important;
+        }
+
+        .tu-real-muted {
+            color: #667085;
+            font-size: 13px;
+        }
+
+        .tu-real-table {
+            width: 100%;
+            min-width: 1200px;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .tu-real-table th,
+        .tu-real-table td {
+            padding: 10px;
+            border-bottom: 1px solid #eef0f3;
+            vertical-align: top;
+        }
+
+        .tu-real-table th {
+            background: #f8fafc;
+            text-align: left;
+            white-space: nowrap;
+        }
+
+        .tu-real-table .num {
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .tu-real-row-actions {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .tu-real-row-actions .tu-btn {
+            padding: 7px 10px;
+            font-size: 11px;
+        }
+
+        .tu-real-empty {
+            text-align: center;
+            padding: 28px 12px !important;
+            color: #667085;
+        }
+
+        @media (max-width: 900px) {
+            .tu-real-form {
+                grid-template-columns: 1fr;
+            }
+
+            .tu-real-field-full {
+                grid-column: auto;
+            }
+        }
+    </style>
+</head>
+
+<body class="tu-page">
+
+<div class="tu-shell">
+
+    <header class="tu-header">
+        <div>
+            <h2>
+                <i class="bi bi-cash-stack"></i>
+                Realisasi TU
+            </h2>
+            <p>
+                Input, ubah, dan nonaktifkan realisasi TU.
+                Hanya Operator yang dapat menjalankan transaksi.
+            </p>
+        </div>
+
+        <div class="tu-actions">
+            <span class="tu-status-pill tu-status-ok">
+                TARGET V5 PRODUKSI
+            </span>
+        </div>
+    </header>
+
+    <section class="tu-card">
+
+        <div class="tu-login-grid">
+
+            <div id="tuLoginPanel"
+                 class="tu-login-box">
+
+                <h4>Login Operator</h4>
+
+                <p class="text-muted mb-2">
+                    Gunakan akun Google yang terdaftar sebagai
+                    Operator TU.
+                </p>
+
+                <div id="googleSignInButton"></div>
+
+                <div id="tuLoginLoading"
+                     class="text-muted mt-2 d-none">
+                    Memverifikasi login...
+                </div>
+
+                <div id="tuAuthMessage"
+                     class="tu-alert tu-alert-danger d-none">
+                </div>
+
+            </div>
+
+            <div id="tuUserBox"
+                 class="tu-user-box">
+
+                <div class="tu-user-name"
+                     id="tuUserName">-</div>
+
+                <div class="tu-user-email"
+                     id="tuUserEmail">-</div>
+
+                <span id="tuUserRole"
+                      class="tu-role">
+                    OPERATOR
+                </span>
+
+                <div class="mt-3">
+                    <button id="tuLogoutButton"
+                            type="button"
+                            class="tu-btn secondary">
+                        Keluar
+                    </button>
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+    <div id="tuAppPanel" class="d-none">
+
+        <div id="tuPageStatus"
+             class="tu-alert tu-alert-success d-none">
+        </div>
+
+        <section class="tu-card">
+
+            <div class="tu-status-line">
+                <div>
+                    <h3>Form Realisasi</h3>
+                    <div class="tu-real-muted">
+                        Endpoint yang digunakan:
+                        <code>tu_realisasi_save</code>,
+                        <code>tu_realisasi_update</code>,
+                        <code>tu_realisasi_delete</code>.
+                    </div>
+                </div>
+
+                <span class="tu-status-pill tu-status-ok">
+                    OPERATOR SAJA
+                </span>
+            </div>
+
+            <div id="tuRealEditing"
+                 class="tu-real-editing d-none"></div>
+
+            <div class="tu-real-form mt-3">
+
+                <div class="tu-real-field">
+                    <label for="tuRealTahun">
+                        Tahun
+                    </label>
+                    <input id="tuRealTahun"
+                           type="number"
+                           min="2024"
+                           max="2100"
+                           value="2026"
+                           readonly>
+                </div>
+
+                <div class="tu-real-field">
+                    <label for="tuRealIdTu">
+                        ID TU
+                    </label>
+                    <input id="tuRealIdTu"
+                           type="text"
+                           value="TU-2026-000356">
+                </div>
+
+                <div class="tu-real-field">
+                    <label for="tuRealTanggal">
+                        Tanggal Realisasi
+                    </label>
+                    <input id="tuRealTanggal"
+                           type="date">
+                </div>
+
+                <div class="tu-real-field">
+                    <label for="tuRealBulan">
+                        Bulan Realisasi
+                    </label>
+                    <input id="tuRealBulan"
+                           type="number"
+                           min="1"
+                           max="12"
+                           value="10">
+                </div>
+
+                <div class="tu-real-field">
+                    <label for="tuRealNominal">
+                        Nominal Realisasi
+                    </label>
+                    <input id="tuRealNominal"
+                           type="number"
+                           min="1"
+                           step="1"
+                           placeholder="Masukkan nominal">
+                </div>
+
+                <div class="tu-real-field">
+                    <label for="tuRealStatusReadonly">
+                        Status
+                    </label>
+                    <input id="tuRealStatusReadonly"
+                           type="text"
+                           value="AKTIF untuk transaksi baru"
+                           readonly>
+                </div>
+
+                <div class="tu-real-field tu-real-field-full">
+                    <label for="tuRealKeterangan">
+                        Keterangan
+                    </label>
+                    <textarea id="tuRealKeterangan"
+                              placeholder="Keterangan realisasi"></textarea>
+                </div>
+
+            </div>
+
+            <div class="tu-real-actions mt-3">
+
+                <button id="tuRealSaveButton"
+                        type="button"
+                        class="tu-btn">
+                    <i class="bi bi-save"></i>
+                    Simpan Realisasi
+                </button>
+
+                <button id="tuRealUpdateButton"
+                        type="button"
+                        class="tu-btn d-none">
+                    <i class="bi bi-pencil-square"></i>
+                    Simpan Perubahan
+                </button>
+
+                <button id="tuRealCancelButton"
+                        type="button"
+                        class="tu-btn secondary d-none">
+                    Batal Edit
+                </button>
+
+                <button id="tuRealRefreshButton"
+                        type="button"
+                        class="tu-btn secondary">
+                    <i class="bi bi-arrow-clockwise"></i>
+                    Muat Ulang
+                </button>
+
+            </div>
+
+            <div class="tu-note">
+                Transaksi akan langsung diteruskan ke Worker TU produksi.
+                Gunakan tombol transaksi hanya untuk data operasional yang benar.
+            </div>
+
+        </section>
+
+        <section class="tu-card">
+
+            <div class="tu-status-line">
+                <div>
+                    <h3>Daftar Realisasi</h3>
+                    <div class="tu-real-muted">
+                        Data dibaca melalui
+                        <code>tu_realisasi_list</code>.
+                    </div>
+                </div>
+
+                <span id="tuRealCount"
+                      class="tu-status-pill tu-status-ok">
+                    0 data
+                </span>
+            </div>
+
+            <div class="tu-table-wrap mt-3">
+
+                <table class="tu-real-table">
+
+                    <thead>
+                        <tr>
+                            <th>No</th>
+                            <th>ID Realisasi</th>
+                            <th>ID TU</th>
+                            <th>Tanggal</th>
+                            <th>Bulan</th>
+                            <th>Nominal</th>
+                            <th>Keterangan</th>
+                            <th>Status</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="tuRealBody">
+                        <tr>
+                            <td colspan="9"
+                                class="tu-real-empty">
+                                Belum ada data yang dimuat.
+                            </td>
+                        </tr>
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+        <section class="tu-card">
+
+            <div class="tu-status-line">
+                <div>
+                    <h3>Response</h3>
+                    <div class="tu-real-muted">
+                        Informasi teknis transaksi terakhir.
+                        Token tidak ditampilkan.
+                    </div>
+                </div>
+            </div>
+
+            <pre id="tuRealOutput"
+                 class="tu-result">Belum ada transaksi.</pre>
+
+        </section>
+
+    </div>
+
+</div>
+
+<script src="https://accounts.google.com/gsi/client"
+        async defer></script>
+
+<script src="assets/js/tu-config.js"></script>
+<script src="assets/js/tu-api.js"></script>
+<script src="assets/js/tu-auth.js"></script>
+<script src="assets/js/tu-realisasi.js"></script>
+
+</body>
+</html>
