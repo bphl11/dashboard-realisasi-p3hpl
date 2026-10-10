@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>TU BPHL XI Banjarbaru</title>
+
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
+    <link rel="stylesheet"
+          href="assets/css/style.css">
+
+    <link rel="stylesheet"
+          href="assets/css/tu.css">
+</head>
+
+<body class="tu-page">
+
+<div class="tu-shell">
+
+    <header class="tu-header">
+        <div>
+            <h2>
+                <i class="bi bi-shield-check"></i>
+                TU BPHL XI Banjarbaru
+            </h2>
+            <p>
+                Modul TU terpisah dari Dashboard P3HPHL dan RPD.
+                Tahap awal menggunakan akses read-only.
+            </p>
+        </div>
+
+        <div>
+            <span class="tu-status-pill tu-status-ok">
+                TARGET V5 PRODUKSI
+            </span>
+        </div>
+    </header>
+
+    <section class="tu-card">
+
+        <div class="tu-login-grid">
+
+            <div id="tuLoginPanel"
+                 class="tu-login-box">
+
+                <h4>Login Operator</h4>
+
+                <p class="text-muted mb-2">
+                    Gunakan akun Google yang terdaftar sebagai
+                    Operator TU.
+                </p>
+
+                <div id="googleSignInButton"></div>
+
+                <div id="tuLoginLoading"
+                     class="text-muted mt-2 d-none">
+                    Memverifikasi login...
+                </div>
+
+                <div id="tuAuthMessage"
+                     class="tu-alert tu-alert-danger d-none">
+                </div>
+
+            </div>
+
+            <div id="tuUserBox"
+                 class="tu-user-box">
+
+                <div class="tu-user-name"
+                     id="tuUserName">-</div>
+
+                <div class="tu-user-email"
+                     id="tuUserEmail">-</div>
+
+                <span id="tuUserRole"
+                      class="tu-role">OPERATOR</span>
+
+                <div class="mt-3">
+                    <button id="tuLogoutButton"
+                            type="button"
+                            class="tu-btn secondary">
+                        Keluar
+                    </button>
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+    <div id="tuAppPanel"
+         class="d-none">
+
+        <div id="tuPageStatus"
+             class="tu-alert tu-alert-success d-none">
+        </div>
+
+        <section class="tu-card">
+
+            <div class="tu-status-line">
+                <div>
+                    <h3>Pengujian Read-only</h3>
+                    <div class="text-muted small">
+                        Halaman ini tidak menyediakan
+                        SAVE, UPDATE, DELETE, RPD SAVE,
+                        atau REVISI SAVE.
+                    </div>
+                </div>
+
+                <span class="tu-status-pill tu-status-ok">
+                    DATA TIDAK DIUBAH
+                </span>
+            </div>
+
+            <div class="tu-controls mt-3">
+
+                <div class="tu-field">
+                    <label for="tuYear">
+                        Tahun Anggaran
+                    </label>
+                    <input id="tuYear"
+                           type="number"
+                           min="2024"
+                           max="2100"
+                           value="2026">
+                </div>
+
+                <div class="tu-field">
+                    <label for="tuIdTu">
+                        ID TU untuk list
+                    </label>
+                    <input id="tuIdTu"
+                           type="text"
+                           value="TU-2026-000356">
+                </div>
+
+                <button id="tuBtnMonitoring"
+                        type="button"
+                        class="tu-btn">
+                    Monitoring FULL
+                </button>
+
+                <button id="tuBtnRealisasi"
+                        type="button"
+                        class="tu-btn secondary">
+                    Realisasi List
+                </button>
+
+                <button id="tuBtnRpd"
+                        type="button"
+                        class="tu-btn secondary">
+                    RPD List
+                </button>
+
+                <button id="tuBtnRevisi"
+                        type="button"
+                        class="tu-btn secondary">
+                    Revisi List
+                </button>
+
+            </div>
+
+        </section>
+
+        <section class="tu-card">
+
+            <div class="tu-status-line">
+                <div>
+                    <h3>Ringkasan TU</h3>
+                    <div class="text-muted small">
+                        Snapshot dari
+                        <code>tu_bootstrap</code> /
+                        <code>tu_monitoring</code>.
+                    </div>
+                </div>
+
+                <span>
+                    Tahun:
+                    <strong id="tuYearLabel">2026</strong>
+                </span>
+            </div>
+
+            <div class="tu-summary-grid mt-3">
+
+                <div class="tu-metric">
+                    <div class="tu-metric-label">
+                        Total Pagu
+                    </div>
+                    <div id="tuMetricPagu"
+                         class="tu-metric-value">
+                        Rp0
+                    </div>
+                </div>
+
+                <div class="tu-metric">
+                    <div class="tu-metric-label">
+                        Realisasi Final
+                    </div>
+                    <div id="tuMetricRealisasi"
+                         class="tu-metric-value">
+                        Rp0
+                    </div>
+                </div>
+
+                <div class="tu-metric">
+                    <div class="tu-metric-label">
+                        Sisa Anggaran
+                    </div>
+                    <div id="tuMetricSisa"
+                         class="tu-metric-value">
+                        Rp0
+                    </div>
+                </div>
+
+                <div class="tu-metric">
+                    <div class="tu-metric-label">
+                        Persentase
+                    </div>
+                    <div id="tuMetricPersentase"
+                         class="tu-metric-value">
+                        0,00%
+                    </div>
+                </div>
+
+                <div class="tu-metric">
+                    <div class="tu-metric-label">
+                        Total RPD
+                    </div>
+                    <div id="tuMetricRpd"
+                         class="tu-metric-value">
+                        Rp0
+                    </div>
+                </div>
+
+                <div class="tu-metric">
+                    <div class="tu-metric-label">
+                        Total Sisa RPD
+                    </div>
+                    <div id="tuMetricSisaRpd"
+                         class="tu-metric-value">
+                        Rp0
+                    </div>
+                </div>
+
+                <div class="tu-metric">
+                    <div class="tu-metric-label">
+                        Waktu Monitoring
+                    </div>
+                    <div id="tuMonitoringTime"
+                         class="tu-metric-value">
+                        -
+                    </div>
+                </div>
+
+                <div class="tu-metric">
+                    <div class="tu-metric-label">
+                        Jumlah Detail
+                    </div>
+                    <div id="tuMonitoringCount"
+                         class="tu-metric-value">
+                        -
+                    </div>
+                </div>
+
+            </div>
+
+        </section>
+
+        <section class="tu-card">
+
+            <div class="tu-status-line">
+                <div>
+                    <h3>Monitoring TU</h3>
+                    <div class="text-muted small">
+                        Menampilkan detail hasil
+                        <code>tu_monitoring</code>.
+                    </div>
+                </div>
+            </div>
+
+            <div class="tu-table-wrap mt-3">
+
+                <table class="tu-table">
+
+                    <thead>
+                        <tr>
+                            <th>No</th>
+                            <th>Kode Sub Komponen</th>
+                            <th>Sub Komponen</th>
+                            <th>Akun</th>
+                            <th>Rincian Item</th>
+                            <th>Pagu</th>
+                            <th>Realisasi</th>
+                            <th>Sisa</th>
+                            <th>%</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="tuMonitoringBody">
+                        <tr>
+                            <td colspan="10"
+                                class="text-center text-muted py-4">
+                                Belum ada pengujian monitoring.
+                            </td>
+                        </tr>
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+        <section class="tu-card">
+
+            <div class="tu-status-line">
+                <div>
+                    <h3>Response Read-only</h3>
+                    <div class="text-muted small">
+                        Untuk pemeriksaan teknis.
+                        Token tidak ditampilkan.
+                    </div>
+                </div>
+            </div>
+
+            <pre id="tuReadOutput"
+                 class="tu-result">Belum ada pengujian.</pre>
+
+            <div class="tu-note">
+                Tahap integrasi pertama sengaja hanya
+                menggunakan endpoint read-only.
+            </div>
+
+        </section>
+
+    </div>
+
+</div>
+
+<script src="https://accounts.google.com/gsi/client"
+        async defer></script>
+
+<script src="assets/js/tu-config.js"></script>
+<script src="assets/js/tu-api.js"></script>
+<script src="assets/js/tu.js"></script>
+<script src="assets/js/tu-auth.js"></script>
+
+</body>
+</html>
