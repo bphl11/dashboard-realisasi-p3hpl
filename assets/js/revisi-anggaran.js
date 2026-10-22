@@ -758,37 +758,46 @@ document.addEventListener("input", event => {
     const input = event.target;
     if (!input.matches(".edit-input")) return;
 
+    // Item tambahan tidak memiliki rowIndex sumber; simpan langsung ke additions.
+    if (input.dataset.addId) {
+        const item = revisiDraft.additions.find(x => x.id === input.dataset.addId);
+        if (!item) return;
+        item[input.dataset.field] = num(input.value);
+        revisiDraft.validation = null;
+        revisiDraft.serverTest = null;
+        revisiDraft.status = "DRAFT";
+        input.classList.add("draft-edited");
+        return;
+    }
+
     const row = revisiRows.find(item => item.rowIndex === Number(input.dataset.row));
     if (!row) return;
 
+    const current = effectiveRow(row);
     const change = {
-        volume: effectiveRow(row).volume,
-        satuan: effectiveRow(row).satuan,
-        harga: effectiveRow(row).harga,
-        nominalBlokir: effectiveRow(row).nominalBlokir ?? 0
+        uraian: current.uraian,
+        volume: current.volume,
+        satuan: current.satuan,
+        harga: current.harga,
+        nominalBlokir: current.nominalBlokir ?? 0
     };
-    change[input.dataset.field] = input.dataset.field === "uraian" || input.dataset.field === "satuan" ? input.value : num(input.value);
+    change[input.dataset.field] = input.dataset.field === "uraian" || input.dataset.field === "satuan"
+        ? input.value
+        : num(input.value);
 
-    if (change.uraian === row.uraian && change.volume === row.volume && change.satuan === row.satuan && change.harga === row.harga && num(change.nominalBlokir) === num(row.nominalBlokir)) {
-        delete revisiDraft.changes[String(row.rowIndex)];
-    } else {
-        revisiDraft.changes[String(row.rowIndex)] = change;
-    }
+    const unchanged = change.uraian === row.uraian &&
+        change.volume === row.volume &&
+        change.satuan === row.satuan &&
+        change.harga === row.harga &&
+        num(change.nominalBlokir) === num(row.nominalBlokir);
 
-    // Setiap perubahan item membuat hasil validasi sebelumnya menjadi kedaluwarsa.
-    // Jangan tampilkan pesan validasi lama yang sudah tidak sesuai dengan draft terbaru.
+    if (unchanged) delete revisiDraft.changes[String(row.rowIndex)];
+    else revisiDraft.changes[String(row.rowIndex)] = change;
+
     revisiDraft.validation = null;
     revisiDraft.serverTest = null;
     revisiDraft.status = "DRAFT";
-
-    // Jangan render ulang saat setiap karakter diketik.
-    // Render ulang saat input selesai (blur/change) agar kursor tidak meloncat
-    // dan nilai seperti "35" tetap bisa diketik langsung.
-    if (input.dataset.field === "uraian" || input.dataset.field === "satuan") {
-        input.classList.add("draft-edited");
-    } else {
-        input.classList.add("draft-edited");
-    }
+    input.classList.add("draft-edited");
 });
 
 document.addEventListener("change", event => {
@@ -1705,7 +1714,8 @@ document.getElementById("btnTambahkanItem").addEventListener("click", () => {
         uraian: norm(addUraian.value),
         volume: num(addVol.value),
         satuan: norm(addSat.value),
-        harga: num(addHarga.value)
+        harga: num(addHarga.value),
+        nominalBlokir: 0
     };
 
     if (!item.kode || !item.akun) return alert("Akun Belanja wajib dipilih.");
