@@ -229,6 +229,8 @@ function buildRows(raw) {
             satuan: hv(row, context.map, ["Satuan", "Sat"]),
             harga: hn(row, context.map, ["Harga Satuan", "Harga"]),
             jumlah: hn(row, context.map, ["Jumlah", "Pagu"]),
+            statusPagu: String(hv(row, context.map, ["Status Pagu", "Status"]) || "Normal").trim().toLowerCase() === "diblokir" ? "Diblokir" : "Normal",
+            nominalBlokir: String(hv(row, context.map, ["Status Pagu", "Status"]) || "Normal").trim().toLowerCase() === "diblokir" ? hn(row, context.map, ["Jumlah", "Pagu"]) : 0,
             tahun: hv(row, context.map, ["Tahun", "Tahun Anggaran"])
         });
     }
@@ -664,7 +666,7 @@ function render() {
         beforeBody.innerHTML = revisiFilteredRows.map(row =>
             '<tr><td>' + esc(row.kode) + '</td><td>' + esc(row.akunLabel) + '</td><td>' + esc(row.uraian) + '</td><td>' +
             esc(row.volume) + '</td><td>' + esc(row.satuan) + '</td><td class="text-end">' +
-            rupiah(row.harga) + '</td><td class="text-end">' + rupiah(row.jumlah) + '</td></tr>'
+            rupiah(row.harga) + '</td><td class="text-end">' + rupiah(row.jumlah) + '</td><td>' + esc(row.statusPagu || "Normal") + '</td></tr>'
         ).join("");
 
         afterBody.innerHTML = revisiFilteredRows.map(row => {
@@ -681,6 +683,7 @@ function render() {
                 '<td><input class="edit-input money numeric-input" type="text" inputmode="decimal" data-row="' + row.rowIndex +
                 '" data-field="harga" value="' + esc(effective.harga) + '" ' + (deleted ? "disabled" : "") + '></td>' +
                 '<td class="text-end fw-bold">' + rupiah(effective.jumlah) + '</td>' +
+                '<td><input class="edit-input money numeric-input" type="text" inputmode="decimal" data-row="' + row.rowIndex + '" data-field="nominalBlokir" value="' + esc(effective.nominalBlokir ?? 0) + '" ' + (deleted ? "disabled" : "") + '></td><td class="text-end">' + rupiah(Math.max(0, num(effective.jumlah) - num(effective.nominalBlokir))) + '</td><td>' + (num(effective.nominalBlokir) >= num(effective.jumlah) && num(effective.jumlah)>0 ? "Diblokir penuh" : num(effective.nominalBlokir)>0 ? "Diblokir sebagian" : "Normal") + '</td>' +
                 '<td class="action-cell"><button class="btn-icon delete" data-action="delete" data-row="' +
                 row.rowIndex + '"><i class="bi ' + (deleted ? "bi-arrow-counterclockwise" : "bi-trash") + '"></i></button></td></tr>';
         }).join("");
@@ -693,7 +696,7 @@ function render() {
             return '<tr class="added"><td>' + esc(item.kode) + '</td><td>' + esc(item.akunLabel || item.akun || '') +
                 '</td><td>' + esc(item.uraian) + '</td><td>' + esc(item.volume) + '</td><td>' + esc(item.satuan) +
                 '</td><td class="text-end">' + rupiah(item.harga) + '</td><td class="text-end fw-bold">' +
-                rupiah(num(item.volume) * num(item.harga)) + '</td><td class="action-cell"><button class="btn-icon delete" data-action="delete-add" data-id="' +
+                rupiah(num(item.volume) * num(item.harga)) + '</td><td><input class="edit-input money numeric-input" type="text" data-add-id="' + esc(item.id) + '" data-field="nominalBlokir" value="' + esc(item.nominalBlokir || 0) + '"></td><td class="text-end">' + rupiah(Math.max(0, num(item.volume)*num(item.harga) - num(item.nominalBlokir))) + '</td><td>' + (num(item.nominalBlokir) >= num(item.volume)*num(item.harga) && num(item.volume)*num(item.harga)>0 ? "Diblokir penuh" : num(item.nominalBlokir)>0 ? "Diblokir sebagian" : "Normal") + '</td><td class="action-cell"><button class="btn-icon delete" data-action="delete-add" data-id="' +
                 esc(item.id) + '"><i class="bi bi-trash"></i></button></td></tr>';
         }
 
@@ -755,36 +758,46 @@ document.addEventListener("input", event => {
     const input = event.target;
     if (!input.matches(".edit-input")) return;
 
+    // Item tambahan tidak memiliki rowIndex sumber; simpan langsung ke additions.
+    if (input.dataset.addId) {
+        const item = revisiDraft.additions.find(x => x.id === input.dataset.addId);
+        if (!item) return;
+        item[input.dataset.field] = num(input.value);
+        revisiDraft.validation = null;
+        revisiDraft.serverTest = null;
+        revisiDraft.status = "DRAFT";
+        input.classList.add("draft-edited");
+        return;
+    }
+
     const row = revisiRows.find(item => item.rowIndex === Number(input.dataset.row));
     if (!row) return;
 
+    const current = effectiveRow(row);
     const change = {
-        volume: effectiveRow(row).volume,
-        satuan: effectiveRow(row).satuan,
-        harga: effectiveRow(row).harga
+        uraian: current.uraian,
+        volume: current.volume,
+        satuan: current.satuan,
+        harga: current.harga,
+        nominalBlokir: current.nominalBlokir ?? 0
     };
-    change[input.dataset.field] = input.dataset.field === "uraian" || input.dataset.field === "satuan" ? input.value : num(input.value);
+    change[input.dataset.field] = input.dataset.field === "uraian" || input.dataset.field === "satuan"
+        ? input.value
+        : num(input.value);
 
-    if (change.uraian === row.uraian && change.volume === row.volume && change.satuan === row.satuan && change.harga === row.harga) {
-        delete revisiDraft.changes[String(row.rowIndex)];
-    } else {
-        revisiDraft.changes[String(row.rowIndex)] = change;
-    }
+    const unchanged = change.uraian === row.uraian &&
+        change.volume === row.volume &&
+        change.satuan === row.satuan &&
+        change.harga === row.harga &&
+        num(change.nominalBlokir) === num(row.nominalBlokir);
 
-    // Setiap perubahan item membuat hasil validasi sebelumnya menjadi kedaluwarsa.
-    // Jangan tampilkan pesan validasi lama yang sudah tidak sesuai dengan draft terbaru.
+    if (unchanged) delete revisiDraft.changes[String(row.rowIndex)];
+    else revisiDraft.changes[String(row.rowIndex)] = change;
+
     revisiDraft.validation = null;
     revisiDraft.serverTest = null;
     revisiDraft.status = "DRAFT";
-
-    // Jangan render ulang saat setiap karakter diketik.
-    // Render ulang saat input selesai (blur/change) agar kursor tidak meloncat
-    // dan nilai seperti "35" tetap bisa diketik langsung.
-    if (input.dataset.field === "uraian" || input.dataset.field === "satuan") {
-        input.classList.add("draft-edited");
-    } else {
-        input.classList.add("draft-edited");
-    }
+    input.classList.add("draft-edited");
 });
 
 document.addEventListener("change", event => {
@@ -1055,6 +1068,8 @@ function validateDraft() {
         if (!norm(row.satuan)) errors.push(label + ": satuan belum diisi.");
         if (num(row.volume) < 0) errors.push(label + ": volume tidak boleh negatif.");
         if (num(row.harga) < 0) errors.push(label + ": harga tidak boleh negatif.");
+        if (num(row.nominalBlokir) < 0) errors.push(label + ": nominal blokir tidak boleh negatif.");
+        if (num(row.nominalBlokir) > num(row.volume) * num(row.harga)) errors.push(label + ": nominal blokir tidak boleh melebihi jumlah pagu item.");
     });
 
     const validatedAt = new Date().toISOString();
@@ -1325,13 +1340,12 @@ function exportRevisionExcel() {
     const entries = comparisonEntries();
     const wb = XLSX.utils.book_new();
 
-    // Format mengikuti CONTOH.xlsx:
-    // 6 kolom SEBELUM + 6 kolom SESUDAH berdampingan.
+    // Delapan kolom per sisi agar nominal dan status blokir ikut terekam.
     const rows = [
-        ["KODE", "Program/Kegiatan/Output/Sub Output/Komponen/Sub Komponen/Akun/Detail", "VOL", "SAT", "HARGA", "JUMLAH",
-         "KODE", "Program/Kegiatan/Output/Sub Output/Komponen/Sub Komponen/Akun/Detail", "VOL", "SAT", "HARGA", "JUMLAH"],
-        [1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 6],
-        ["SEBELUM REVISI", "", "", "", "", "", "SESUDAH REVISI", "", "", "", "", ""]
+        ["KODE", "Uraian", "VOL", "SAT", "HARGA", "JUMLAH", "NOMINAL BLOKIR", "STATUS PAGU",
+         "KODE", "Uraian", "VOL", "SAT", "HARGA", "JUMLAH", "NOMINAL BLOKIR", "STATUS PAGU"],
+        [1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8],
+        ["SEBELUM REVISI", "", "", "", "", "", "", "", "SESUDAH REVISI", "", "", "", "", "", "", ""]
     ];
 
     const exportRows = hierarchyRowsForEntries(entries);
@@ -1339,8 +1353,8 @@ function exportRevisionExcel() {
     exportRows.forEach(entry => {
         if (entry.type === "hierarchy") {
             rows.push([
-                entry.code || "", entry.label || "", "", "", "", entry.before || 0,
-                entry.code || "", entry.label || "", "", "", "", entry.after || 0
+                entry.code || "", entry.label || "", "", "", "", entry.before || 0, "", "",
+                entry.code || "", entry.label || "", "", "", "", entry.after || 0, "", ""
             ]);
             return;
         }
@@ -1348,8 +1362,8 @@ function exportRevisionExcel() {
         if (entry.type === "addition") {
             const x = entry.item;
             rows.push([
-                "", "", "", "", "", "",
-                x.kode, x.uraian || x.akunLabel || x.akun || "", x.volume, x.satuan, num(x.harga), num(x.volume) * num(x.harga)
+                "", "", "", "", "", "", "", "",
+                x.kode, x.uraian || x.akunLabel || x.akun || "", x.volume, x.satuan, num(x.harga), num(x.volume) * num(x.harga), num(x.nominalBlokir), num(x.nominalBlokir) >= num(x.volume) * num(x.harga) && num(x.volume) * num(x.harga) > 0 ? "Diblokir penuh" : num(x.nominalBlokir) > 0 ? "Diblokir sebagian" : "Normal"
             ]);
             return;
         }
@@ -1358,9 +1372,10 @@ function exportRevisionExcel() {
         const effective = effectiveRow(row);
         rows.push([
             row.kode || "", row.uraian || row.akunLabel || "", row.volume ?? "", row.satuan || "",
-            num(row.harga), num(row.jumlah),
+            num(row.harga), num(row.jumlah), num(row.nominalBlokir), row.statusPagu || "Normal",
             effective.kode || "", effective.uraian || effective.akunLabel || "", effective.volume ?? "",
-            effective.satuan || "", num(effective.harga), num(effective.jumlah)
+            effective.satuan || "", num(effective.harga), num(effective.jumlah), num(effective.nominalBlokir),
+            num(effective.nominalBlokir) >= num(effective.jumlah) && num(effective.jumlah) > 0 ? "Diblokir penuh" : num(effective.nominalBlokir) > 0 ? "Diblokir sebagian" : "Normal"
         ]);
     });
 
@@ -1548,7 +1563,9 @@ function buildPrintReport() {
                 "",
                 "",
                 "",
-                rupiah(side === "before" ? entry.before : entry.after)
+                rupiah(side === "before" ? entry.before : entry.after),
+                "",
+                ""
             ];
             type = entry.level === "sub" ? "sub" :
                 entry.level === "account" ? "account" : "component";
@@ -1556,8 +1573,8 @@ function buildPrintReport() {
             const x = entry.item;
             code = x.kode;
             values = side === "after"
-                ? [x.kode, x.uraian || x.akunLabel || x.akun || "", x.volume, x.satuan, rupiah(x.harga), rupiah(num(x.volume) * num(x.harga))]
-                : ["", "", "", "", "", ""];
+                ? [x.kode, x.uraian || x.akunLabel || x.akun || "", x.volume, x.satuan, rupiah(x.harga), rupiah(num(x.volume) * num(x.harga)), rupiah(num(x.nominalBlokir)), num(x.nominalBlokir) >= num(x.volume) * num(x.harga) && num(x.volume) * num(x.harga) > 0 ? "Diblokir penuh" : num(x.nominalBlokir) > 0 ? "Diblokir sebagian" : "Normal"]
+                : ["", "", "", "", "", "", "", ""];
             type = "added";
         } else {
             const row = entry.row;
@@ -1570,7 +1587,9 @@ function buildPrintReport() {
                 data.volume ?? "",
                 data.satuan || "",
                 rupiah(data.harga),
-                rupiah(data.jumlah)
+                rupiah(data.jumlah),
+                rupiah(data.nominalBlokir),
+                num(data.nominalBlokir) >= num(data.jumlah) && num(data.jumlah) > 0 ? "Diblokir penuh" : num(data.nominalBlokir) > 0 ? "Diblokir sebagian" : "Normal"
             ];
             if (side === "after" && revisiDraft.changes[String(row.rowIndex)]) {
                 type = "changed";
@@ -1586,7 +1605,7 @@ function buildPrintReport() {
     const table = (side, label) =>
         '<div class="print-side">' +
         '<h3 class="' + side + '-label">' + label + '</h3>' +
-        '<table><thead><tr><th>KODE</th><th>Program/Kegiatan/Output/Sub Output/Komponen/Sub Komponen/Akun/Detail</th><th>VOL</th><th>SAT</th><th>HARGA</th><th>JUMLAH</th></tr></thead>' +
+        '<table><thead><tr><th>KODE</th><th>Uraian</th><th>VOL</th><th>SAT</th><th>HARGA</th><th>JUMLAH</th><th>NOMINAL BLOKIR</th><th>STATUS PAGU</th></tr></thead>' +
         '<tbody>' + makeRows(side) + '</tbody></table></div>';
 
     const print = document.getElementById("printRevisionReport");
@@ -1699,7 +1718,8 @@ document.getElementById("btnTambahkanItem").addEventListener("click", () => {
         uraian: norm(addUraian.value),
         volume: num(addVol.value),
         satuan: norm(addSat.value),
-        harga: num(addHarga.value)
+        harga: num(addHarga.value),
+        nominalBlokir: 0
     };
 
     if (!item.kode || !item.akun) return alert("Akun Belanja wajib dipilih.");
