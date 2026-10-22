@@ -666,7 +666,7 @@ function render() {
         beforeBody.innerHTML = revisiFilteredRows.map(row =>
             '<tr><td>' + esc(row.kode) + '</td><td>' + esc(row.akunLabel) + '</td><td>' + esc(row.uraian) + '</td><td>' +
             esc(row.volume) + '</td><td>' + esc(row.satuan) + '</td><td class="text-end">' +
-            rupiah(row.harga) + '</td><td class="text-end">' + rupiah(row.jumlah) + '</td></tr>'
+            rupiah(row.harga) + '</td><td class="text-end">' + rupiah(row.jumlah) + '</td><td>' + esc(row.statusPagu || "Normal") + '</td></tr>'
         ).join("");
 
         afterBody.innerHTML = revisiFilteredRows.map(row => {
@@ -683,6 +683,7 @@ function render() {
                 '<td><input class="edit-input money numeric-input" type="text" inputmode="decimal" data-row="' + row.rowIndex +
                 '" data-field="harga" value="' + esc(effective.harga) + '" ' + (deleted ? "disabled" : "") + '></td>' +
                 '<td class="text-end fw-bold">' + rupiah(effective.jumlah) + '</td>' +
+                '<td><input class="edit-input money numeric-input" type="text" inputmode="decimal" data-row="' + row.rowIndex + '" data-field="nominalBlokir" value="' + esc(effective.nominalBlokir ?? 0) + '" ' + (deleted ? "disabled" : "") + '></td><td>' + (num(effective.nominalBlokir) >= num(effective.jumlah) && num(effective.jumlah)>0 ? "Diblokir penuh" : num(effective.nominalBlokir)>0 ? "Diblokir sebagian" : "Normal") + '</td>' +
                 '<td class="action-cell"><button class="btn-icon delete" data-action="delete" data-row="' +
                 row.rowIndex + '"><i class="bi ' + (deleted ? "bi-arrow-counterclockwise" : "bi-trash") + '"></i></button></td></tr>';
         }).join("");
@@ -695,7 +696,7 @@ function render() {
             return '<tr class="added"><td>' + esc(item.kode) + '</td><td>' + esc(item.akunLabel || item.akun || '') +
                 '</td><td>' + esc(item.uraian) + '</td><td>' + esc(item.volume) + '</td><td>' + esc(item.satuan) +
                 '</td><td class="text-end">' + rupiah(item.harga) + '</td><td class="text-end fw-bold">' +
-                rupiah(num(item.volume) * num(item.harga)) + '</td><td class="action-cell"><button class="btn-icon delete" data-action="delete-add" data-id="' +
+                rupiah(num(item.volume) * num(item.harga)) + '</td><td><input class="edit-input money numeric-input" type="text" data-add-id="' + esc(item.id) + '" data-field="nominalBlokir" value="' + esc(item.nominalBlokir || 0) + '"></td><td>' + (num(item.nominalBlokir) >= num(item.volume)*num(item.harga) && num(item.volume)*num(item.harga)>0 ? "Diblokir penuh" : num(item.nominalBlokir)>0 ? "Diblokir sebagian" : "Normal") + '</td><td class="action-cell"><button class="btn-icon delete" data-action="delete-add" data-id="' +
                 esc(item.id) + '"><i class="bi bi-trash"></i></button></td></tr>';
         }
 
