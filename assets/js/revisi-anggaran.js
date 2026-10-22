@@ -1563,7 +1563,9 @@ function buildPrintReport() {
                 "",
                 "",
                 "",
-                rupiah(side === "before" ? entry.before : entry.after)
+                rupiah(side === "before" ? entry.before : entry.after),
+                "",
+                ""
             ];
             type = entry.level === "sub" ? "sub" :
                 entry.level === "account" ? "account" : "component";
@@ -1571,8 +1573,8 @@ function buildPrintReport() {
             const x = entry.item;
             code = x.kode;
             values = side === "after"
-                ? [x.kode, x.uraian || x.akunLabel || x.akun || "", x.volume, x.satuan, rupiah(x.harga), rupiah(num(x.volume) * num(x.harga))]
-                : ["", "", "", "", "", ""];
+                ? [x.kode, x.uraian || x.akunLabel || x.akun || "", x.volume, x.satuan, rupiah(x.harga), rupiah(num(x.volume) * num(x.harga)), rupiah(num(x.nominalBlokir)), num(x.nominalBlokir) >= num(x.volume) * num(x.harga) && num(x.volume) * num(x.harga) > 0 ? "Diblokir penuh" : num(x.nominalBlokir) > 0 ? "Diblokir sebagian" : "Normal"]
+                : ["", "", "", "", "", "", "", ""];
             type = "added";
         } else {
             const row = entry.row;
@@ -1585,7 +1587,9 @@ function buildPrintReport() {
                 data.volume ?? "",
                 data.satuan || "",
                 rupiah(data.harga),
-                rupiah(data.jumlah)
+                rupiah(data.jumlah),
+                rupiah(data.nominalBlokir),
+                num(data.nominalBlokir) >= num(data.jumlah) && num(data.jumlah) > 0 ? "Diblokir penuh" : num(data.nominalBlokir) > 0 ? "Diblokir sebagian" : "Normal"
             ];
             if (side === "after" && revisiDraft.changes[String(row.rowIndex)]) {
                 type = "changed";
@@ -1601,7 +1605,7 @@ function buildPrintReport() {
     const table = (side, label) =>
         '<div class="print-side">' +
         '<h3 class="' + side + '-label">' + label + '</h3>' +
-        '<table><thead><tr><th>KODE</th><th>Program/Kegiatan/Output/Sub Output/Komponen/Sub Komponen/Akun/Detail</th><th>VOL</th><th>SAT</th><th>HARGA</th><th>JUMLAH</th></tr></thead>' +
+        '<table><thead><tr><th>KODE</th><th>Uraian</th><th>VOL</th><th>SAT</th><th>HARGA</th><th>JUMLAH</th><th>NOMINAL BLOKIR</th><th>STATUS PAGU</th></tr></thead>' +
         '<tbody>' + makeRows(side) + '</tbody></table></div>';
 
     const print = document.getElementById("printRevisionReport");
