@@ -229,6 +229,8 @@ function buildRows(raw) {
             satuan: hv(row, context.map, ["Satuan", "Sat"]),
             harga: hn(row, context.map, ["Harga Satuan", "Harga"]),
             jumlah: hn(row, context.map, ["Jumlah", "Pagu"]),
+            statusPagu: String(hv(row, context.map, ["Status Pagu", "Status"]) || "Normal").trim().toLowerCase() === "diblokir" ? "Diblokir" : "Normal",
+            nominalBlokir: String(hv(row, context.map, ["Status Pagu", "Status"]) || "Normal").trim().toLowerCase() === "diblokir" ? hn(row, context.map, ["Jumlah", "Pagu"]) : 0,
             tahun: hv(row, context.map, ["Tahun", "Tahun Anggaran"])
         });
     }
