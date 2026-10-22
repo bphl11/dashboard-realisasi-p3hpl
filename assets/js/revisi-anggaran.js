@@ -1340,13 +1340,12 @@ function exportRevisionExcel() {
     const entries = comparisonEntries();
     const wb = XLSX.utils.book_new();
 
-    // Format mengikuti CONTOH.xlsx:
-    // 6 kolom SEBELUM + 6 kolom SESUDAH berdampingan.
+    // Delapan kolom per sisi agar nominal dan status blokir ikut terekam.
     const rows = [
-        ["KODE", "Program/Kegiatan/Output/Sub Output/Komponen/Sub Komponen/Akun/Detail", "VOL", "SAT", "HARGA", "JUMLAH",
-         "KODE", "Program/Kegiatan/Output/Sub Output/Komponen/Sub Komponen/Akun/Detail", "VOL", "SAT", "HARGA", "JUMLAH"],
-        [1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 6],
-        ["SEBELUM REVISI", "", "", "", "", "", "SESUDAH REVISI", "", "", "", "", ""]
+        ["KODE", "Uraian", "VOL", "SAT", "HARGA", "JUMLAH", "NOMINAL BLOKIR", "STATUS PAGU",
+         "KODE", "Uraian", "VOL", "SAT", "HARGA", "JUMLAH", "NOMINAL BLOKIR", "STATUS PAGU"],
+        [1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8],
+        ["SEBELUM REVISI", "", "", "", "", "", "", "", "SESUDAH REVISI", "", "", "", "", "", "", ""]
     ];
 
     const exportRows = hierarchyRowsForEntries(entries);
@@ -1354,8 +1353,8 @@ function exportRevisionExcel() {
     exportRows.forEach(entry => {
         if (entry.type === "hierarchy") {
             rows.push([
-                entry.code || "", entry.label || "", "", "", "", entry.before || 0,
-                entry.code || "", entry.label || "", "", "", "", entry.after || 0
+                entry.code || "", entry.label || "", "", "", "", entry.before || 0, "", "",
+                entry.code || "", entry.label || "", "", "", "", entry.after || 0, "", ""
             ]);
             return;
         }
@@ -1363,8 +1362,8 @@ function exportRevisionExcel() {
         if (entry.type === "addition") {
             const x = entry.item;
             rows.push([
-                "", "", "", "", "", "",
-                x.kode, x.uraian || x.akunLabel || x.akun || "", x.volume, x.satuan, num(x.harga), num(x.volume) * num(x.harga)
+                "", "", "", "", "", "", "", "",
+                x.kode, x.uraian || x.akunLabel || x.akun || "", x.volume, x.satuan, num(x.harga), num(x.volume) * num(x.harga), num(x.nominalBlokir), num(x.nominalBlokir) >= num(x.volume) * num(x.harga) && num(x.volume) * num(x.harga) > 0 ? "Diblokir penuh" : num(x.nominalBlokir) > 0 ? "Diblokir sebagian" : "Normal"
             ]);
             return;
         }
@@ -1373,9 +1372,10 @@ function exportRevisionExcel() {
         const effective = effectiveRow(row);
         rows.push([
             row.kode || "", row.uraian || row.akunLabel || "", row.volume ?? "", row.satuan || "",
-            num(row.harga), num(row.jumlah),
+            num(row.harga), num(row.jumlah), num(row.nominalBlokir), row.statusPagu || "Normal",
             effective.kode || "", effective.uraian || effective.akunLabel || "", effective.volume ?? "",
-            effective.satuan || "", num(effective.harga), num(effective.jumlah)
+            effective.satuan || "", num(effective.harga), num(effective.jumlah), num(effective.nominalBlokir),
+            num(effective.nominalBlokir) >= num(effective.jumlah) && num(effective.jumlah) > 0 ? "Diblokir penuh" : num(effective.nominalBlokir) > 0 ? "Diblokir sebagian" : "Normal"
         ]);
     });
 
