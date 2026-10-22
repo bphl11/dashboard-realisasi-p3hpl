@@ -763,11 +763,12 @@ document.addEventListener("input", event => {
     const change = {
         volume: effectiveRow(row).volume,
         satuan: effectiveRow(row).satuan,
-        harga: effectiveRow(row).harga
+        harga: effectiveRow(row).harga,
+        nominalBlokir: effectiveRow(row).nominalBlokir ?? 0
     };
     change[input.dataset.field] = input.dataset.field === "uraian" || input.dataset.field === "satuan" ? input.value : num(input.value);
 
-    if (change.uraian === row.uraian && change.volume === row.volume && change.satuan === row.satuan && change.harga === row.harga) {
+    if (change.uraian === row.uraian && change.volume === row.volume && change.satuan === row.satuan && change.harga === row.harga && num(change.nominalBlokir) === num(row.nominalBlokir)) {
         delete revisiDraft.changes[String(row.rowIndex)];
     } else {
         revisiDraft.changes[String(row.rowIndex)] = change;
@@ -1057,6 +1058,8 @@ function validateDraft() {
         if (!norm(row.satuan)) errors.push(label + ": satuan belum diisi.");
         if (num(row.volume) < 0) errors.push(label + ": volume tidak boleh negatif.");
         if (num(row.harga) < 0) errors.push(label + ": harga tidak boleh negatif.");
+        if (num(row.nominalBlokir) < 0) errors.push(label + ": nominal blokir tidak boleh negatif.");
+        if (num(row.nominalBlokir) > num(row.volume) * num(row.harga)) errors.push(label + ": nominal blokir tidak boleh melebihi jumlah pagu item.");
     });
 
     const validatedAt = new Date().toISOString();
